@@ -1,26 +1,24 @@
-# Stage Force 0.1.1
+# Stage Force 0.1.2
 
-## Appearance and layout
+## Signal and noise
 
-- Light/dark toggle on the login screen and in the CRM header, remembered per browser and synchronized across tabs.
-- Dark glass panels over a slowly moving purple/deep-blue gradient with faint mathematical equations.
-- Background animation can be paused; reduced-motion preferences disable it automatically.
-- Larger text, controls and list rows at 100% zoom, with reduced outer margins and a full-width desktop layout.
-- Dark styles cover editing, contacts, links, call queues, email review, warnings and dialogs.
+Literal formula text and CSS background animations have been replaced by a low-resolution canvas field. Branching harmonic streams and sparse pulses represent many social information sources becoming one coherent signal. Soft gradients and translucent panels keep the decoration behind the working interface.
+
+The drawing buffer is capped at 960 x 540 without Retina scaling, and animation drawing is capped at 20 frames per second. Animation stops in hidden tabs, light mode, forced-colors mode, when paused and when reduced motion is requested. No WebGL, canvas blur filter or external graphics library is used. CSS remains responsible for static layout and glass-panel blur; performance depends on the browser and device.
+
+## Follow system appearance
+
+The default is now **System**, following live `prefers-color-scheme` changes. The compact selector also offers **Hell** and **Dunkel**. The old v0.1.1 theme key is ignored because that version persisted its default light setting as well as intentional choices. New explicit choices are remembered and synchronized across tabs.
 
 ## Update
-
-Container: `ghcr.io/progries/stageforce:0.1.1` (amd64 and arm64).
-
-For an existing local checkout:
 
 ```sh
 git pull --ff-only
 docker compose -f compose.local.yaml up -d --build
 ```
 
-Refresh the browser. Existing accounts and imported data stay in the same Docker volume; no migration or account recreation is needed. Do not remove the volume.
+Refresh the browser. Existing users and data remain in the same volume; no migration is required.
 
-For production, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.1.1` in `.env`, then run `docker compose pull` and `docker compose up -d --no-build`.
+Production image: `ghcr.io/progries/stageforce:0.1.2` (amd64 and arm64). Set `CRM_IMAGE` in `.env`, then `docker compose pull` and `docker compose up -d --no-build`.
 
-There are no database or mailbox-integration changes in this release. Browser rendering has not been manually verified in the build environment; verify the appearance at your preferred screen size after updating.
+Browser visuals and device-specific animation performance have not been manually verified in the build environment.

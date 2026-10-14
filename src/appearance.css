@@ -1,7 +1,10 @@
 /* Shared sizing: readable at 100% zoom without a fixed-width desktop canvas. */
 .app-shell,.login-page{position:relative;z-index:1}
 .appearance-controls{display:flex;align-items:center;gap:4px}
-.theme-toggle{border:1px solid var(--line);background:rgba(255,255,255,.35)}
+.theme-picker{display:flex;align-items:center;gap:7px;min-height:38px;padding:0 9px;border:1px solid var(--line);border-radius:9px;background:rgba(255,255,255,.35);color:var(--theme-text-secondary,#667e8f)}
+.theme-picker select{max-width:85px;border:0;background:transparent;color:inherit;font-size:12px;cursor:pointer;min-height:36px;padding:0 2px}
+.theme-picker:focus-within{outline:2px solid var(--action);outline-offset:3px}
+.theme-picker select:focus{outline:none}
 .login-appearance{position:absolute;top:22px;right:24px}
 .login-card{width:440px}
 .entity-actions{flex-wrap:wrap}
@@ -19,22 +22,13 @@
 .note-composer:focus-within{border-color:var(--action)}
 .icon-button:disabled{opacity:.45}
 
-/* The static base is always present; only transform/opacity are animated. */
+/* Static fallback and layout only. Background motion is drawn on canvas. */
 .ambient-backdrop{display:none;position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none;user-select:none}
 [data-theme="dark"]{color-scheme:dark;--ink:#edf1ff;--muted:#a8b4ce;--line:rgba(185,197,239,.16);--action:#b0bfff;--theme-text-strong:#e2e8fb;--theme-text-secondary:#c1cbe1;--theme-text-muted:#a9b5d0;--glass:#151b35}
 [data-theme="light"]{color-scheme:light}
 [data-theme="dark"] body{background:#0b1027;background-image:none}
 [data-theme="dark"] .ambient-backdrop{display:block;background:linear-gradient(135deg,#171137,#101d40 55%,#090e25)}
-.ambient-gradient{position:absolute;inset:-18%;background:radial-gradient(ellipse at 17% 25%,rgba(116,59,191,.56),transparent 48%),radial-gradient(ellipse at 82% 70%,rgba(35,82,172,.55),transparent 48%),radial-gradient(ellipse at 78% 13%,rgba(138,49,142,.19),transparent 44%);animation:ambient-flow 42s ease-in-out infinite alternate}
-.ambient-equation{position:absolute;color:#cad1ff;opacity:.13;font-family:Georgia,"Times New Roman",serif;font-style:italic;font-size:clamp(23px,2.5vw,43px);white-space:nowrap;animation:equation-float 58s ease-in-out infinite alternate}
-.equation-0{left:5%;top:15%;animation-delay:-11s}
-.equation-1{left:61%;top:7%;animation-delay:-29s}
-.equation-2{left:33%;top:49%;animation-delay:-43s}
-.equation-3{left:65%;top:80%;animation-delay:-19s}
-.equation-4{left:8%;top:86%;animation-delay:-36s}
-@keyframes ambient-flow{from{transform:translate3d(-2%,-1%,0) scale(1)}to{transform:translate3d(3%,2%,0) scale(1.06)}}
-@keyframes equation-float{from{transform:translate3d(0,0,0) rotate(-3deg);opacity:.08}to{transform:translate3d(22px,-28px,0) rotate(2deg);opacity:.16}}
-[data-motion="paused"] .ambient-gradient,[data-motion="paused"] .ambient-equation{animation-play-state:paused}
+.ambient-canvas{position:absolute;inset:0;width:100%;height:100%;opacity:.88}
 
 /* Opaque fallbacks; translucency is enabled only with backdrop-filter support. */
 [data-theme="dark"] .glass{border-color:rgba(215,223,255,.15);box-shadow:0 12px 40px #02061335,inset 0 1px 0 #ffffff06}
@@ -52,7 +46,7 @@
 [data-theme="dark"] .nav-item:hover,[data-theme="dark"] .entity-item:hover{background:#c1c4ff0a}
 [data-theme="dark"] .nav-item.active,[data-theme="dark"] .entity-item.selected,[data-theme="dark"] .import-list-item.selected{background:linear-gradient(120deg,#91aaff1b,#ca9bff13);box-shadow:inset 0 0 0 1px #bfccff17}
 [data-theme="dark"] .icon-button:hover{background:#a7b9ff19;color:#eef1ff}
-[data-theme="dark"] .theme-toggle{background:#a9b7ff0e}
+[data-theme="dark"] .theme-picker{background:#a9b7ff0e}
 [data-theme="dark"] .searchbox{background:#080e232e;border-color:var(--line)}
 [data-theme="dark"] input::placeholder,[data-theme="dark"] textarea::placeholder{color:#93a0bf}
 [data-theme="dark"] .filter.active{background:#9d90ee26;color:#d3d9ff}
@@ -90,7 +84,6 @@
  .list-pane{width:100%}.detail-pane{padding:22px 18px}.entity-actions>.button.primary{margin-left:0}.entity-actions>.button{flex:1}
  .entity-hero h2{font-size:25px}.entity-avatar{display:none}.savebar{flex-wrap:wrap}.savebar>span{max-width:none}.savebar>div{margin-left:auto}
  .login-card{padding:30px}.import-modal>header{padding:20px}.import-layout>section{padding:20px}.metadata-list>div{grid-template-columns:90px minmax(0,1fr)}
- .ambient-equation{font-size:24px}.equation-1,.equation-3{left:45%}
 }
-@media(prefers-reduced-motion:reduce){.ambient-gradient,.ambient-equation{animation:none!important}.motion-toggle{display:none}}
+@media(prefers-reduced-motion:reduce){.motion-toggle{display:none}}
 @media(forced-colors:active){.ambient-backdrop{display:none!important}}
