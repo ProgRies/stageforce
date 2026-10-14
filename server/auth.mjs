@@ -1,0 +1,13 @@
+import {randomBytes,scrypt as scryptCb,timingSafeEqual,createHash} from 'node:crypto';
+import {promisify} from 'node:util';
+import {uid,now} from './db.mjs';
+const scrypt=promisify(scryptCb);
+export const hashToken=s=>createHash('sha256').update(s).digest('hex');
+export function email(value){return typeof value==='string'&&value.length<=254&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);}
+export async function hashPassword(password){if(typeof password!=='string'||password.length<12||password.length>1024)throw Error('Passwort: mindestens 12, höchstens 1024 Zeichen.');const salt=randomBytes(16).toString('hex');const hash=await scrypt(password,salt,64,{N:32768,r:8,p:1,maxmem:64*1024*1024});return `${salt}:${hash.toString('hex')}`;}
+export async function verifyPassword(password,stored){if(typeof password!=='string'||password.length>1024)return false;const [salt,hex]=(stored||'00000000000000000000000000000000:'+('00'.repeat(64))).split(':');const hash=await scrypt(password,salt,64,{N:32768,r:8,p:1,maxmem:64*1024*1024});const expected=Buffer.from(hex,'hex');return hash.length===expected.length&&timingSafeEqual(hash,expected);}
+export async function addUser(db,address,name,password){if(!email(address)||!name?.trim())throw Error('Gültige E-Mail und Name erforderlich.');const id=uid(),hash=await hashPassword(password);db.prepare('INSERT INTO users(id,email,name,password_hash,created_at) VALUES(?,?,?,?,?)').run(id,address.trim().toLowerCase(),name.trim(),hash,now());return id;}
+export function publicUser(u){return {id:u.id,email:u.email,name:u.name};}
+export function createSession(db,user){const token=randomBytes(32).toString('base64url'),csrf=randomBytes(24).toString('base64url');db.prepare('INSERT INTO sessions VALUES(?,?,?,?)').run(hashToken(token),user.id,csrf,Date.now()+7*86400000);return{token,csrf,user:publicUser(user)};}
+export function getSession(db,req){const cookies=Object.fromEntries((req.headers.cookie||'').split(';').map(s=>{const p=s.trim().indexOf('=');return p<0?['','']:[s.trim().slice(0,p),s.trim().slice(p+1)];}));const token=cookies.stage_session;if(!token||token.length>128)return null;return db.prepare('SELECT u.id,u.email,u.name,s.csrf,s.token_hash FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>? AND u.active=1').get(hashToken(token),Date.now())||null;}
+export function limited(db,key,max=10,window=600000){const time=Date.now(),hashed=hashToken(key);db.prepare('DELETE FROM login_limits WHERE reset_at<?').run(time);let r=db.prepare('SELECT * FROM login_limits WHERE key=?').get(hashed);if(!r){db.prepare('INSERT INTO login_limits VALUES(?,1,?)').run(hashed,time+window);return false;}db.prepare('UPDATE login_limits SET count=count+1 WHERE key=?').run(hashed);return r.count>=max;}

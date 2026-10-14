@@ -1,0 +1,15 @@
+node_modules/
+dist/
+data/
+private/
+backups/
+.env
+*.sqlite*
+*.db*
+*.eml
+*.csv
+*.xlsx
+*-snapshot.json
+*-report.json
+*.zip
+coverage/

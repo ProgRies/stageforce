@@ -1,0 +1,41 @@
+# Production deployment behind the same Traefik as Glass Board.
+# Initial build: docker compose up -d --build
+# With a published image: docker compose pull && docker compose up -d --no-build
+services:
+  crm:
+    image: ${CRM_IMAGE:-stageforce:0.1.0}
+    build: .
+    restart: unless-stopped
+    init: true
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "3000"
+      DATA_DIR: /app/data
+      APP_URL: https://${CRM_HOST:?Set CRM_HOST in .env}
+    volumes:
+      - storage:/app/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,noexec,nosuid
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: reverse-proxy
+      traefik.http.routers.stage-crm.entrypoints: web-secure
+      traefik.http.routers.stage-crm.rule: "Host(`${CRM_HOST:?Set CRM_HOST in .env}`)"
+      traefik.http.routers.stage-crm.service: stage-crm
+      traefik.http.routers.stage-crm.tls: "true"
+      traefik.http.routers.stage-crm.tls.certresolver: letsencrypt
+      traefik.http.routers.stage-crm.middlewares: default@file
+      traefik.http.services.stage-crm.loadbalancer.server.port: "3000"
+    networks:
+      - default
+      - reverse-proxy
+networks:
+  reverse-proxy:
+    external: true
+volumes:
+  storage:

@@ -1,0 +1,20 @@
+import {readFileSync,writeFileSync} from 'node:fs';
+import {createInterface,emitKeypressEvents} from 'node:readline';
+import {openDB,backupDB} from './db.mjs';
+import {addUser,hashPassword} from './auth.mjs';
+import {migrateSnapshot} from './migrate.mjs';
+import {createOrg,save,addContact} from './crm.mjs';
+import {randomUUID} from 'node:crypto';
+process.umask(0o077);
+async function password(){if(!process.stdin.isTTY){if(!process.argv.includes('--password-stdin'))throw Error('Use an interactive terminal, or explicitly pass --password-stdin with a secret piped via stdin.');let s='';for await(const c of process.stdin)s+=c;return s.replace(/[\r\n]+$/,'');}
+ process.stdout.write('Passwort (mindestens 12 Zeichen): ');emitKeypressEvents(process.stdin);process.stdin.setRawMode(true);process.stdin.resume();return await new Promise((resolve,reject)=>{let value='';const onkey=(s,key={})=>{if(key.ctrl&&key.name==='c'){done();reject(Error('Abgebrochen.'));}else if(key.name==='return'){done();resolve(value);}else if(key.name==='backspace')value=value.slice(0,-1);else if(!key.ctrl&&!key.meta&&s)value+=s;};const done=()=>{process.stdin.off('keypress',onkey);process.stdin.setRawMode(false);process.stdin.pause();process.stdout.write('\n');};process.stdin.on('keypress',onkey);});}
+const db=openDB();try{const [cmd,...args]=process.argv.slice(2);
+ if(cmd==='user:add'){if(!args[0]||!args[1])throw Error('user:add EMAIL "NAME"');await addUser(db,args[0],args[1],await password());console.log('Account erstellt.');}
+ else if(cmd==='user:password'){const user=db.prepare('SELECT id FROM users WHERE email=? COLLATE NOCASE').get(args[0]);if(!user)throw Error('Account nicht gefunden.');db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(await hashPassword(await password()),user.id);db.prepare('DELETE FROM sessions WHERE user_id=?').run(user.id);console.log('Passwort geändert; Sitzungen beendet.');}
+ else if(cmd==='user:disable'){const u=db.prepare('SELECT id FROM users WHERE email=? COLLATE NOCASE').get(args[0]);if(!u)throw Error('Account nicht gefunden.');db.prepare('UPDATE users SET active=0 WHERE id=?').run(u.id);db.prepare('DELETE FROM sessions WHERE user_id=?').run(u.id);console.log('Account deaktiviert.');}
+ else if(cmd==='user:list')console.table(db.prepare('SELECT name,email,active FROM users').all());
+ else if(cmd==='migrate'){if(!args[0])throw Error('migrate /path/to/snapshot.json [report.json]');const report=migrateSnapshot(db,JSON.parse(readFileSync(args[0],'utf8')));if(args[1])writeFileSync(args[1],JSON.stringify(report,null,2),{mode:0o600});console.log(JSON.stringify({...report,warnings:report.warnings.length},null,2));}
+ else if(cmd==='backup'){if(!args[0])throw Error('backup /path/to/backup.sqlite');await backupDB(db,args[0]);console.log('Konsistente SQLite-Sicherung erstellt.');}
+ else if(cmd==='demo'){if(db.prepare('SELECT count(*) AS n FROM organisations').get().n)throw Error('Demo benötigt eine leere Datenbank.');for(let i=1;i<=45;i++){const e=createOrg(db,null,`${i<=25?'Beispielstadt':'Beispielverein'} ${String(i).padStart(2,'0')} · DEMO`);db.prepare('UPDATE organisations SET status=?,phase=?,last_contact=?,summary=? WHERE id=?').run(i<=25?'Kunde':'Lead',i<=25?'Gewonnen':i<=35?'Im Gespräch':'Unbearbeitet','2025-01-15','Fiktiver Datensatz zum Testen. Keine echte Organisation.',e.id);addContact(db,e.id,{name:'Demo Kontakt',e_mails:[`kontakt${i}@example.invalid`],telefone:['+49 000 000000']},true);}const {reindex}=await import('./db.mjs');for(const r of db.prepare('SELECT id FROM organisations').all())reindex(db,r.id);console.log('45 fiktive Organisationen erstellt.');}
+ else{console.log('Befehle: user:add EMAIL "NAME", user:password EMAIL, user:disable EMAIL, user:list, migrate SNAPSHOT [REPORT], backup FILE, demo');}
+}catch(e){console.error(e.message);process.exitCode=1;}finally{db.close();}

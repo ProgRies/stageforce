@@ -1,0 +1,3 @@
+import {writeFileSync} from 'node:fs';
+const path=process.argv[2];if(!path||!path.endsWith('.eml'))throw Error('Usage: node scripts/create-demo-email.mjs /path/demo.eml');
+writeFileSync(path,`From: Demo Kontakt <kontakt1@example.invalid>\r\nTo: demo@example.test\r\nMessage-ID: <stage-crm-demo-v1@example.invalid>\r\nDate: ${new Date().toUTCString()}\r\nSubject: DEMO: Unser naechster Termin\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nGuten Tag,\r\n\r\nwir moechten Stage naechste Woche gemeinsam besprechen.\r\nBitte rufen Sie uns am Dienstag an.\r\n\r\n> Dies ist ein altes Zitat und muss nicht erneut ins CRM.\r\n\r\n-- \r\nDemo Kontakt\r\nFiktive Organisation\r\n`,{mode:0o600});console.log('Fiktive Test-E-Mail erstellt.');
