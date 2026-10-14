@@ -12,6 +12,21 @@ function setup(){const db=openDB(':memory:');for(const name of['alex','bea'])db.
 async function mail({sender='Pat Test <pat@customer.test>',to='alex@our-team.test',cc='',date='Tue, 13 Oct 2026 10:00:00 +0200',id='one',body='Agreed.'}={}){return parseEmail(Buffer.from(`From: ${sender}\r\nTo: ${to}\r\nCc: ${cc}\r\nMessage-ID: <${id}@example.test>\r\nDate: ${date}\r\nSubject: Message ${id}\r\n\r\n${body}`),'alex@our-team.test');}
 const confirm=(p,org,extra={})=>({importId:p.id,id:org.id,version:org.version,date:'2026-10-13',body:p.cleaned,...extra});
 
+test('legacy generic contacts remain visible and participate in email placement without reclassifying notes',async()=>{const{db,user}=setup();try{
+ const org=createOrg(db,user,'Legacy example');
+ addActivity(db,org.id,null,{type:'Kontakt',date:'2026-02-11',text:'Call followed by email',contacted:true});
+ addActivity(db,org.id,null,{type:'Notiz / Status',text:'Undated historical information'});
+ const before=JSON.stringify(db.prepare('SELECT * FROM activities ORDER BY id').all());
+ assert.equal(history(db,org.id,0,'communication').items[0].art,'Kontakt');
+ assert.equal(history(db,org.id,0,'communication').total,1);
+ assert.equal(history(db,org.id,0,'internal').items[0].art,'Notiz / Status');
+ const p=stageImport(db,user,await mail());
+ const position=timelinePosition(db,user,{importId:p.id,id:org.id,date:'2026-02-10'});
+ assert.equal(position.position,2);assert.equal(position.before.art,'Kontakt');
+ assert.equal(JSON.stringify(db.prepare('SELECT * FROM activities ORDER BY id').all()),before);
+ assert.equal(entity(db,org.id).values[15],'2026-02-11');
+ }finally{db.close();}});
+
 test('wizard suggests exact sender, handles shared agency addresses, and never uses public mailbox domains as company evidence',async()=>{const{db,user}=setup();try{
  const a=createOrg(db,user,'Customer'),b=createOrg(db,user,'Other');addContact(db,a.id,{e_mails:['pat@customer.test']});addContact(db,b.id,{e_mails:['cc@other.test']});
  let p=stageImport(db,user,await mail({cc:'cc@other.test'}));assert.equal(p.bestId,a.id);assert.equal(p.candidates[0].reason,'E-Mail-Adresse bekannt');

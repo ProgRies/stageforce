@@ -1,26 +1,14 @@
-# Stage Force 0.1.7
+# Stage Force 0.1.8
 
-Email review now uses three steps for both Gmail and `.eml`: organisation, contacts, and chronological placement. Confirm a suggested organisation with **Stimmt**, or create a new Lead inside the wizard. Select multiple contacts with checkboxes. Preview the email between neighbouring events, then save everything together.
+Historical spreadsheet entries stored as **Kontakt** now appear in the organisation's communication timeline and in email placement previews. They retain their original dates, wording and generic contact label; the app does not guess whether they were phone calls or emails.
 
-Organisation pages now focus on name, Kunde/Lead status and a newest-first email/call timeline. Contacts and supporting details live in a compact right-hand column. Emails expand on click; calls have a small reached/not-reached form with optional notes and follow-up. Internal notes and edit history remain available under **Mehr Details**.
-
-Kunde means confirmed obligation to pay. Free usage and agency status do not automatically qualify. Historical unclear/former statuses are retained and flagged for human review. [Workflow details](https://github.com/ProgRies/stageforce/blob/main/docs/email-wizard.md).
+This fixes a display regression from 0.1.7. No database migration, repeat import or contact-date rewrite is needed. Undated internal notes remain under **Mehr Details**. Recovering dates from spreadsheet revisions is a separate, private review process; no historical customer data is included in this release.
 
 ## Update
-
-Back up first:
-
-```sh
-docker compose -f compose.local.yaml exec crm node server/cli.mjs backup /app/data/backups/before-0.1.7.sqlite
-```
-
-Then update and rebuild:
 
 ```sh
 git pull --ff-only
 docker compose -f compose.local.yaml up -d --build
 ```
 
-Refresh your browser. Schema 4 adds one table automatically; no repeat spreadsheet import. An older app needs the pre-upgrade backup to roll back. No email-writing functionality has been introduced.
-
-43 automated tests, type checking and production build pass locally. Interactive browser verification remains outstanding. The versioned image is available only after successful publication: `ghcr.io/progries/stageforce:0.1.7`.
+Refresh the browser afterward. 44 automated tests, type checking and the production build pass locally. Interactive browser verification remains outstanding. The versioned image is available after successful publication: `ghcr.io/progries/stageforce:0.1.8`.
