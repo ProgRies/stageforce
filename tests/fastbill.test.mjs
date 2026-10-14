@@ -82,7 +82,7 @@ test('FastBill HTTP routes require signed-in session, origin and CSRF; no arbitr
  }finally{await new Promise(r=>server.close(r));db.close();}});
 
 test('version 2 upgrades preserve CRM and add empty import tables',()=>{const dir=mkdtempSync(join(tmpdir(),'stage-fastbill-'));let db=openDB(join(dir,'crm.sqlite'));try{
- const o=createOrg(db,null,'Example');db.exec('DROP TABLE fastbill_rows; DROP TABLE fastbill_batches; DROP TABLE fastbill_decisions; DROP TABLE fastbill_mappings; DELETE FROM schema_versions WHERE version=3; PRAGMA user_version=2');db.close();db=openDB(join(dir,'crm.sqlite'));assert.equal(db.prepare('PRAGMA user_version').get().user_version,3);assert.equal(entity(db,o.id).values[1],'Example');assert.equal(db.prepare('SELECT count(*) n FROM fastbill_batches').get().n,0);assert.equal(db.prepare('PRAGMA foreign_key_check').all().length,0);
+ const o=createOrg(db,null,'Example');db.exec('DROP TABLE fastbill_rows; DROP TABLE fastbill_batches; DROP TABLE fastbill_decisions; DROP TABLE fastbill_mappings; DELETE FROM schema_versions WHERE version=3; PRAGMA user_version=2');db.close();db=openDB(join(dir,'crm.sqlite'));assert.equal(db.prepare('PRAGMA user_version').get().user_version,4);assert.equal(entity(db,o.id).values[1],'Example');assert.equal(db.prepare('SELECT count(*) n FROM fastbill_batches').get().n,0);assert.equal(db.prepare('PRAGMA foreign_key_check').all().length,0);
  }finally{db.close();rmSync(dir,{recursive:true,force:true});}});
 
 test('reviewer can append addresses to an existing contact without overwriting its name or creating a duplicate',()=>{const{db,user}=setup();try{

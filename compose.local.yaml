@@ -1,7 +1,7 @@
 # Isolated local demo. Never use this configuration on a public server.
 services:
   crm:
-    image: stageforce:0.1.6
+    image: stageforce:0.1.7
     build: .
     restart: unless-stopped
     init: true

@@ -76,7 +76,7 @@ test('version 1 database upgrades additively and retains users and organisations
  try{
   const id=await addUser(db,'alex@example.test','Alex',password),org=createOrg(db,{id},'Existing customer');
   db.exec('DROP TABLE gmail_keys; DELETE FROM schema_versions WHERE version=2; PRAGMA user_version=1');db.close();db=openDB(path);
-  assert.equal(db.prepare('PRAGMA user_version').get().user_version,3);
+  assert.equal(db.prepare('PRAGMA user_version').get().user_version,4);
   assert.equal(db.prepare('SELECT name FROM organisations WHERE id=?').get(org.id).name,'Existing customer');
   assert.equal(db.prepare('SELECT email FROM users WHERE id=?').get(id).email,'alex@example.test');
   assert.equal(db.prepare('SELECT count(*) n FROM gmail_keys').get().n,0);assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(),[]);

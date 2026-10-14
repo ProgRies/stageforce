@@ -39,3 +39,6 @@ CREATE INDEX IF NOT EXISTS fastbill_rows_batch ON fastbill_rows(batch_id,status)
 CREATE TABLE IF NOT EXISTS fastbill_decisions(scope TEXT NOT NULL,fingerprint TEXT NOT NULL,decision TEXT NOT NULL CHECK(decision IN ('applied','ignored')),organisation_id TEXT REFERENCES organisations(id),user_id TEXT NOT NULL REFERENCES users(id),created_at TEXT NOT NULL,note TEXT NOT NULL,PRIMARY KEY(scope,fingerprint));
 CREATE TABLE IF NOT EXISTS fastbill_mappings(scope TEXT NOT NULL,source_key TEXT NOT NULL,organisation_id TEXT NOT NULL REFERENCES organisations(id),PRIMARY KEY(scope,source_key,organisation_id));
 INSERT OR IGNORE INTO schema_versions VALUES(3,datetime('now'));
+
+CREATE TABLE IF NOT EXISTS activity_contacts(activity_id TEXT NOT NULL REFERENCES activities(id) ON DELETE CASCADE,contact_id TEXT NOT NULL REFERENCES contacts(id),PRIMARY KEY(activity_id,contact_id));
+INSERT OR IGNORE INTO schema_versions VALUES(4,datetime('now'));

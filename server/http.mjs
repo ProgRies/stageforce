@@ -4,7 +4,7 @@ import {resolve,extname} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {openDB} from './db.mjs';
 import {getSession,verifyPassword,createSession,limited,publicUser} from './auth.mjs';
-import {Problem,listData,entity,history,search,save,createOrg,contactSave,linkSave,stageImport,importPreview,confirmImport} from './crm.mjs';
+import {Problem,listData,entity,history,search,save,createOrg,contactSave,linkSave,stageImport,importPreview,confirmImport,timelinePosition} from './crm.mjs';
 import {inspectCSV,csvRecords,stageFastbill,fastbillBatches,fastbillRows,fastbillPreview,decideFastbill,deleteFastbillBatch,fetchFastbillPage} from './fastbill.mjs';
 import {parseEmail} from './email.mjs';
 import {gmailStatus,createGmailKey,revokeGmailKey,authorizeGmail,selectedGmailMessage,stageGmailMessage} from './gmail.mjs';
@@ -70,8 +70,8 @@ export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:300
    case 'gmailCreate':data={...createGmailKey(db,session),publicHttps:secure};break;
    case 'gmailRevoke':revokeGmailKey(db,session);data={...gmailStatus(db,session),publicHttps:secure};break;
    case 'load':data=listData(db);break;
-   case 'detail':data={entity:entity(db,b.id,true),history:history(db,b.id)};break;
-   case 'history':data=history(db,b.id,b.offset);break;
+   case 'detail':data={entity:entity(db,b.id,true),history:history(db,b.id,0,b.historyKind||'all')};break;
+   case 'history':data=history(db,b.id,b.offset,b.kind||'all');break;
    case 'search':data={ids:search(db,b.query)};break;
    case 'save':data=save(db,session,b);break;
    case 'create':data={entity:createOrg(db,session,b.name)};break;
@@ -79,9 +79,10 @@ export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:300
    case 'link':data=linkSave(db,session,b);break;
    case 'imports':data={items:db.prepare('SELECT id,payload_json FROM email_imports WHERE user_id=? AND expires_at>? ORDER BY rowid DESC').all(session.id,Date.now()).map(r=>{const p=JSON.parse(r.payload_json);return{id:r.id,subject:p.subject,sentAt:p.sentAt,direction:p.direction};})};break;
    case 'importPreview':data=importPreview(db,session,b.importId);break;
+   case 'importPosition':data=timelinePosition(db,session,b);break;
    case 'importConfirm':data=confirmImport(db,session,b);break;
    case 'importDelete':db.prepare('DELETE FROM email_imports WHERE id=? AND user_id=?').run(b.importId,session.id);data={};break;
-   case 'message':{const m=db.prepare('SELECT * FROM messages WHERE id=?').get(b.id);if(!m)throw new Problem('Nachricht nicht gefunden.',404);data={body:m.body,sources:db.prepare('SELECT mailbox,source_url FROM message_sources WHERE message_id=?').all(b.id)};break;}
+   case 'message':{const m=db.prepare('SELECT * FROM messages WHERE id=?').get(b.id);if(!m)throw new Problem('Nachricht nicht gefunden.',404);data={body:m.body,subject:m.subject,direction:m.direction,sentAt:m.sent_at,sender:JSON.parse(m.sender_json),recipients:JSON.parse(m.recipients_json),contacts:db.prepare('SELECT c.id,c.name FROM contacts c JOIN activity_contacts ac ON ac.contact_id=c.id JOIN activities a ON a.id=ac.activity_id WHERE a.message_id=?').all(m.id),sources:db.prepare('SELECT mailbox,source_url FROM message_sources WHERE message_id=?').all(b.id)};break;}
    default:throw new Problem('Unbekannte Aktion.');
   }return success(res,data);
  }

@@ -1,25 +1,26 @@
-# Stage Force 0.1.6
+# Stage Force 0.1.7
 
-## FastBill import review
+Email review now uses three steps for both Gmail and `.eml`: organisation, contacts, and chronological placement. Confirm a suggested organisation with **Stimmt**, or create a new Lead inside the wizard. Select multiple contacts with checkboxes. Preview the email between neighbouring events, then save everything together.
 
-The sidebar now opens **Importe**, with E-Mail and FastBill sources. FastBill customer CSV exports and optional invoice context go through column review, organisation matching and explicit field/contact confirmation. Unrelated records can be skipped. Repeated exports remember confirmed mappings and unchanged skip decisions; changed source data returns for review.
+Organisation pages now focus on name, Kunde/Lead status and a newest-first email/call timeline. Contacts and supporting details live in a compact right-hand column. Emails expand on click; calls have a small reached/not-reached form with optional notes and follow-up. Internal notes and edit history remain available under **Mehr Details**.
 
-The optional API adapter works from local Docker using outgoing HTTPS. Fetch customers, contacts or invoice context in pages of 100. Only `customer.get`, `contact.get` and `invoice.get` are available. Credentials remain transient; billing data is not synchronized automatically. No email or FastBill sending/write actions are implemented.
-
-Missing-phone/link checks update after confirmed enrichment. Existing manual review notes and customer/contact dates are preserved. Internal customer IDs and customer numbers are separate. Customer URLs are not guessed. [Instructions](https://github.com/ProgRies/stageforce/blob/main/docs/fastbill-import.md).
+Kunde means confirmed obligation to pay. Free usage and agency status do not automatically qualify. Historical unclear/former statuses are retained and flagged for human review. [Workflow details](https://github.com/ProgRies/stageforce/blob/main/docs/email-wizard.md).
 
 ## Update
 
-Back up first, then update and rebuild:
+Back up first:
 
 ```sh
-docker compose -f compose.local.yaml exec crm node server/cli.mjs backup /app/data/backups/before-0.1.6.sqlite
+docker compose -f compose.local.yaml exec crm node server/cli.mjs backup /app/data/backups/before-0.1.7.sqlite
+```
+
+Then update and rebuild:
+
+```sh
 git pull --ff-only
 docker compose -f compose.local.yaml up -d --build
 ```
 
-Refresh your browser. Schema 3 adds four import tables automatically. Existing organisations, users and history remain intact. Do not repeat the initial spreadsheet import. Rollback to an older version requires the pre-upgrade backup.
+Refresh your browser. Schema 4 adds one table automatically; no repeat spreadsheet import. An older app needs the pre-upgrade backup to roll back. No email-writing functionality has been introduced.
 
-Validated with automated service/parser/security tests, TypeScript and production build. Live FastBill export/API compatibility and interactive browser testing remain outstanding. All fixtures are fictional.
-
-The versioned image is available only after successful release publication: `ghcr.io/progries/stageforce:0.1.6`.
+43 automated tests, type checking and production build pass locally. Interactive browser verification remains outstanding. The versioned image is available only after successful publication: `ghcr.io/progries/stageforce:0.1.7`.

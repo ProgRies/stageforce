@@ -1,6 +1,6 @@
 # Database and migration
 
-`server/schema.sql` is the executable schema. Tables use foreign keys and stable text IDs. `PRAGMA user_version` tracks the schema version; future application versions must introduce an explicit versioned migration before changing a deployed database. An older binary refuses a newer schema. Current version: 3. Version 2 added `gmail_keys`; version 3 adds the four FastBill import tables below. Startup applies these additive changes in a transaction and preserves existing CRM data. Back up before upgrading. Older binaries refuse newer databases; rollback requires restoring the pre-upgrade backup.
+`server/schema.sql` is the executable schema. Tables use foreign keys and stable text IDs. `PRAGMA user_version` tracks the schema version; future application versions must introduce an explicit versioned migration before changing a deployed database. An older binary refuses a newer schema. Current version: 4. Version 2 added `gmail_keys`; version 3 added the four FastBill import tables below; version 4 adds `activity_contacts`. Startup applies these additive changes in a transaction and preserves existing CRM data. Back up before upgrading. Older binaries refuse newer databases; rollback requires restoring the pre-upgrade backup.
 
 | Table | Purpose / relationship |
 | --- | --- |
@@ -9,6 +9,7 @@
 | organisation_contacts | Organisation ↔ contact membership; at most one primary contact per organisation |
 | contact_addresses | Multiple email addresses/phone numbers per contact; primary address ordered first |
 | activities | One interaction/note per row; linked organisation and optional signed-in author/message |
+| activity_contacts | Explicitly reviewed email activity ↔ contact associations; no backfill/inferred links for old messages |
 | messages | Approved text, subject, participants, sent timestamp, direction, attachment metadata and unique deduplication key |
 | message_sources | Mailbox owner and optional original URL; multiple colleagues may reference one message |
 | followups | Next action and due date; at most one current follow-up per organisation in v0.1 |
@@ -37,3 +38,5 @@ The relationship tab is canonical; mirror JSON entries are folded into the same 
 Validate each private snapshot by comparing organisation, contact, activity and relationship counts, checking foreign-key integrity and reviewing the private migration report. Structural verification does not establish business accuracy.
 
 The UI loads a compact organisation list and queries the full-text index for deeper matches. History is paged in batches of 40; email bodies are fetched on expansion. No attachments or mailbox mirror are stored. Search-index updates and business writes share the same transaction.
+
+Communication history and internal notes are separately filtered and paginated. Both use the reviewed event date, then the original email timestamp when present, then recording order. The wizard computes the proposed position from all communication rows, not just the first page. Unknown dates remain unknown; calls without a time sort after timed emails on the same date. Email import explicitly whitelists status, phase and follow-up changes, so it cannot override the last-contact date directly.

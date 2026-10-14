@@ -23,7 +23,7 @@ export function phone(e: Entity) { const primary=text(e,14).trim();if(primary.re
 export const REVIEW_CATEGORIES = [
   {id:"fastbill",label:"FastBill-Link",source:"field",description:"Fehlender oder ungültiger Link bei Kunden, ehemaligen Kunden oder offenen Angeboten."},
   {id:"phone",label:"Telefonnummer",source:"field",description:"Keine verwendbare Telefonnummer hinterlegt."},
-  {id:"status",label:"Status widersprüchlich",source:"field",description:"Als Lead geführt, aber mit der Vertriebsphase Gewonnen."},
+  {id:"status",label:"Kundenstatus prüfen",source:"field",description:"Zahlungspflicht bei gewonnenen Leads oder bisher unklarem/ehemaligem Kundenstatus prüfen."},
   {id:"note-billing",label:"Vertrag & Rechnung",source:"note",description:"Prüfnotizen zu Vertragspartnern, Rechnungsempfängern und Abrechnung."},
   {id:"note-relationship",label:"Organisation & Verknüpfung",source:"note",description:"Prüfnotizen zu Agenturen, Zuordnung und möglichen Dubletten."},
   {id:"note-status",label:"Kundenstatus & Nutzung",source:"note",description:"Prüfnotizen zu Kundenstatus, Angeboten, Tests und Nutzung."},
@@ -49,7 +49,8 @@ export function reviewFindings(e:Entity):ReviewFinding[]{
   }
   if(needsFastbill(e)&&!fastbillURL(e.values[3]))out.push({source:'field',categories:['fastbill'],text:text(e,3)?'FastBill-Link ist nicht gültig.':'FastBill-Link fehlt.'});
   if(!phone(e))out.push({source:'field',categories:['phone'],text:'Telefonnummer fehlt.'});
-  if(text(e,9)==='Lead'&&text(e,10)==='Gewonnen')out.push({source:'field',categories:['status'],text:'Kundenstatus und Vertriebsphase widersprechen sich.'});
+  if(!['Kunde','Lead'].includes(text(e,9)))out.push({source:'field',categories:['status'],text:'Zahlenden Kundenstatus prüfen; bisher: '+(text(e,9)||'unbekannt')+'.'});
+  if(text(e,9)==='Lead'&&text(e,10)==='Gewonnen')out.push({source:'field',categories:['status'],text:'Als Lead mit Phase Gewonnen geführt: Zahlungspflicht prüfen.'});
   return out;
 }
 export function findingsFor(findings:ReviewFinding[],category:ReviewSelection){return category==='all'?findings:findings.filter(f=>f.categories.includes(category));}
