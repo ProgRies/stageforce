@@ -49,3 +49,16 @@ Docker builds, login and restart persistence are tested by GitHub Actions before
 ## Gmail add-on
 
 See [gmail-setup.md](gmail-setup.md). Google must reach the HTTPS hostname and `/api/integrations/gmail/` without a browser-only proxy login. The application still authenticates each request with a dedicated key. Proxy access logs must not log Authorization headers or request bodies. No CORS relaxation is needed. Google credentials are never placed in the CRM container.
+
+## Move local work to the server
+
+Use the full local SQLite database after cleanup, not the original spreadsheet snapshot. The backup preserves organisations, contacts, history, approved email text, links, accounts and password hashes. Pending reviews still expire after 24 hours; confirm relevant work before the move.
+
+At cutover, stop making local edits and take the final consistent backup from PowerShell in the repository directory:
+
+```powershell
+docker compose -f compose.local.yaml exec crm node server/cli.mjs backup /app/data/transfer.sqlite
+docker compose -f compose.local.yaml cp crm:/app/data/transfer.sqlite ./stageforce-transfer.sqlite
+```
+
+Give that private backup to the server administrator through your normal secure transfer method. Do not commit or publicly upload it. The administrator should use the stopped-instance restore procedure above with this file and the same or a newer application version. Confirm login, representative recent edits and history on the HTTPS site, then continue working only on that hosted instance. Keep the local copy as a fallback until the transfer is verified. Do not re-run the spreadsheet migration or create replacement accounts after restoring the database.

@@ -1,24 +1,24 @@
-# Stage Force 0.1.4
+# Stage Force 0.1.5
 
-## Review by issue type
+## Searchable organisation picker
 
-**Prüfen** now shows issue categories in the middle panel and affected organisations on the right. Automatic checks are separated from topics in existing manual-review notes. Open a record, make corrections, and return to the same filtered list. Counts update after saving.
+Email review now has one organisation field instead of a separate search box and native dropdown. Typing immediately opens filtered results; choosing a result displays its name. The search resets for each opened message, so text from a previous email cannot appear beside another suggested organisation.
 
-Counts represent distinct organisations, not individual tasks. Groups may overlap. Notes are routed by keywords without being rewritten, resolved or treated as verified facts; unclassified notes stay visible. No new missing-field requirements or automatic bulk changes were added.
+Names, cities and primary email addresses can be searched. Arrow keys and Enter select; Escape closes. Editing the search clears the previous assignment until a result is explicitly chosen. Confirmation also waits for that selected organisation's details, preventing use of stale detail state. Out-of-order preview responses are ignored.
 
-Secondary contact numbers now count consistently in both the organisation list and detail view, avoiding false missing-phone warnings when the main number is incomplete.
+The existing batch picker accepts up to 10 `.eml` files, with individual confirmation and the existing 30-message/24-hour pending queue. No full-mailbox, clipboard or FastBill CSV importer was added.
 
-## Update and test locally
+## Keep local cleanup when deploying
+
+New [deployment instructions](https://github.com/ProgRies/stageforce/blob/main/docs/deployment.md#move-local-work-to-the-server) describe moving the complete SQLite backup, including accounts and confirmed changes. No repeat spreadsheet import is needed.
+
+## Update
 
 ```sh
 git pull --ff-only
 docker compose -f compose.local.yaml up -d --build
 ```
 
-Refresh the browser and open **Prüfen**. No data reimport or new database schema migration is needed from 0.1.3. Back up regularly; when upgrading from 0.1.2 or earlier, first follow the schema-upgrade backup instructions in [Gmail setup](https://github.com/ProgRies/stageforce/blob/main/docs/gmail-setup.md).
+Refresh the browser afterward. No schema migration from 0.1.3/0.1.4. Validation: existing automated service tests, TypeScript and production build; interactive browser testing remains outstanding.
 
-The existing Gmail and file-import flows remain available. FastBill CSV import is not included in this version.
-
-Validation: 20 automated tests, TypeScript check and production build. New tests cover overlapping counts, preservation and fallback grouping of notes, field correction versus explicit note resolution, and consistent phone checks. Browser visual QA has not been performed in the development environment.
-
-The versioned container is available only after successful release publication: `ghcr.io/progries/stageforce:0.1.4`.
+The versioned image is available after successful release publication: `ghcr.io/progries/stageforce:0.1.5`.

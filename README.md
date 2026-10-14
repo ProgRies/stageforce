@@ -1,4 +1,4 @@
-# Stage Force · 0.1.4
+# Stage Force · 0.1.5
 
 A self-hosted, shared CRM for a small team. The existing frosted desktop interface now uses SQLite on your server. It does not need Google Sheets, ChatGPT, an AI provider, Gmail credentials or a mail-sending service.
 
@@ -43,7 +43,7 @@ docker compose up -d --build
 docker compose exec crm node server/cli.mjs user:add you@example.com "Your Name"
 ```
 
-The startup command builds the source locally. `.env` selects the local `stageforce:0.1.4` image; no registry account is required. A versioned registry image is available only after a successful release workflow. Open the HTTPS address and log in after creating the account. No default password, shared password or public registration exists.
+The startup command builds the source locally. `.env` selects the local `stageforce:0.1.5` image; no registry account is required. A versioned registry image is available only after a successful release workflow. Open the HTTPS address and log in after creating the account. No default password, shared password or public registration exists.
 
 All colleagues have equal CRM read/edit access. Each action uses their individual account. Account management is through CLI only. Local accounts do not grant access to a colleague's mailbox.
 
@@ -116,3 +116,5 @@ The selected-message add-on and private test installation steps are in [docs/gma
 ## Review by issue type
 
 **Prüfen** groups affected organisations by automatic field checks and topics in existing review notes. Pick a category, search/filter its organisations, open a record, edit it, then return to the same list. Category counts update after saving. Counts represent distinct organisations and can overlap between groups. Note grouping never resolves or rewrites a note. See [review workflow](docs/review.md).
+
+Local cleanup can be moved to production using a full SQLite backup, including accounts and confirmed changes. See [moving local work to the server](docs/deployment.md#move-local-work-to-the-server). Do not repeat the original spreadsheet import after restoring that database.

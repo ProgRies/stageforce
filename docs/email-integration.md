@@ -26,3 +26,9 @@ Quote removal recognizes explicit quote lines, common original-message separator
 A sent reply is not automatically captured. Import it from Sent, or add a manual `E-Mail gesendet` activity. A previously imported received email remains unchanged. Identical RFC Message-ID values deduplicate across colleagues; messages lacking that header use a deterministic fingerprint of original participants, date, subject and body. Missing headers, changed re-exports or reused Message-IDs can need manual checking; this is not semantic duplicate detection. An email already assigned to another organisation cannot be silently reassigned through import.
 
 Keeping review and confirmation in the CRM allows another mail-client adapter or `.eml` files to replace Gmail without changing the business tables. Any future local LLM must offer suggestions within the review step, not bypass confirmation.
+
+## Organisation picker and batches
+
+The review uses a single searchable organisation picker. Typing opens and narrows results immediately; search supports organisation names, cities and primary email addresses. Picking a result displays that organisation name. Typing a new search clears the previous assignment until another result is explicitly selected. Arrow keys and Enter choose a result; Escape closes the list. Opening a different message resets the picker to that message’s own suggested assignment.
+
+Up to 10 `.eml` files can be selected together; the queue holds at most 30 pending imports, expiring after 24 hours. Every message still requires individual review and confirmation. This is selected-message intake, not a full-mailbox importer. Clipboard-text and MBOX imports are not implemented.
