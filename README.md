@@ -1,8 +1,11 @@
-# Stage Force · 0.1.0
+# Stage Force · 0.1.1
 
 A self-hosted, shared CRM for a small team. The existing frosted desktop interface now uses SQLite on your server. It does not need Google Sheets, ChatGPT, an AI provider, Gmail credentials or a mail-sending service.
 
 ## Included
+
+- Light/dark appearance switch, remembered per browser; dark mode includes a gentle animated gradient and decorative equations. Pause control and reduced-motion support are built in.
+- Larger working text and controls, with a full-width responsive desktop layout.
 
 - Individual local accounts; CLI account creation, password changes and disabling.
 - Organisation search across master data, contacts, notes, email bodies and source references.
@@ -40,7 +43,7 @@ docker compose up -d --build
 docker compose exec crm node server/cli.mjs user:add you@example.com "Your Name"
 ```
 
-The startup command builds the source locally. `.env` selects the local `stageforce:0.1.0` image; no registry account is required. A versioned registry image is available only after a successful release workflow. Open the HTTPS address and log in after creating the account. No default password, shared password or public registration exists.
+The startup command builds the source locally. `.env` selects the local `stageforce:0.1.1` image; no registry account is required. A versioned registry image is available only after a successful release workflow. Open the HTTPS address and log in after creating the account. No default password, shared password or public registration exists.
 
 All colleagues have equal CRM read/edit access. Each action uses their individual account. Account management is through CLI only. Local accounts do not grant access to a colleague's mailbox.
 

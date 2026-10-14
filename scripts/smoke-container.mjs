@@ -1,6 +1,6 @@
 import {execFileSync} from 'node:child_process';
 import {randomBytes} from 'node:crypto';
-const image=process.argv[2]||'stageforce:0.1.0',name='stage-crm-check-'+process.pid,volume=name+'-data',password=randomBytes(24).toString('base64url');
+const image=process.argv[2]||'stageforce:0.1.1',name='stage-crm-check-'+process.pid,volume=name+'-data',password=randomBytes(24).toString('base64url');
 const docker=(args,options={})=>execFileSync('docker',args,{encoding:'utf8',stdio:['pipe','pipe','pipe'],...options});
 try{
  docker(['volume','create',volume]);docker(['run','-d','--name',name,'-p','127.0.0.1::3000','-e','APP_URL=https://crm.example.test','-v',volume+':/app/data',image]);

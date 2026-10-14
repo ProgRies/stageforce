@@ -44,4 +44,4 @@ The archive does not imply a container tag exists. The operator must publish the
 - Full real-snapshot migration, row counts, foreign-key/integrity checks and representative search/list timing.
 - Production dependency audit.
 
-Docker runtime and browser rendering cannot be tested in the current build environment. `scripts/smoke-container.mjs` is included and the GitHub release workflow requires it before image publication. The administrator should also test the two UI flows over the final HTTPS hostname before the team cuts over. The original hosted prototype remains separate.
+Docker builds, login and restart persistence are tested by GitHub Actions before image publication. Browser rendering has not been manually verified in the current build environment. The administrator should also test the two UI flows over the final HTTPS hostname before the team cuts over. The original hosted prototype remains separate.

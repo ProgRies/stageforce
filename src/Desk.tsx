@@ -1,6 +1,7 @@
 import {api,request} from "./api";
 import EmailInbox from "./EmailInbox";
 import EntityTools from "./EntityTools";
+import {AppearanceControls} from "./Appearance";
 
 import {useEffect,useMemo,useRef,useState} from "react";
 import {Search,Users,Phone,ArrowUpRight,RefreshCw,ChevronRight,ChevronDown,ArrowLeft,Check,Plus,SlidersHorizontal,AlertCircle,Link2,Globe,MapPin,UserRound,Copy,Mail,MessageSquare,NotebookPen,CheckCheck,X,LoaderCircle,ArrowDown,CalendarDays} from "lucide-react";
@@ -69,7 +70,7 @@ export default function Desk({user}:{user:User}){
       <div className="sidebar-bottom"><button className="sheet-link" onClick={async()=>{if(editing&&!window.confirm("Ungespeicherte Eingaben verwerfen und abmelden?"))return;await request("/api/logout",{});window.location.reload();}}>Abmelden</button><div className="user"><div className="user-avatar">{initials(user?.name||"CRM")}</div><div><strong>{user?.name||"Stage Force"}</strong><span>{user?.email||"Privater Arbeitsbereich"}</span></div></div></div>
     </aside>
     <div className="workspace">
-      <header className="topbar"><div><h1>{mode==="calls"?"Deine Anrufe":reviewOnly?"Zum Prüfen":"Organisationen"}</h1><span className="header-count">{mode==="calls"?`${done.length} / ${queue.length||count}`:entities.length?entities.length.toLocaleString("de-DE"):""}</span></div><div className="top-actions"><button className="icon-button" title="Organisation hinzufügen" aria-label="Organisation hinzufügen" onClick={newOrganisation}><Plus size={18}/></button>{data&&<span className={`connection ${error?"stale":""}`} title={error?"Angezeigte Daten sind möglicherweise veraltet.":`Geladen ${new Date(data.loadedAt).toLocaleTimeString("de-DE")}`}><i/>{error?"Veraltet":"Live"}</span>}<button className="icon-button" title="Daten aktualisieren" aria-label="Aktualisieren" disabled={loading||saving} onClick={()=>refresh()}><RefreshCw size={18} className={loading?"spin":""}/></button></div></header>
+      <header className="topbar"><div><h1>{mode==="calls"?"Deine Anrufe":reviewOnly?"Zum Prüfen":"Organisationen"}</h1><span className="header-count">{mode==="calls"?`${done.length} / ${queue.length||count}`:entities.length?entities.length.toLocaleString("de-DE"):""}</span></div><div className="top-actions"><AppearanceControls/><button className="icon-button" title="Organisation hinzufügen" aria-label="Organisation hinzufügen" onClick={newOrganisation}><Plus size={18}/></button>{data&&<span className={`connection ${error?"stale":""}`} title={error?"Angezeigte Daten sind möglicherweise veraltet.":`Geladen ${new Date(data.loadedAt).toLocaleTimeString("de-DE")}`}><i/>{error?"Veraltet":"Live"}</span>}<button className="icon-button" title="Daten aktualisieren" aria-label="Aktualisieren" disabled={loading||saving} onClick={()=>refresh()}><RefreshCw size={18} className={loading?"spin":""}/></button></div></header>
       {error&&<div className="error-banner" role="alert"><AlertCircle size={18}/><span>{error.message||"Daten konnten nicht geladen werden."}</span><button className="button small" disabled={loading} onClick={()=>refresh()}>Erneut laden</button></div>}
       <div className="workbody">
         <section className="list-pane glass">
