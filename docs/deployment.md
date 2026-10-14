@@ -2,11 +2,11 @@
 
 ## Boundaries
 
-One Node service and one SQLite volume on the same host. Traefik terminates HTTPS. Production `APP_URL` must equal the browser's origin exactly (scheme and hostname). The application checks Origin and session CSRF tokens for mutations. It does not trust forwarded host headers. No server port is published in the production Compose file.
+One Node service and one SQLite volume on the same host. Traefik terminates HTTPS. Production `APP_URL` must equal the browser's origin exactly (scheme and hostname). Browser mutations require Origin and session CSRF checks. The two dedicated Gmail endpoints instead require an import-only bearer key, reject browser Origin headers and never authorize CRM reads or confirmation. It does not trust forwarded host headers. No server port is published in the production Compose file.
 
 The container runs as the unprivileged `node` user (UID 1000). Docker initializes the named volume from the image's owned `/app/data`. If using a host bind mount instead, provision that directory for UID/GID 1000; do not make it world-writable. The production root filesystem is read-only, with a writable data volume and bounded `/tmp`.
 
-Account sessions expire after seven days. Password changes and account disabling revoke existing sessions. Passwords use scrypt with independent random salts. Every user can read and edit CRM data; only the server operator can manage accounts. There are no default credentials, self-service registration or mail-sending endpoints.
+Account sessions expire after seven days. Password changes and account disabling revoke existing sessions and Gmail keys. Passwords use scrypt with independent random salts. Every user can read and edit CRM data; only the server operator can manage accounts. There are no default credentials, self-service registration or mail-sending endpoints.
 
 The browser renders email content as text, never as sender-provided HTML. No remote images, attachment fetches or embedded tracking resources are loaded. Uploads are limited to 10 MB and two concurrently parsed messages; body text has a 500,000-character limit. Rate limits cover uploads and login attempts. Pending email text is stored for at most 24 hours and cleaned up once per minute while the application is running. Restarted servers clean up stale imports too.
 
@@ -22,7 +22,7 @@ docker compose run --rm --no-deps --entrypoint sh -v /absolute/private/path/know
 docker compose up -d
 ```
 
-Removing WAL/SHM files is appropriate only for this stopped-instance restore from a consistent backup. Never remove them from a running application. The backup includes users, so restore also restores accounts/session state; reset affected passwords if restoring after an account compromise.
+Removing WAL/SHM files is appropriate only for this stopped-instance restore from a consistent backup. Never remove them from a running application. The backup includes users and Gmail keys, so restore also restores accounts/session/key state; reset affected passwords if restoring after an account compromise.
 
 ## Updates
 
@@ -45,3 +45,7 @@ The archive does not imply a container tag exists. The operator must publish the
 - Production dependency audit.
 
 Docker builds, login and restart persistence are tested by GitHub Actions before image publication. Browser rendering has not been manually verified in the current build environment. The administrator should also test the two UI flows over the final HTTPS hostname before the team cuts over. The original hosted prototype remains separate.
+
+## Gmail add-on
+
+See [gmail-setup.md](gmail-setup.md). Google must reach the HTTPS hostname and `/api/integrations/gmail/` without a browser-only proxy login. The application still authenticates each request with a dedicated key. Proxy access logs must not log Authorization headers or request bodies. No CORS relaxation is needed. Google credentials are never placed in the CRM container.

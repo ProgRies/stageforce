@@ -1,0 +1,23 @@
+{
+  "timeZone": "Europe/Berlin",
+  "runtimeVersion": "V8",
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/gmail.addons.execute",
+    "https://www.googleapis.com/auth/gmail.addons.current.message.action",
+    "https://www.googleapis.com/auth/script.external_request",
+    "https://www.googleapis.com/auth/userinfo.email"
+  ],
+  "urlFetchWhitelist": ["https://crm.example.com/api/integrations/gmail/"],
+  "addOns": {
+    "common": {
+      "name": "Stage Force",
+      "logoUrl": "https://crm.example.com/assets/stageforce-icon.svg",
+      "layoutProperties": {"primaryColor": "#6851bb", "secondaryColor": "#e33b9b"},
+      "homepageTrigger": {"runFunction": "onHomepage"},
+      "openLinkUrlPrefixes": ["https://crm.example.com/"]
+    },
+    "gmail": {
+      "contextualTriggers": [{"unconditional": {}, "onTriggerFunction": "onGmailMessage"}]
+    }
+  }
+}

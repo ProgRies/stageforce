@@ -1,7 +1,7 @@
 import {api,request} from "./api";
 import EmailInbox from "./EmailInbox";
 import EntityTools from "./EntityTools";
-import {AppearanceControls} from "./Appearance";
+import SystemSettings from "./SystemSettings";
 
 import {useEffect,useMemo,useRef,useState} from "react";
 import {Search,Users,Phone,ArrowUpRight,RefreshCw,ChevronRight,ChevronDown,ArrowLeft,Check,Plus,SlidersHorizontal,AlertCircle,Link2,Globe,MapPin,UserRound,Copy,Mail,MessageSquare,NotebookPen,CheckCheck,X,LoaderCircle,ArrowDown,CalendarDays} from "lucide-react";
@@ -20,8 +20,10 @@ export default function Desk({user}:{user:User}){
   const [editing,setEditing]=useState(false),[draft,setDraft]=useState<Record<number,string>>({}),[note,setNote]=useState<Note>(emptyNote()),[baseVersion,setBaseVersion]=useState(""),[saving,setSaving]=useState(false),[saveError,setSaveError]=useState<Failure|null>(null),[conflictEntity,setConflictEntity]=useState<Entity|null>(null);
   const [queue,setQueue]=useState<QueueItem[]>([]),[done,setDone]=useState<string[]>([]),[skipped,setSkipped]=useState<string[]>([]),[settings,setSettings]=useState(false),[count,setCount]=useState(30),[days,setDays]=useState(90),[share,setShare]=useState(.6),[pendingCall,setPendingCall]=useState(false),[visibleCount,setVisibleCount]=useState(80);
   const [expandedIssues,setExpandedIssues]=useState(false);
-  const [detail,setDetail]=useState<Entity|null>(null),[historyItems,setHistoryItems]=useState<any[]>([]),[historyTotal,setHistoryTotal]=useState(0),[detailLoading,setDetailLoading]=useState(false),[detailError,setDetailError]=useState(""),[searchIds,setSearchIds]=useState<string[]|null>(null),[searchError,setSearchError]=useState(""),[importsOpen,setImportsOpen]=useState(false),[messageBodies,setMessageBodies]=useState<Record<string,any>>({});
+  const [detail,setDetail]=useState<Entity|null>(null),[historyItems,setHistoryItems]=useState<any[]>([]),[historyTotal,setHistoryTotal]=useState(0),[detailLoading,setDetailLoading]=useState(false),[detailError,setDetailError]=useState(""),[searchIds,setSearchIds]=useState<string[]|null>(null),[searchError,setSearchError]=useState(""),[importsOpen,setImportsOpen]=useState(()=>new URLSearchParams(window.location.search).has('import')),[messageBodies,setMessageBodies]=useState<Record<string,any>>({});
 
+  const [initialImportId,setInitialImportId]=useState(()=>new URLSearchParams(window.location.search).get('import')||'');
+  function closeImports(){setImportsOpen(false);setInitialImportId('');const url=new URL(window.location.href);url.searchParams.delete('import');window.history.replaceState(null,'',url.pathname+url.search+url.hash);}
   const searchRef=useRef<HTMLInputElement>(null),detailRef=useRef<HTMLDivElement>(null),fastRef=useRef<HTMLInputElement>(null),requestRef=useRef<string|null>(null),originalDraft=useRef<Record<number,string>>({});
   const entities=data?.entities||[],byId=useMemo(()=>new Map(entities.map(e=>[e.id,e])),[entities]);const entity=detail?.id===selected?detail:byId.get(selected);
   const queueKey=`stage-calls:${user?.id||"unknown"}:${todayBerlin()}`;
@@ -70,7 +72,7 @@ export default function Desk({user}:{user:User}){
       <div className="sidebar-bottom"><button className="sheet-link" onClick={async()=>{if(editing&&!window.confirm("Ungespeicherte Eingaben verwerfen und abmelden?"))return;await request("/api/logout",{});window.location.reload();}}>Abmelden</button><div className="user"><div className="user-avatar">{initials(user?.name||"CRM")}</div><div><strong>{user?.name||"Stage Force"}</strong><span>{user?.email||"Privater Arbeitsbereich"}</span></div></div></div>
     </aside>
     <div className="workspace">
-      <header className="topbar"><div><h1>{mode==="calls"?"Deine Anrufe":reviewOnly?"Zum Prüfen":"Organisationen"}</h1><span className="header-count">{mode==="calls"?`${done.length} / ${queue.length||count}`:entities.length?entities.length.toLocaleString("de-DE"):""}</span></div><div className="top-actions"><AppearanceControls/><button className="icon-button" title="Organisation hinzufügen" aria-label="Organisation hinzufügen" onClick={newOrganisation}><Plus size={18}/></button>{data&&<span className={`connection ${error?"stale":""}`} title={error?"Angezeigte Daten sind möglicherweise veraltet.":`Geladen ${new Date(data.loadedAt).toLocaleTimeString("de-DE")}`}><i/>{error?"Veraltet":"Live"}</span>}<button className="icon-button" title="Daten aktualisieren" aria-label="Aktualisieren" disabled={loading||saving} onClick={()=>refresh()}><RefreshCw size={18} className={loading?"spin":""}/></button></div></header>
+      <header className="topbar"><div><h1>{mode==="calls"?"Deine Anrufe":reviewOnly?"Zum Prüfen":"Organisationen"}</h1><span className="header-count">{mode==="calls"?`${done.length} / ${queue.length||count}`:entities.length?entities.length.toLocaleString("de-DE"):""}</span></div><div className="top-actions"><button className="icon-button" title="Organisation hinzufügen" aria-label="Organisation hinzufügen" onClick={newOrganisation}><Plus size={20}/></button><SystemSettings signedIn loadedAt={data?.loadedAt} stale={!!error} loading={loading} disabled={saving} onRefresh={()=>refresh()}/></div></header>
       {error&&<div className="error-banner" role="alert"><AlertCircle size={18}/><span>{error.message||"Daten konnten nicht geladen werden."}</span><button className="button small" disabled={loading} onClick={()=>refresh()}>Erneut laden</button></div>}
       <div className="workbody">
         <section className="list-pane glass">
@@ -107,7 +109,7 @@ export default function Desk({user}:{user:User}){
       </div>
     </div>
     {settings&&<div className="modal-backdrop" onClick={()=>setSettings(false)}><div className="queue-modal glass" role="dialog" aria-modal="true" aria-labelledby="queue-title" onClick={e=>e.stopPropagation()}><button className="modal-close icon-button" aria-label="Schließen" onClick={()=>setSettings(false)}><X size={18}/></button><div className="modal-icon"><Phone size={26}/></div><h2 id="queue-title">Deine nächste Runde.</h2><p>Wiedervorlagen zuerst. Dann Kunden und neue Kontakte.</p><div className="queue-settings"><label><span>Anrufe</span><input type="number" min={1} max={100} value={count} onChange={e=>setCount(Math.max(1,Math.min(100,Number(e.target.value)||1)))}/></label><label><span>Kunden nach Kontaktpause</span><select value={days} onChange={e=>setDays(Number(e.target.value))}>{[30,60,90,180,365].map(d=><option key={d} value={d}>{d} Tage</option>)}</select></label><label><span>Kunden / Leads</span><select value={share} onChange={e=>setShare(Number(e.target.value))}><option value={.5}>50 / 50</option><option value={.6}>60 / 40</option><option value={.8}>80 / 20</option></select></label></div><small>{eligibleCount.toLocaleString("de-DE")} erreichbare Einträge · fehlende Telefonnummern bleiben draußen</small><button className="button primary wide" onClick={generate}>Liste erstellen <ArrowUpRight size={17}/></button></div></div>}
-    {importsOpen&&<EmailInbox entities={entities} onClose={()=>setImportsOpen(false)} onSaved={async(id)=>{await refresh();setSelected(id);setToast("E-Mail übernommen");}}/>}
+    {importsOpen&&<EmailInbox entities={entities} initialImportId={initialImportId} onClose={closeImports} onSaved={async(id)=>{await refresh();setSelected(id);setToast("E-Mail übernommen");}}/>}
     {toast&&<div className="toast" role="status"><Check size={16}/>{toast}</div>}
   </div>;
 }

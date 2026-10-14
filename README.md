@@ -1,4 +1,4 @@
-# Stage Force · 0.1.2
+# Stage Force · 0.1.3
 
 A self-hosted, shared CRM for a small team. The existing frosted desktop interface now uses SQLite on your server. It does not need Google Sheets, ChatGPT, an AI provider, Gmail credentials or a mail-sending service.
 
@@ -16,7 +16,7 @@ A self-hosted, shared CRM for a small team. The existing frosted desktop interfa
 - Paginated history and email bodies loaded only when opened.
 - One-time migration of the current Stage spreadsheet snapshot, with preserved IDs and a reconciliation report.
 
-The Gmail add-on, FastBill API synchronization and ticket-system integration are not part of this release. The importer stores reviewed email text and attachment names, not attachment files. No component sends, drafts, deletes, forwards or changes email.
+The optional Gmail add-on is included with private installation instructions. FastBill API synchronization and ticket-system integration remain out of scope. The file importer stores reviewed email text and attachment names, not attachment files; the Gmail add-on transfers text and envelope fields only. No component sends, drafts, deletes, forwards or changes email.
 
 ## Quick local test with fictional data
 
@@ -38,12 +38,12 @@ The configuration uses the Glass Board conventions: `reverse-proxy`, `web-secure
 git clone https://github.com/ProgRies/stageforce.git
 cd stageforce
 cp .env.example .env
-# Edit CRM_HOST in .env, for example crm.jaimo.me.
+# Edit CRM_HOST in .env, for example crm.example.com.
 docker compose up -d --build
 docker compose exec crm node server/cli.mjs user:add you@example.com "Your Name"
 ```
 
-The startup command builds the source locally. `.env` selects the local `stageforce:0.1.2` image; no registry account is required. A versioned registry image is available only after a successful release workflow. Open the HTTPS address and log in after creating the account. No default password, shared password or public registration exists.
+The startup command builds the source locally. `.env` selects the local `stageforce:0.1.3` image; no registry account is required. A versioned registry image is available only after a successful release workflow. Open the HTTPS address and log in after creating the account. No default password, shared password or public registration exists.
 
 All colleagues have equal CRM read/edit access. Each action uses their individual account. Account management is through CLI only. Local accounts do not grant access to a colleague's mailbox.
 
@@ -63,7 +63,7 @@ docker compose cp crm:/app/data/migration-report.json ./migration-report.json
 
 Review the report and compare selected records with the sheet. The same snapshot can be rerun safely; a different snapshot is refused once organisations exist. There is no merge/overwrite mode. The source spreadsheet remains untouched. Once your team accepts the migration, stop editing the old sheet; this CRM is the new source of truth. Preserve the private snapshot for audit/rollback and keep it out of Git.
 
-This snapshot was captured on **14 October 2026**. Later spreadsheet edits will not be included automatically. If the team continues editing the sheet before cutover, take a fresh snapshot and validate it before importing into a fresh production database.
+An initial snapshot captures data at its export time. Later spreadsheet edits will not be included automatically. If the team continues editing the sheet before cutover, take a fresh snapshot and validate it before importing into a fresh production database.
 
 Migration findings and schema are explained in [docs/schema.md](docs/schema.md). The private archive contains the report from the full migration validation.
 
@@ -108,3 +108,7 @@ The server serves the built UI; a separate frontend dev server is not required. 
 Tests use temporary SQLite databases and fictional data. They cover auth, CSRF/origin checks, conflicts, duplicate/retry protection, email parsing, rollback, migration, backups and call queues. Run `node scripts/smoke-container.mjs IMAGE` to verify a Docker image's login and restart persistence. The release workflow runs this check before publishing.
 
 See [docs/release.md](docs/release.md) for source-only GitHub/GHCR publication.
+
+## Gmail button
+
+The selected-message add-on and private test installation steps are in [docs/gmail-setup.md](docs/gmail-setup.md). Pair each account under the top-right gear → Gmail verbinden. A publicly reachable HTTPS deployment is required for Google delivery; the `.eml` workflow continues to work locally. Version 0.1.3 adds one database table automatically; back up before upgrading and do not repeat the initial spreadsheet import.

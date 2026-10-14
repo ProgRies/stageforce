@@ -1,21 +1,28 @@
-# Email workflow and future Gmail button
+# Email workflow
 
-## Working now
+The CRM handles review and confirmation; the mail client only supplies a selected message. No background watcher, LLM extraction or email-write capability exists.
 
-The user downloads a single `.eml` message, uploads it while logged into the CRM, reviews a temporary import and confirms. Incoming and outgoing messages use the same flow. Sender matching suggests candidates but never silently assigns an unknown organisation. Multiple exact contact matches are offered for human choice. Contact creation is opt-in.
+## Gmail add-on
 
-A sent reply is not automatically captured. Import it from Sent, or add a manual `E-Mail gesendet` activity. A previously imported received email remains unchanged. Identical RFC Message-ID values deduplicate across colleagues; messages lacking that header use a deterministic fingerprint of original participants, date, subject and body. In ambiguous cases (missing headers, materially changed re-exports, reused Message-IDs) the user should inspect the result; this is not semantic duplicate detection. An email already assigned to another organisation cannot be silently reassigned through import.
+Implementation: `integrations/gmail/Code.gs` and `appsscript.json`. Follow [gmail-setup.md](gmail-setup.md) for the private test installation and per-user pairing. The add-on reads a selected message only on a button click, sends plain text plus sender/recipients/date/subject/IDs (no attachments or Bcc list), and offers an authenticated review link. Replies must be imported separately from Sent. The CRM must be reachable by Google over HTTPS; localhost remains suitable for `.eml` tests.
 
-Quote removal recognizes explicit quote lines, common original-message separators and signature markers. It retains unquoted inline answers. Because human email formatting varies, review always includes the complete decoded message text and a restore-full-text button. Raw HTML is never displayed; attachments are discarded after metadata extraction. An optional user-written summary becomes the timeline entry; approved email text is expandable.
+Two POST-only server-to-server endpoints exist:
 
-## Next phase: Google Workspace add-on
+- `/api/integrations/gmail/check`: returns only the key owner's email address for account matching.
+- `/api/integrations/gmail/import`: stages one message and returns only `reviewUrl`. JSON fields: `mailbox`, `gmailId`, `messageId`, `from`, `to`, `cc`, `date`, `subject`, `text`.
 
-This release deliberately does not install a Google project, request mailbox permission or expose an unauthenticated integration endpoint.
+Both require `Authorization: Bearer <individual capture key>`, never accept session cookies as authorization, reject browser Origin headers, and do not enable CORS. The random key is hashed in SQLite, scoped to staging, revocable, bound to an active user and expires after 90 days. Browser key management still requires session, Origin and CSRF checks. Import limits: two concurrent parses, 20 integration requests/minute/user, 3 MB JSON, 500,000 body characters, 30 pending imports per user. Keys cannot read CRM records or confirm imports. The key's validity is checked again after asynchronous parsing, so revocation during parsing prevents staging.
 
-The planned add-on will use Google's interaction-scoped access to the currently selected message. A minimal Apps Script component extracts the message and submits it to a dedicated endpoint on the self-hosted CRM. That endpoint will accept an individual revocable capture credential, authorize temporary import creation only, enforce rate/size limits, and bind the review to the matching CRM user. Credentials are never placed in shared script properties or review URLs.
+Gmail URLs point back to the owner's mailbox; they do not share mailbox access. A review URL contains an opaque import ID, never credentials. Access requires the matching CRM login. Unconfirmed imports expire after 24 hours; confirmation/discard removes the temporary payload.
 
-The add-on then presents **Open review**. The colleague follows the link to the CRM and signs in; the opaque import ID is not authorization by itself. The same review UI handles matching, quote cleanup, contact suggestions and confirmation. No mail sending/modification permission is required. The current browser upload route requires a local CRM session and CSRF token and must not simply be opened to Google clients by weakening those checks.
+## Shared review and file fallback
 
-Steps when implementing: create Apps Script test project; install privately for initial testing; register a standard Google Cloud project and explicit OAuth scopes; publish privately to the same Workspace organisation; pair each colleague with their CRM account. Provide administrator installation instructions at that phase.
+Download a single `.eml` message and upload it while signed in to the CRM. This uses the existing session/Origin/CSRF protected route, with a 10 MB upload limit. Attachments are discarded after metadata extraction. Incoming and outgoing messages use the same review UI.
 
-Keeping the import/review logic in the CRM allows another mail-client adapter or `.eml` files to replace Gmail without changing the database. Any future local LLM must produce optional suggestions within this review step, not bypass confirmation.
+Sender matching suggests candidates but never silently assigns an unknown organisation. Multiple exact contact matches are offered for human choice. Contact creation is opt-in. The human chooses the organisation, approved text, summary and any status/follow-up changes. Confirmed content becomes visible to CRM colleagues.
+
+Quote removal recognizes explicit quote lines, common original-message separators and signature markers. It retains unquoted inline answers. Human email formatting varies, so review includes the complete decoded message text and a restore-full-text button. Raw HTML is never displayed. A user-written summary becomes the timeline entry; approved email text is expandable.
+
+A sent reply is not automatically captured. Import it from Sent, or add a manual `E-Mail gesendet` activity. A previously imported received email remains unchanged. Identical RFC Message-ID values deduplicate across colleagues; messages lacking that header use a deterministic fingerprint of original participants, date, subject and body. Missing headers, changed re-exports or reused Message-IDs can need manual checking; this is not semantic duplicate detection. An email already assigned to another organisation cannot be silently reassigned through import.
+
+Keeping review and confirmation in the CRM allows another mail-client adapter or `.eml` files to replace Gmail without changing the business tables. Any future local LLM must offer suggestions within the review step, not bypass confirmation.

@@ -29,3 +29,6 @@ CREATE TABLE IF NOT EXISTS migrations(id TEXT PRIMARY KEY,created_at TEXT NOT NU
 CREATE TABLE IF NOT EXISTS migration_archive(id TEXT PRIMARY KEY,organisation_id TEXT REFERENCES organisations(id),payload_json TEXT NOT NULL);
 CREATE VIRTUAL TABLE IF NOT EXISTS search_docs USING fts5(organisation_id UNINDEXED,content,tokenize='unicode61 remove_diacritics 2');
 INSERT OR IGNORE INTO schema_versions VALUES(1,datetime('now'));
+
+CREATE TABLE IF NOT EXISTS gmail_keys(user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,token_hash TEXT NOT NULL UNIQUE,created_at INTEGER NOT NULL,expires_at INTEGER NOT NULL,last_used_at INTEGER);
+INSERT OR IGNORE INTO schema_versions VALUES(2,datetime('now'));

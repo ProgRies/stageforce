@@ -1,6 +1,6 @@
 # Database and migration
 
-`server/schema.sql` is the executable schema. Tables use foreign keys and stable text IDs. `PRAGMA user_version` tracks the schema version; future application versions must introduce an explicit versioned migration before changing a deployed database. An older binary refuses a newer schema. Current version: 1.
+`server/schema.sql` is the executable schema. Tables use foreign keys and stable text IDs. `PRAGMA user_version` tracks the schema version; future application versions must introduce an explicit versioned migration before changing a deployed database. An older binary refuses a newer schema. Current version: 2. Version 2 adds only `gmail_keys`; startup applies it in a transaction and preserves existing CRM data. Back up before upgrading. A version 1 binary refuses a version 2 database; rollback requires restoring the pre-upgrade backup.
 
 | Table | Purpose / relationship |
 | --- | --- |
@@ -17,6 +17,7 @@
 | source_references | Original provenance attached to an organisation, contact or activity |
 | audit_log | Author, timestamp and structured before/after values for organisation edits; contact/link/import events |
 | users / sessions | Local accounts, salted scrypt password hashes, hashed opaque session tokens and CSRF tokens |
+| gmail_keys | One revocable, hashed import-only credential per user; creation, expiry and last-use timestamps |
 | email_imports | Per-user, short-lived review payload; removed on confirmation/discard/expiry |
 | requests | Idempotency receipts for saves and email confirmations |
 | migrations / migration_archive | Import fingerprint/report and immutable original data retained to prevent loss |
@@ -30,6 +31,6 @@ The old main-contact scalar columns are matched to the contacts JSON. If exactly
 
 The relationship tab is canonical; mirror JSON entries are folded into the same pair. Conflicting notes or unresolved IDs are reported and preserved in the archive. The importer refuses duplicate organisation IDs or unexpected headers, imports in one transaction, and validates foreign keys. Malformed metadata is reported and retained rather than dropped.
 
-Migration validation on the 14 October snapshot: 2,592 organisations, 2,726 contacts (2,723 JSON entries plus three main contacts that could not be matched unambiguously), 1,258 history entries, 27 relationships. All four JSON columns parsed successfully. Three main-contact cases are listed in the private report. This is structural verification, not a new audit of business accuracy.
+Validate each private snapshot by comparing organisation, contact, activity and relationship counts, checking foreign-key integrity and reviewing the private migration report. Structural verification does not establish business accuracy.
 
 The UI loads a compact organisation list and queries the full-text index for deeper matches. History is paged in batches of 40; email bodies are fetched on expansion. No attachments or mailbox mirror are stored. Search-index updates and business writes share the same transaction.

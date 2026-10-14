@@ -4,6 +4,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts
 COPY index.html tsconfig.json ./
 COPY src ./src
+COPY public ./public
 RUN npm run typecheck && npm run build
 
 FROM node:24-bookworm-slim AS runtime

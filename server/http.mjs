@@ -6,6 +6,7 @@ import {openDB} from './db.mjs';
 import {getSession,verifyPassword,createSession,limited,publicUser} from './auth.mjs';
 import {Problem,listData,entity,history,search,save,createOrg,contactSave,linkSave,stageImport,importPreview,confirmImport} from './crm.mjs';
 import {parseEmail} from './email.mjs';
+import {gmailStatus,createGmailKey,revokeGmailKey,authorizeGmail,selectedGmailMessage,stageGmailMessage} from './gmail.mjs';
 export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:3000',staticDir=resolve('dist')}={}){
  const url=new URL(origin);if(url.origin!==origin.replace(/\/$/,''))throw Error('APP_URL must be an origin without a path.');origin=url.origin;const secure=url.protocol==='https:';if(process.env.NODE_ENV==='production'&&!secure)throw Error('Production APP_URL must use HTTPS.');let parsing=0;
  const json=(res,status,data)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(JSON.stringify(data));};
@@ -15,6 +16,22 @@ export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:300
  const server=createServer(async(req,res)=>{res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');res.setHeader('X-Frame-Options','DENY');res.setHeader('Permissions-Policy','camera=(), microphone=(), geolocation=()');res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");if(secure)res.setHeader('Strict-Transport-Security','max-age=31536000');
  try{const path=new URL(req.url,'http://internal').pathname;
  if(req.method==='GET'&&path==='/healthz')return json(res,200,{ok:db.prepare('SELECT 1 AS ok').get().ok===1});
+ // Isolated server-to-server endpoint. No cookie/session authorization and no CORS.
+ if(path==='/api/integrations/gmail/check'||path==='/api/integrations/gmail/import'){
+  if(req.method!=='POST')throw new Problem('Methode nicht erlaubt.',405);
+  if(req.headers.origin)throw new Problem('Nur für das Gmail-Add-on.',403);
+  const user=authorizeGmail(db,req);
+  if(!String(req.headers['content-type']).startsWith('application/json'))throw new Problem('JSON erwartet.',415);
+  if(path.endsWith('/check')){await body(req,1024);return success(res,{email:user.email});}
+  if(parsing>=2)throw new Problem('Bitte kurz warten und erneut versuchen.',429);
+  parsing++;try{
+   const input=JSON.parse((await body(req,3*1024*1024)).toString());
+   let parsed;try{parsed=await selectedGmailMessage(input,user);}catch(e){if(e instanceof Problem)throw e;throw new Problem('Nachricht konnte nicht gelesen werden. Bitte .eml-Import verwenden.');}
+   // A key may have been revoked while MIME parsing yielded to another request.
+   const current=authorizeGmail(db,{headers:req.headers},false);
+   const id=stageGmailMessage(db,current,parsed);return success(res,{reviewUrl:origin+'/?import='+encodeURIComponent(id)});
+  }finally{parsing--;}
+ }
  if(req.method==='POST'){
   if(req.headers.origin!==origin)throw new Problem('Unzulässiger Ursprung.',403,'forbidden');
   if(path==='/api/login'){if(!String(req.headers['content-type']).startsWith('application/json'))throw new Problem('JSON erwartet.',415);const b=JSON.parse((await body(req,8192)).toString());const address=String(b.email||'').trim().toLowerCase();if(limited(db,'global-login',200)||limited(db,'login:'+address,10))throw new Problem('Zu viele Versuche. Bitte in zehn Minuten erneut versuchen.',429,'rate_limited');const user=db.prepare('SELECT * FROM users WHERE email=? COLLATE NOCASE AND active=1').get(address);const valid=await verifyPassword(b.password,user?.password_hash);if(!valid||!user)throw new Problem('Anmeldung fehlgeschlagen.',401,'unauthorized');const session=createSession(db,user);res.setHeader('Set-Cookie',cookie(session.token));return success(res,{user:session.user,csrf:session.csrf});}
@@ -30,6 +47,9 @@ export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:300
   if(!String(req.headers['content-type']).startsWith('application/json'))throw new Problem('JSON erwartet.',415);
   const b=JSON.parse((await body(req)).toString());let data;
   switch(b.action){
+   case 'gmailStatus':data={...gmailStatus(db,session),publicHttps:secure};break;
+   case 'gmailCreate':data={...createGmailKey(db,session),publicHttps:secure};break;
+   case 'gmailRevoke':revokeGmailKey(db,session);data={...gmailStatus(db,session),publicHttps:secure};break;
    case 'load':data=listData(db);break;
    case 'detail':data={entity:entity(db,b.id,true),history:history(db,b.id)};break;
    case 'history':data=history(db,b.id,b.offset);break;

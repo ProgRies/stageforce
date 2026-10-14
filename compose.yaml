@@ -3,7 +3,7 @@
 # With a published image: docker compose pull && docker compose up -d --no-build
 services:
   crm:
-    image: ${CRM_IMAGE:-stageforce:0.1.2}
+    image: ${CRM_IMAGE:-stageforce:0.1.3}
     build: .
     restart: unless-stopped
     init: true
