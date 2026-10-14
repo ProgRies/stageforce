@@ -1,0 +1,70 @@
+# FastBill import review
+
+Stage Force 0.1.6 adds **Importe → FastBill**. CSV files and read-only API pages feed the same review queue. Nothing changes in FastBill. Nothing changes in an organisation until a reviewer confirms it. All parsing and matching are deterministic; no AI or external parsing service is used.
+
+## Start with a customer CSV
+
+In FastBill, open **Kunden → Export**, select **CSV**, and enable **Ansprechpartner exportieren?**. Alternatively use **Import Export → Kundendaten** for a direct download. Use the customer export first to find names, email addresses, phone numbers and customer identifiers.
+
+1. Open **Importe → FastBill → CSV auswählen** in Stage Force.
+2. Enter the FastBill main account's email as the account identifier. Use the same value for every export, including imports by colleagues. API imports use that email automatically. This keeps identical customer numbers from different accounts separate.
+3. Select the original CSV, without opening and re-saving it in Excel. Review the suggested column mappings and the first-row sample. Choose **Nicht übernehmen** for unneeded columns. Internal customer ID and customer number are distinct fields.
+4. Select **Zur Prüfung laden**. The private review queue survives browser closure and application restart.
+5. Select a row, inspect the source values and suggested organisations, and choose the correct organisation. A shared email/name is only a suggestion; multiple candidates stay unresolved.
+6. Tick fields to copy. Existing values appear alongside proposed values; only blank city, website or customer-link fields are preselected when a value is available. These still require confirmation.
+7. To import phone/email data, tick **Kontaktdaten übernehmen**. Choose an existing contact to append addresses without replacing its name or position, or create a new contact. Shared contacts belonging to multiple organisations must be edited through the contact editor. Primary-contact selection is unchanged.
+8. **Bestätigen** saves the chosen data, account/customer references and optional team note with your authorship. **Nicht relevant** records a skip decision without touching CRM data.
+
+A manually created organisation is saved immediately by **Neue Organisation**, independently of the later import confirmation. Check for an existing organisation first.
+
+## Invoice exports are evidence, not a second ledger
+
+For invoice context, use **Ausgangsrechnungen (neu)**, CSV, with a deliberate date range. Choose one row per invoice for a compact overview, or one row per invoice line when the descriptions are needed to distinguish Stage from other services. Include all relevant records rather than only open items when researching historical relationships.
+
+Stage Force stages invoice numbers, dates, titles/descriptions, type and cancellation/status text where present, alongside customer identifiers. Amounts, tax data, payment details, bank details, attachments and document-access URLs are not selected by the built-in mappings or API adapter. Unmapped CSV columns are dropped when staging; the raw file is not retained. Invoice lines are separate review items, with identical retained rows deduplicated.
+
+Invoice evidence does not automatically establish current customer status, payment, product usage or last contact. Confirm any business conclusion through the normal organisation editor. The CRM stores the reviewed customer references and optional note, not the invoice payload as a permanent financial ledger. The staged context remains in its import run until you delete it.
+
+FastBill stays authoritative for billing. Customer URLs remain manually entered or explicitly mapped from an existing URL column. The documented customer API exposes a customer-facing document-history link, not a verified internal customer-profile URL; Stage Force does not substitute that link or construct an unverified URL from a customer number.
+
+## Test the API locally
+
+You do **not** need a publicly hosted CRM or a Google add-on. Your Docker container needs outgoing HTTPS access to `my.fastbill.com`.
+
+1. In FastBill, the main account user opens **Einstellungen → Übersicht → API-Key**.
+2. In Stage Force, choose **Importe → FastBill → API abrufen**.
+3. Enter the main account email and API key directly in your local app. Do not put them in source code, an issue, a screenshot or chat.
+4. Choose **Kunden** and **Erste 100 abrufen**. Each click fetches one page. Further pages append to the same import run; repeated page contents deduplicate. Use **Zur Prüfliste** to review, or **Fertig · Schlüssel leeren** to clear the key and review.
+5. Review customer mappings first. Then optionally fetch **Ansprechpartner** and **Rechnungen als Prüfhinweis**. Internal IDs from confirmed API customers help associate later contact rows.
+
+The key is held only in component memory while the FastBill window remains open; it is cleared by the explicit clear button, closing that window, or reload. The server uses it for the request and does not persist it, log it or return it. It is never placed in browser storage or URLs. HTTPS is required for deployed use; the local Compose configuration binds to loopback only.
+
+The server has a fixed endpoint and a hard allowlist: `customer.get`, `contact.get`, `invoice.get`. No arbitrary service, destination URL, write call, sending action, automatic polling, webhooks or credential-storage feature is exposed. The FastBill key itself may permit more than read operations; read-only behavior is enforced by this application, not by a claimed provider scope.
+
+FastBill currently documents 100 results per page and plan-dependent hourly call limits (Solo 50, Solo-Plus 100, Pro 500, Premium 1000). An error does not advance the page or apply partial results. No background retries run. Closing/reloading the dialog resets the API cursor; starting again is safe because reviewed evidence is remembered. The adapter targets FastBill API v1.0, not the separate FastBill Next API.
+
+## Repeat imports, corrections and limits
+
+- Fingerprints cover retained source fields. Identical reviewed or skipped rows are marked accordingly on another import. Changed retained fields create a new pending review. Changes to discarded financial fields do not trigger CRM review.
+- Confirmed customer ID/number mappings are scoped to the FastBill account. One payer can have multiple explicitly confirmed CRM associations; this never merges organisations. Agency/ministry relationships still require human judgment.
+- **Erneut prüfen** clears the remembered decision and that customer's remembered mapping to the prior organisation. Previously approved CRM fields, contacts, provenance and history remain. Correct those in the organisation editor if needed; reopening is not a rollback.
+- Queue rows are private to the uploader. Decisions and confirmed mappings are shared. A decision made in another import blocks a conflicting save and appears on reloading the row. Organisation versions protect concurrent edits.
+- Deleting an import run removes its staged rows, not confirmed CRM changes, shared mappings or fingerprint decisions. Kept runs are included in SQLite backups.
+- Maximum 8 MB CSV, 10,000 rows per run and 20 retained runs per user. Lists page at 100 rows. API pages also append up to 10,000 records per run. Delete completed runs when no longer needed.
+- Supported: UTF-8/BOM and browser-decoded Windows-1252, comma/semicolon/tab delimiters, quoted delimiters, escaped quotes, multiline cells. XLSX, ZIP, DATEV and attachment imports are not supported. Malformed structure rejects the whole upload before staging.
+- Automatic missing-phone/link checks update after actual fields change. Manual review notes are never silently cleared.
+
+## Upgrade and verification
+
+Back up before upgrading: schema version 3 adds four import tables transactionally. Existing CRM records are retained. Do not re-run the original spreadsheet migration. An older version refuses schema 3; rollback requires the pre-upgrade backup. The existing full-database backup/restore workflow moves local review work to your hosted deployment.
+
+Automated tests cover parsing, column validation, staged-data minimization, ownership, CSRF/origin/session checks, read-only API requests, repeat imports, conflicts, transactional rollback, contact enrichment, ID/number separation and additive schema upgrades. API tests use mocked responses and fictional records. A real FastBill export, live credentials and interactive browser testing are still needed for final compatibility validation.
+
+## Official references
+
+- [Customer exports](https://support.fastbill.com/hc/de/articles/360012777940-Kunden-daten-exportieren)
+- [Invoice export fields](https://support.fastbill.com/hc/de/articles/21072842352668-Produkte-und-Projekte-auswerten)
+- [API key setup](https://support.fastbill.com/hc/de/articles/204843527-FastBill-API)
+- [Authentication, pagination and limits](https://apidocs.fastbill.com/)
+- [Customer and contact API](https://apidocs.fastbill.com/fastbill/de/customer.html)
+- [Invoice API](https://apidocs.fastbill.com/fastbill/de/invoice.html)

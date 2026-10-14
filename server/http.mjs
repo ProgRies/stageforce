@@ -5,6 +5,7 @@ import {pathToFileURL} from 'node:url';
 import {openDB} from './db.mjs';
 import {getSession,verifyPassword,createSession,limited,publicUser} from './auth.mjs';
 import {Problem,listData,entity,history,search,save,createOrg,contactSave,linkSave,stageImport,importPreview,confirmImport} from './crm.mjs';
+import {inspectCSV,csvRecords,stageFastbill,fastbillBatches,fastbillRows,fastbillPreview,decideFastbill,deleteFastbillBatch,fetchFastbillPage} from './fastbill.mjs';
 import {parseEmail} from './email.mjs';
 import {gmailStatus,createGmailKey,revokeGmailKey,authorizeGmail,selectedGmailMessage,stageGmailMessage} from './gmail.mjs';
 export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:3000',staticDir=resolve('dist')}={}){
@@ -43,6 +44,24 @@ export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:300
   if(req.headers['x-csrf-token']!==session.csrf)throw new Problem('Sicherheitsprüfung fehlgeschlagen. Bitte neu anmelden.',403,'forbidden');
   if(path==='/api/logout'){db.prepare('DELETE FROM sessions WHERE token_hash=?').run(session.token_hash);res.setHeader('Set-Cookie',cookie('',0));return success(res,{});}
   if(path==='/api/import'){if(parsing>=2||limited(db,'upload:'+session.id,20,60000))throw new Problem('Bitte kurz warten und erneut importieren.',429);parsing++;try{const raw=await body(req,10*1024*1024);let p;try{p=await parseEmail(raw,session.email);}catch(e){throw new Problem(e.message||'E-Mail konnte nicht gelesen werden.');}return success(res,stageImport(db,session,p));}finally{parsing--;}}
+  if(path==='/api/fastbill'){
+   if(!String(req.headers['content-type']).startsWith('application/json'))throw new Problem('JSON erwartet.',415);
+   if(parsing>=2||limited(db,'fastbill:'+session.id,300,60000))throw new Problem('Bitte kurz warten.',429);
+   parsing++;try{const b=JSON.parse((await body(req,10*1024*1024)).toString());let data;
+    if(['inspect','csv','api'].includes(b.action)&&limited(db,'fastbill-source:'+session.id,20,60000))throw new Problem('Bitte kurz warten und erneut laden.',429);
+    switch(b.action){
+     case 'inspect':data=inspectCSV(b.text);break;
+     case 'csv':data=stageFastbill(db,session,{scope:b.scope,label:b.label,records:csvRecords(b.text,b.mapping,b.kind)});break;
+     case 'api':{const page=await fetchFastbillPage(b);if(!getSession(db,req))throw new Problem('Bitte erneut anmelden.',401);data={...page,records:undefined,batch:page.records.length?stageFastbill(db,session,{scope:b.email.trim().toLowerCase(),label:'API · '+b.kind,batchId:b.batchId,records:page.records}):null};break;}
+     case 'batches':data={items:fastbillBatches(db,session)};break;
+     case 'rows':data=fastbillRows(db,session,b);break;
+     case 'preview':data=fastbillPreview(db,session,b.rowId);break;
+     case 'decide':data=decideFastbill(db,session,b);break;
+     case 'delete':data=deleteFastbillBatch(db,session,b.batchId);break;
+     default:throw new Problem('Unbekannte Importaktion.');
+    }return success(res,data);
+   }finally{parsing--;}
+  }
   if(path!=='/api/crm')throw new Problem('Nicht gefunden.',404);
   if(!String(req.headers['content-type']).startsWith('application/json'))throw new Problem('JSON erwartet.',415);
   const b=JSON.parse((await body(req)).toString());let data;

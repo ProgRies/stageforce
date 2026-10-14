@@ -7,6 +7,7 @@ import {normalize,text,type Entity} from './domain';
 export default function OrganisationPicker({entities,value,onChange,disabled=false}:{entities:Entity[];value:string;onChange:(id:string)=>void;disabled?:boolean}){
  const [query,setQuery]=useState<string|null>(null),[open,setOpen]=useState(false),[active,setActive]=useState(0);
  const input=useRef<HTMLInputElement>(null),list=useRef<HTMLDivElement>(null),uid=useId();
+ useEffect(()=>{if(value)setQuery(null);},[value]);
  const chosen=entities.find(e=>e.id===value);
  const terms=normalize(query||'').trim().split(/\s+/).filter(Boolean);
  const matches=entities.filter(e=>terms.every(term=>normalize([text(e,1),text(e,4),text(e,13)].join(' ')).includes(term)))

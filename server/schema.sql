@@ -32,3 +32,10 @@ INSERT OR IGNORE INTO schema_versions VALUES(1,datetime('now'));
 
 CREATE TABLE IF NOT EXISTS gmail_keys(user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,token_hash TEXT NOT NULL UNIQUE,created_at INTEGER NOT NULL,expires_at INTEGER NOT NULL,last_used_at INTEGER);
 INSERT OR IGNORE INTO schema_versions VALUES(2,datetime('now'));
+
+CREATE TABLE IF NOT EXISTS fastbill_batches(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),scope TEXT NOT NULL,label TEXT NOT NULL,created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS fastbill_rows(id TEXT PRIMARY KEY,batch_id TEXT NOT NULL REFERENCES fastbill_batches(id) ON DELETE CASCADE,source_key TEXT NOT NULL,fingerprint TEXT NOT NULL,payload_json TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN ('pending','applied','ignored')),organisation_id TEXT REFERENCES organisations(id),note TEXT NOT NULL DEFAULT '');
+CREATE INDEX IF NOT EXISTS fastbill_rows_batch ON fastbill_rows(batch_id,status);
+CREATE TABLE IF NOT EXISTS fastbill_decisions(scope TEXT NOT NULL,fingerprint TEXT NOT NULL,decision TEXT NOT NULL CHECK(decision IN ('applied','ignored')),organisation_id TEXT REFERENCES organisations(id),user_id TEXT NOT NULL REFERENCES users(id),created_at TEXT NOT NULL,note TEXT NOT NULL,PRIMARY KEY(scope,fingerprint));
+CREATE TABLE IF NOT EXISTS fastbill_mappings(scope TEXT NOT NULL,source_key TEXT NOT NULL,organisation_id TEXT NOT NULL REFERENCES organisations(id),PRIMARY KEY(scope,source_key,organisation_id));
+INSERT OR IGNORE INTO schema_versions VALUES(3,datetime('now'));

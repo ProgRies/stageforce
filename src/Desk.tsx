@@ -1,5 +1,5 @@
 import {api,request} from "./api";
-import EmailInbox from "./EmailInbox";
+import ImportHub from "./ImportHub";
 import EntityTools from "./EntityTools";
 import SystemSettings from "./SystemSettings";
 import {ReviewCategories,ReviewResults} from "./Review";
@@ -73,7 +73,7 @@ export default function Desk({user}:{user:User}){
   return <div className="app-shell">
     <aside className="sidebar glass">
       <div className="brand"><div className="stage-mark"><i/><i/><i/></div><span className="brand-name">Stage <span>Force</span></span></div>
-      <nav><button className={mode==="orgs"&&!reviewOnly?"nav-item active":"nav-item"} onClick={()=>{setMode("orgs");setReviewOnly(false);}}><Users size={19}/>Organisationen</button><button className={mode==="calls"?"nav-item active":"nav-item"} onClick={()=>setMode("calls")}><Phone size={19}/>Anrufe{queue.length>0&&<small>{pending.length}</small>}</button><button className={reviewOnly&&mode==="orgs"?"nav-item active":"nav-item"} onClick={()=>{if(!pick(""))return;setMode("orgs");setReviewOnly(true);setReviewDetail(false);}}><AlertCircle size={19}/>Prüfen<small className="amber-count">{overview.affected||""}</small></button><button className="nav-item" onClick={()=>setImportsOpen(true)}><Mail size={19}/>E-Mail übernehmen</button></nav>
+      <nav><button className={mode==="orgs"&&!reviewOnly?"nav-item active":"nav-item"} onClick={()=>{setMode("orgs");setReviewOnly(false);}}><Users size={19}/>Organisationen</button><button className={mode==="calls"?"nav-item active":"nav-item"} onClick={()=>setMode("calls")}><Phone size={19}/>Anrufe{queue.length>0&&<small>{pending.length}</small>}</button><button className={reviewOnly&&mode==="orgs"?"nav-item active":"nav-item"} onClick={()=>{if(!pick(""))return;setMode("orgs");setReviewOnly(true);setReviewDetail(false);}}><AlertCircle size={19}/>Prüfen<small className="amber-count">{overview.affected||""}</small></button><button className="nav-item" onClick={()=>setImportsOpen(true)}><Mail size={19}/>Importe</button></nav>
       <div className="sidebar-bottom"><button className="sheet-link" onClick={async()=>{if(editing&&!window.confirm("Ungespeicherte Eingaben verwerfen und abmelden?"))return;await request("/api/logout",{});window.location.reload();}}>Abmelden</button><div className="user"><div className="user-avatar">{initials(user?.name||"CRM")}</div><div><strong>{user?.name||"Stage Force"}</strong><span>{user?.email||"Privater Arbeitsbereich"}</span></div></div></div>
     </aside>
     <div className="workspace">
@@ -121,7 +121,7 @@ export default function Desk({user}:{user:User}){
       </div>
     </div>
     {settings&&<div className="modal-backdrop" onClick={()=>setSettings(false)}><div className="queue-modal glass" role="dialog" aria-modal="true" aria-labelledby="queue-title" onClick={e=>e.stopPropagation()}><button className="modal-close icon-button" aria-label="Schließen" onClick={()=>setSettings(false)}><X size={18}/></button><div className="modal-icon"><Phone size={26}/></div><h2 id="queue-title">Deine nächste Runde.</h2><p>Wiedervorlagen zuerst. Dann Kunden und neue Kontakte.</p><div className="queue-settings"><label><span>Anrufe</span><input type="number" min={1} max={100} value={count} onChange={e=>setCount(Math.max(1,Math.min(100,Number(e.target.value)||1)))}/></label><label><span>Kunden nach Kontaktpause</span><select value={days} onChange={e=>setDays(Number(e.target.value))}>{[30,60,90,180,365].map(d=><option key={d} value={d}>{d} Tage</option>)}</select></label><label><span>Kunden / Leads</span><select value={share} onChange={e=>setShare(Number(e.target.value))}><option value={.5}>50 / 50</option><option value={.6}>60 / 40</option><option value={.8}>80 / 20</option></select></label></div><small>{eligibleCount.toLocaleString("de-DE")} erreichbare Einträge · fehlende Telefonnummern bleiben draußen</small><button className="button primary wide" onClick={generate}>Liste erstellen <ArrowUpRight size={17}/></button></div></div>}
-    {importsOpen&&<EmailInbox entities={entities} initialImportId={initialImportId} onClose={closeImports} onSaved={async(id)=>{await refresh();setSelected(id);setReviewDetail(reviewing);setToast("E-Mail übernommen");}}/>}
+    {importsOpen&&<ImportHub accountEmail={user?.email||""} entities={entities} initialImportId={initialImportId} onClose={closeImports} onSaved={async(id)=>{await refresh();setSelected(id);setReviewDetail(reviewing);setToast("Import übernommen");}}/>}
     {toast&&<div className="toast" role="status"><Check size={16}/>{toast}</div>}
   </div>;
 }

@@ -1,6 +1,6 @@
 # Database and migration
 
-`server/schema.sql` is the executable schema. Tables use foreign keys and stable text IDs. `PRAGMA user_version` tracks the schema version; future application versions must introduce an explicit versioned migration before changing a deployed database. An older binary refuses a newer schema. Current version: 2. Version 2 adds only `gmail_keys`; startup applies it in a transaction and preserves existing CRM data. Back up before upgrading. A version 1 binary refuses a version 2 database; rollback requires restoring the pre-upgrade backup.
+`server/schema.sql` is the executable schema. Tables use foreign keys and stable text IDs. `PRAGMA user_version` tracks the schema version; future application versions must introduce an explicit versioned migration before changing a deployed database. An older binary refuses a newer schema. Current version: 3. Version 2 added `gmail_keys`; version 3 adds the four FastBill import tables below. Startup applies these additive changes in a transaction and preserves existing CRM data. Back up before upgrading. Older binaries refuse newer databases; rollback requires restoring the pre-upgrade backup.
 
 | Table | Purpose / relationship |
 | --- | --- |
@@ -19,6 +19,9 @@
 | users / sessions | Local accounts, salted scrypt password hashes, hashed opaque session tokens and CSRF tokens |
 | gmail_keys | One revocable, hashed import-only credential per user; creation, expiry and last-use timestamps |
 | email_imports | Per-user, short-lived review payload; removed on confirmation/discard/expiry |
+| fastbill_batches / fastbill_rows | Per-user review runs and whitelisted source payloads; deleting a run cascades to staged rows |
+| fastbill_decisions | Account-scoped fingerprints, applied/ignored decision, reviewer, target and note; survives run deletion |
+| fastbill_mappings | Account-scoped customer ID/number to organisation associations; many-to-many, never an automatic merge |
 | requests | Idempotency receipts for saves and email confirmations |
 | migrations / migration_archive | Import fingerprint/report and immutable original data retained to prevent loss |
 | search_docs | SQLite FTS5 index; derived, not authoritative customer data |

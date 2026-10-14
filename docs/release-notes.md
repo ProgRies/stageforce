@@ -1,24 +1,25 @@
-# Stage Force 0.1.5
+# Stage Force 0.1.6
 
-## Searchable organisation picker
+## FastBill import review
 
-Email review now has one organisation field instead of a separate search box and native dropdown. Typing immediately opens filtered results; choosing a result displays its name. The search resets for each opened message, so text from a previous email cannot appear beside another suggested organisation.
+The sidebar now opens **Importe**, with E-Mail and FastBill sources. FastBill customer CSV exports and optional invoice context go through column review, organisation matching and explicit field/contact confirmation. Unrelated records can be skipped. Repeated exports remember confirmed mappings and unchanged skip decisions; changed source data returns for review.
 
-Names, cities and primary email addresses can be searched. Arrow keys and Enter select; Escape closes. Editing the search clears the previous assignment until a result is explicitly chosen. Confirmation also waits for that selected organisation's details, preventing use of stale detail state. Out-of-order preview responses are ignored.
+The optional API adapter works from local Docker using outgoing HTTPS. Fetch customers, contacts or invoice context in pages of 100. Only `customer.get`, `contact.get` and `invoice.get` are available. Credentials remain transient; billing data is not synchronized automatically. No email or FastBill sending/write actions are implemented.
 
-The existing batch picker accepts up to 10 `.eml` files, with individual confirmation and the existing 30-message/24-hour pending queue. No full-mailbox, clipboard or FastBill CSV importer was added.
-
-## Keep local cleanup when deploying
-
-New [deployment instructions](https://github.com/ProgRies/stageforce/blob/main/docs/deployment.md#move-local-work-to-the-server) describe moving the complete SQLite backup, including accounts and confirmed changes. No repeat spreadsheet import is needed.
+Missing-phone/link checks update after confirmed enrichment. Existing manual review notes and customer/contact dates are preserved. Internal customer IDs and customer numbers are separate. Customer URLs are not guessed. [Instructions](https://github.com/ProgRies/stageforce/blob/main/docs/fastbill-import.md).
 
 ## Update
 
+Back up first, then update and rebuild:
+
 ```sh
+docker compose -f compose.local.yaml exec crm node server/cli.mjs backup /app/data/backups/before-0.1.6.sqlite
 git pull --ff-only
 docker compose -f compose.local.yaml up -d --build
 ```
 
-Refresh the browser afterward. No schema migration from 0.1.3/0.1.4. Validation: existing automated service tests, TypeScript and production build; interactive browser testing remains outstanding.
+Refresh your browser. Schema 3 adds four import tables automatically. Existing organisations, users and history remain intact. Do not repeat the initial spreadsheet import. Rollback to an older version requires the pre-upgrade backup.
 
-The versioned image is available after successful release publication: `ghcr.io/progries/stageforce:0.1.5`.
+Validated with automated service/parser/security tests, TypeScript and production build. Live FastBill export/API compatibility and interactive browser testing remain outstanding. All fixtures are fictional.
+
+The versioned image is available only after successful release publication: `ghcr.io/progries/stageforce:0.1.6`.
