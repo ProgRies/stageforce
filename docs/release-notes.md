@@ -1,28 +1,24 @@
-# Stage Force 0.1.3
+# Stage Force 0.1.4
 
-## Cleaner controls
+## Review by issue type
 
-A compact gear in the top right contains appearance/system mode, animation pause, connection status and refresh. The organisation add button stays outside, before the gear. Disclosure arrows now sit beside contact counts and section labels.
+**Prüfen** now shows issue categories in the middle panel and affected organisations on the right. Automatic checks are separated from topics in existing manual-review notes. Open a record, make corrections, and return to the same filtered list. Counts update after saving.
 
-## Gmail capture and human review
+Counts represent distinct organisations, not individual tasks. Groups may overlap. Notes are routed by keywords without being rewritten, resolved or treated as verified facts; unclassified notes stay visible. No new missing-field requirements or automatic bulk changes were added.
 
-A private Google Workspace add-on reads the selected message after an explicit click and transfers its text/headers into the signed-in owner's review queue. Attachments stay in Gmail. The add-on cannot send, draft, forward or modify emails. Nothing updates the business record until a human confirms in the CRM. Sent replies can be captured separately.
+Secondary contact numbers now count consistently in both the organisation list and detail view, avoiding false missing-phone warnings when the main number is incomplete.
 
-Per-user import-only keys can be created, renewed or revoked in settings. Keys expire after 90 days, are hashed in SQLite and cannot access CRM records. Pending reviews expire after 24 hours, require the matching account and deduplicate retries. The existing `.eml` workflow remains available.
-
-Installation requires a publicly reachable HTTPS CRM and a one-time Apps Script test deployment; Google cannot send to your computer's localhost. See [Gmail setup](https://github.com/ProgRies/stageforce/blob/main/docs/gmail-setup.md).
-
-## Update
-
-Back up before upgrading. Schema version 2 adds only the integration-key table; it applies automatically and retains existing data/accounts. No spreadsheet reimport is needed. Downgrading requires restoring the pre-upgrade backup.
+## Update and test locally
 
 ```sh
-docker compose -f compose.local.yaml exec crm node server/cli.mjs backup /app/data/before-0.1.3.sqlite
-docker compose -f compose.local.yaml cp crm:/app/data/before-0.1.3.sqlite ./before-0.1.3.sqlite
 git pull --ff-only
 docker compose -f compose.local.yaml up -d --build
 ```
 
-Refresh the browser after rebuilding. The versioned production image is published only if the release workflow succeeds: `ghcr.io/progries/stageforce:0.1.3`.
+Refresh the browser and open **Prüfen**. No data reimport or new database schema migration is needed from 0.1.3. Back up regularly; when upgrading from 0.1.2 or earlier, first follow the schema-upgrade backup instructions in [Gmail setup](https://github.com/ProgRies/stageforce/blob/main/docs/gmail-setup.md).
 
-Validation: automated service/security tests, mocked Apps Script adapter, additive upgrade preservation, TypeScript and production UI build. Browser visuals and live Gmail installation/delivery have not been tested in the build environment.
+The existing Gmail and file-import flows remain available. FastBill CSV import is not included in this version.
+
+Validation: 20 automated tests, TypeScript check and production build. New tests cover overlapping counts, preservation and fallback grouping of notes, field correction versus explicit note resolution, and consistent phone checks. Browser visual QA has not been performed in the development environment.
+
+The versioned container is available only after successful release publication: `ghcr.io/progries/stageforce:0.1.4`.
