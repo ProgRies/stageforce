@@ -1,4 +1,4 @@
-# Stage Force · 0.1.10
+# Stage Force · 0.1.11
 
 A self-hosted, shared CRM for a small team. The existing frosted desktop interface now uses SQLite on your server. It does not need Google Sheets, ChatGPT, an AI provider, Gmail credentials or a mail-sending service.
 
@@ -133,7 +133,7 @@ Local cleanup can be moved to production using a full SQLite backup, including a
 
 **Importe → FastBill** accepts customer CSV exports and optional invoice context, with editable column mapping, suggested organisations, explicit field/contact confirmation and remembered skip decisions. A read-only API adapter can fetch customers, contacts and invoice context from local Docker without a public CRM URL. No billing writes, automatic CRM updates or permanent credential storage.
 
-Start with **Kunden → Export → CSV**, including contacts. [Export/API instructions and limits](docs/fastbill-import.md). Back up before upgrading to 0.1.10: database schema 4 includes FastBill review tables and email/contact associations. Do not repeat the original spreadsheet import.
+Start with **Kunden → Export → CSV**, including contacts. [Export/API instructions and limits](docs/fastbill-import.md). Back up before upgrading to 0.1.11: database schema 4 includes FastBill review tables and email/contact associations. Do not repeat the original spreadsheet import.
 
 ## Email wizard and communication view
 

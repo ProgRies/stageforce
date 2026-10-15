@@ -2,7 +2,9 @@
 
 ## First production deployment (GHCR)
 
-The production Compose file runs the published `ghcr.io/progries/stageforce:0.1.10` image on amd64 or arm64. It includes persistent SQLite storage, health checks, bounded logs, graceful shutdown and a read-only root filesystem. It does not install Traefik or configure DNS. Run one CRM instance on local storage.
+The production Compose file runs the published `ghcr.io/progries/stageforce:latest` image on amd64 or arm64. It includes persistent SQLite storage, health checks, bounded logs, graceful shutdown and a read-only root filesystem. It does not install Traefik or configure DNS. Run one CRM instance on local storage.
+
+The `latest` tag advances on releases from `main`; updates still require an explicit pull and `up`. To pin a release for rollback, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.1.11` (or the relevant published version).
 
 ### 1. Prepare routing and configuration
 
@@ -16,12 +18,14 @@ cd stageforce
 cp .env.example .env
 ```
 
+If Compose reports `CRM_HOST is missing`, the production `.env` has not been created or does not define that value. Run the commands from this directory. For **local Mac testing**, use `docker compose -p stageforce-real -f compose.local.yaml up -d --build` instead; this local file needs no production `.env` or Traefik. Omit the project flag only if your existing local instance uses the default project.
+
 Copy `.env.example` only on the first installation. Review `.env`:
 
 | Setting | Default / meaning |
 | --- | --- |
 | `CRM_HOST` | `stageforce.jaimo.me`, hostname only |
-| `CRM_IMAGE` | `ghcr.io/progries/stageforce:0.1.10`, published version |
+| `CRM_IMAGE` | `ghcr.io/progries/stageforce:latest`, latest published release |
 | `TRAEFIK_NETWORK` | `reverse-proxy`, existing external network |
 | `TRAEFIK_ENTRYPOINT` | `web-secure`, existing HTTPS entrypoint |
 | `TRAEFIK_CERTRESOLVER` | `letsencrypt`, existing certificate resolver |
@@ -104,7 +108,7 @@ docker compose cp crm:/app/data/backups/before-update.sqlite ./before-update.sql
 git pull --ff-only
 ```
 
-Set `CRM_IMAGE` in the existing `.env` to the desired **published** GHCR version (currently `ghcr.io/progries/stageforce:0.1.10`). An old `.env` containing `stageforce:0.1.10` overrides the new default and must be updated. Then:
+Set `CRM_IMAGE` in the existing `.env` to `ghcr.io/progries/stageforce:latest` (or a published version tag to pin a release). An old `.env` containing `stageforce:0.1.10` overrides the new default and must be updated. Then:
 
 ```sh
 docker compose config --quiet

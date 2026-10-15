@@ -2,7 +2,7 @@
 
 Canonical repository: https://github.com/ProgRies/stageforce.
 
-Production `compose.yaml` pulls the versioned GHCR image. See [deployment.md](deployment.md) for server setup. `compose.local.yaml` remains the separate local source-build configuration.
+Production `compose.yaml` pulls `ghcr.io/progries/stageforce:latest` by default. See [deployment.md](deployment.md) for server setup. `compose.local.yaml` remains the separate local source-build configuration.
 
 Keep the private initial-data archive in a completely separate location. No customer rows, email exports, database files or passwords belong in Git or the Docker build context.
 
@@ -16,8 +16,10 @@ Every push to main and pull request runs `.github/workflows/ci.yml`: tests, type
 
 A push to main that changes `package.json` or the release workflow starts a release. For later releases, update the version and release notes first.
 
-Alternatively, in GitHub Actions, select **Build and publish**, then **Run workflow** on main. Alternatively, push a version tag matching `package.json`, such as `v0.1.10`. The workflow tests the code and container before publishing amd64/arm64 images and creating a GitHub release with the matching version tag. The versioned image, after successful publication, is `ghcr.io/progries/stageforce:0.1.10`.
+Alternatively, in GitHub Actions, select **Build and publish**, then **Run workflow** on main. Alternatively, push a version tag matching `package.json`, such as `v0.1.11`. The workflow tests the code and container before publishing amd64/arm64 images and creating a GitHub release with the matching version tag. The versioned image, after successful publication, is `ghcr.io/progries/stageforce:0.1.11`.
 
 It uses the repository workflow token with contents and packages write permissions. No production credentials or customer data are needed. A green CI check alone does not publish an image; the release workflow must finish successfully.
 
-After publication, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.1.10` in the server's `.env`, then run `docker compose pull` and `docker compose up -d --no-build`. Check package visibility in GitHub; private packages require registry authentication on the server. Use a new package version and release tag for subsequent releases rather than replacing an existing release version.
+Successful builds from `main` also publish `latest` alongside the immutable version tag. Tag-triggered historical releases do not move `latest`. No automatic container updates run on the server: the administrator explicitly pulls and recreates the service.
+
+After publication, set `CRM_IMAGE=ghcr.io/progries/stageforce:latest` in the server's `.env`, then run `docker compose pull` and `docker compose up -d --no-build`. Check package visibility in GitHub; private packages require registry authentication on the server. Use a new package version and release tag for subsequent releases rather than replacing an existing release version.

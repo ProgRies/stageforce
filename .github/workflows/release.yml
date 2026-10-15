@@ -61,6 +61,7 @@ jobs:
           push: true
           tags: |
             ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }}
+            ${{ github.ref == 'refs/heads/main' && format('{0}:latest', steps.meta.outputs.image) || '' }}
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}

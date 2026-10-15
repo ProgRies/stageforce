@@ -5,7 +5,7 @@
 # docker compose up -d
 services:
   crm:
-    image: ${CRM_IMAGE:-ghcr.io/progries/stageforce:0.1.10}
+    image: ${CRM_IMAGE:-ghcr.io/progries/stageforce:latest}
     restart: unless-stopped
     init: true
     stop_grace_period: 30s

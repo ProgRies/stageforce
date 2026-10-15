@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 // Check Docker's resolved configuration, including interpolation and normalization.
 const config = JSON.parse(readFileSync(process.argv[2], 'utf8'));
 const crm = config.services.crm;
-assert.equal(crm.image, 'ghcr.io/progries/stageforce:0.1.10');
+assert.equal(crm.image, 'ghcr.io/progries/stageforce:latest');
 assert.equal(crm.build, undefined, 'Production must pull a published image');
 assert.ok(!crm.ports?.length, 'Only Traefik may expose the application');
 assert.equal(crm.environment.APP_URL, 'https://stageforce.jaimo.me');

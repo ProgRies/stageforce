@@ -1,18 +1,28 @@
-# Stage Force 0.1.10
+# Stage Force 0.1.11
 
-Opening the login page without an existing session no longer incorrectly displays “Sitzung abgelaufen”. A genuinely expired session during CRM use still returns the user to login, with a small neutral notice. Failed sign-in attempts retain a distinct, compact error message. Authentication and access checks are unchanged.
+Production deployment now defaults to `ghcr.io/progries/stageforce:latest`. Releases from `main` publish both `latest` and their version tag for amd64 and arm64 after tests and container smoke checks pass. Historical tag builds do not move `latest`.
 
-No database migration or repeat import is needed.
+The complete production Compose configuration includes persistent storage, health checks, bounded logs and configurable Traefik settings for `stageforce.jaimo.me`. Local Compose continues to build from source and keeps its separate database.
 
-## Update
+No application behavior or database schema changes; no repeat import is needed.
 
-For the Mac installation using the `stageforce-real` Compose project, run separately, continuing only if the pull succeeds:
+## Production update
+
+Keep your existing `.env` and database volume. On the server, ensure `.env` contains `CRM_HOST=stageforce.jaimo.me` and `CRM_IMAGE=ghcr.io/progries/stageforce:latest`. On a fresh installation only, copy `.env.example` to `.env` and review the Traefik settings. Back up an existing database before updating.
+
+```sh
+git pull --ff-only
+docker compose pull
+docker compose up -d
+```
+
+## Mac local update
+
+For the existing `stageforce-real` instance:
 
 ```sh
 git pull --ff-only
 docker compose -p stageforce-real -f compose.local.yaml up -d --build
 ```
 
-If your installation uses the default project, omit `-p stageforce-real`. Refresh the browser afterward.
-
-Regression tests cover unauthenticated session checks, invalid login credentials and expiry during protected CRM requests. Interactive browser verification remains outstanding.
+Use the same project name as before to retain your database. See [deployment instructions](deployment.md) for server accounts, data transfer and Gmail pairing.
