@@ -32,18 +32,28 @@ Choose a password of at least 12 characters at the hidden prompt, then open <htt
 
 ## Deploy behind your existing Traefik
 
-The configuration uses the Glass Board conventions: `reverse-proxy`, `web-secure`, `letsencrypt`, and `default@file`. Your administrator sets DNS/TLS and can change these four Traefik values if necessary.
+Production `compose.yaml` pulls the published GHCR image; it does not build on the server. Defaults target **https://stageforce.jaimo.me** and the Glass Board Traefik conventions (`reverse-proxy`, `web-secure`, `letsencrypt`, `default@file`). Your administrator must verify those names and configure DNS/TLS.
+
+For a fresh deployment:
 
 ```sh
 git clone https://github.com/ProgRies/stageforce.git
 cd stageforce
 cp .env.example .env
-# Edit CRM_HOST in .env, for example crm.example.com.
-docker compose up -d --build
-docker compose exec crm node server/cli.mjs user:add you@example.com "Your Name"
+# Review .env against the server's Traefik configuration.
+docker compose config --quiet
+docker compose pull
+docker compose up -d
+docker compose ps
 ```
 
-The startup command builds the source locally. `.env` selects the local `stageforce:0.1.10` image; no registry account is required. A versioned registry image is available only after a successful release workflow. Open the HTTPS address and log in after creating the account. No default password, shared password or public registration exists.
+Then restore your locally worked-on database **or**, for an empty installation, create your account:
+
+```sh
+docker compose exec crm node server/cli.mjs user:add ries@jaimo-solutions.com "Christian Ries"
+```
+
+The CLI prompts for a password; there is no public signup. After restoring a database, use its existing accounts. See the [complete administrator deployment guide](docs/deployment.md#first-production-deployment-ghcr) for registry access, data transfer, updates and Gmail pairing. Existing deployments must retain their `.env`, project name and volume; update `CRM_IMAGE` there if it still names a local image.
 
 All colleagues have equal CRM read/edit access. Each action uses their individual account. Account management is through CLI only. Local accounts do not grant access to a colleague's mailbox.
 

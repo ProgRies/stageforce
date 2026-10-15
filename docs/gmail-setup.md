@@ -4,28 +4,21 @@ This is a private Google Workspace add-on, not a Chrome extension. It reads the 
 
 ## 1. Update and deploy the CRM
 
-You can test the new settings and the existing `.eml` workflow on localhost. Google runs the add-on on its own servers: it cannot deliver to `localhost:3000` on your computer. For the Gmail test, first deploy this version on your server with a publicly reachable HTTPS address, e.g. `https://crm.example.com`. Set `APP_URL` to exactly that origin, without a path. Your administrator handles HTTPS as before.
+Google runs the add-on on its own servers: it cannot deliver to `localhost:3000` on your computer. Deploy the CRM at **https://stageforce.jaimo.me** using the [administrator guide](deployment.md#first-production-deployment-ghcr). Production Compose pulls the published GHCR image and derives `APP_URL` from `CRM_HOST`.
 
-Back up before the schema upgrade (PowerShell, from the repository folder):
+Back up an existing database before updating. Restore your locally worked-on SQLite database if you want to preserve local edits and accounts; do not reimport the original spreadsheet after restoration.
 
-```powershell
-docker compose -f compose.local.yaml exec crm node server/cli.mjs backup /app/data/before-0.1.3.sqlite
-docker compose -f compose.local.yaml cp crm:/app/data/before-0.1.3.sqlite ./before-0.1.3.sqlite
-git pull --ff-only
-docker compose -f compose.local.yaml up -d --build
-```
+Verify login and the public icon URL `https://stageforce.jaimo.me/assets/stageforce-icon.svg`. Reverse proxies must allow the authenticated server-to-server endpoint; a browser-only authentication wall in front of it will block Google. Keep the application's key authentication; no CORS change is needed.
 
-Keep that backup private. Startup automatically adds the key table; do not reimport the spreadsheet or recreate accounts. For production, use `compose.yaml` instead of `compose.local.yaml`. The backup must be made before running the new image. Restoring the old version requires restoring this backup, because the database schema version advances from 1 to 2.
-
-Verify login and the public icon URL `https://crm.example.com/assets/stageforce-icon.svg`. Reverse proxies must allow the authenticated server-to-server endpoint; a browser-only authentication wall in front of it will block Google. Do not remove the application's key authentication or enable CORS.
+If the add-on is already visible in Gmail, verify its configured hostname below, then proceed directly to **3. Pair your account**.
 
 ## 2. Create your Apps Script project
 
 1. Sign into [script.google.com](https://script.google.com/) with `you@your-company.example` and create a standalone project named **Stage Force**.
 2. Copy [Code.gs](../integrations/gmail/Code.gs) into its `Code.gs` file.
-3. In Project Settings, enable **Show “appsscript.json” manifest file in editor**. Replace that file with [appsscript.json](../integrations/gmail/appsscript.json).
+3. In **Projekteinstellungen**, enable **Manifestdatei „appsscript.json“ im Editor anzeigen**. Replace that file with [appsscript.json](../integrations/gmail/appsscript.json).
 4. Replace the example hostname with your actual CRM hostname: update `CRM_ORIGIN` in `Code.gs` and all three hostname entries in the manifest (fetch allowlist, logo URL, open-link prefix). Keep HTTPS, exact host and the supplied path restrictions.
-5. Save. Choose **Deploy → Test deployments → Install**, then **Done**. This installs an unpublished test add-on for you; do not deploy it as a web app.
+5. Save. Choose **Bereitstellen → Bereitstellungen testen → Installieren**, then **Fertig**. This installs an unpublished test add-on for you; do not deploy it as a web app.
 6. Reload Gmail. Open the Stage Force icon in the right sidebar and authorize the add-on when prompted. Your Workspace administrator may need to allow the internal test app.
 
 Expected permissions: run as a Gmail add-on, read the open message when you interact, connect to the configured CRM, and read your own Google email address to match the CRM account. The manifest intentionally contains no send, compose, modify, full-mailbox or broad `gmail.readonly` permission. Do not accept an unexpected write/full-mailbox permission by expanding the manifest to work around an error.

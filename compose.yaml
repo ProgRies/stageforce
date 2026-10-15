@@ -1,14 +1,25 @@
 # Production deployment behind the same Traefik as Glass Board.
-# Initial build: docker compose up -d --build
-# With a published image, run separately:
+# Pulls the published image; no source build or host Node installation required.
+# See docs/deployment.md for first deployment, accounts and data transfer.
 # docker compose pull
-# docker compose up -d --no-build
+# docker compose up -d
 services:
   crm:
-    image: ${CRM_IMAGE:-stageforce:0.1.10}
-    build: .
+    image: ${CRM_IMAGE:-ghcr.io/progries/stageforce:0.1.10}
     restart: unless-stopped
     init: true
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
@@ -25,13 +36,13 @@ services:
     cap_drop: [ALL]
     labels:
       traefik.enable: "true"
-      traefik.docker.network: reverse-proxy
-      traefik.http.routers.stage-crm.entrypoints: web-secure
+      traefik.docker.network: ${TRAEFIK_NETWORK:-reverse-proxy}
+      traefik.http.routers.stage-crm.entrypoints: ${TRAEFIK_ENTRYPOINT:-web-secure}
       traefik.http.routers.stage-crm.rule: "Host(`${CRM_HOST:?Set CRM_HOST in .env}`)"
       traefik.http.routers.stage-crm.service: stage-crm
       traefik.http.routers.stage-crm.tls: "true"
-      traefik.http.routers.stage-crm.tls.certresolver: letsencrypt
-      traefik.http.routers.stage-crm.middlewares: default@file
+      traefik.http.routers.stage-crm.tls.certresolver: ${TRAEFIK_CERTRESOLVER:-letsencrypt}
+      traefik.http.routers.stage-crm.middlewares: ${TRAEFIK_MIDDLEWARES-default@file}
       traefik.http.services.stage-crm.loadbalancer.server.port: "3000"
     networks:
       - default
@@ -39,5 +50,6 @@ services:
 networks:
   reverse-proxy:
     external: true
+    name: ${TRAEFIK_NETWORK:-reverse-proxy}
 volumes:
   storage:
