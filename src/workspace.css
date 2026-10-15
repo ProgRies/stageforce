@@ -62,3 +62,7 @@
 .tour-card header,.tour-card footer{display:flex;align-items:center;justify-content:space-between;gap:15px}.tour-card header{margin:-8px -8px 8px 0}.tour-card small{color:#778299;font-size:12px;font-variant-numeric:tabular-nums}.tour-card h2{font-size:19px;letter-spacing:-.25px;font-weight:600;line-height:1.45}.tour-card p{font-size:14px;line-height:1.75;color:#62708a;margin:10px 0 22px}.tour-card .text-button{font-size:12px;gap:6px}
 [data-theme="dark"] .tour-card{background:#202b45;color:#edf1ff;border-color:#aabbec33}[data-theme="dark"] .tour-card p,[data-theme="dark"] .tour-card small{color:#b3bfd8}
 .fastbill-field.missing input{border-color:#cf9b5266}.fastbill-field.missing>span>small{font-size:11px;color:var(--amber);margin-left:auto}
+
+/* A fresh login is quiet; only an interrupted session needs a small notice. */
+.login-card .login-notice{display:flex;align-items:center;gap:8px;margin:16px 0 0;padding:0;font-size:13px;line-height:1.5;color:var(--muted)}
+.login-card .login-error{margin:16px 0 0;padding:10px 12px;font-size:13px;line-height:1.5;border-radius:10px}

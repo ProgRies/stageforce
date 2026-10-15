@@ -1,21 +1,18 @@
-# Stage Force 0.1.9
+# Stage Force 0.1.10
 
-- Connected timeline cards for emails and calls, newest first. Historical generic **Kontakt** entries keep their original wording and dates.
-- Inline call entry, contact editing and organisation linking.
-- Visible right-hand fields for status, phase, owner, follow-up, summary, FastBill URL and review notes. Explicit save, unsaved-edit warnings and version checks protect changes. Missing expected FastBill links are highlighted.
-- **In Gmail suchen** opens an organisation/contact search in a new tab for the current CRM account. No email access or changes.
-- Top-right question mark opens a guided spotlight tour, with keyboard navigation and Escape to close.
-- Gmail add-on capture and the three-step email reviewer remain compatible. No database schema change or repeat import.
+Opening the login page without an existing session no longer incorrectly displays “Sitzung abgelaufen”. A genuinely expired session during CRM use still returns the user to login, with a small neutral notice. Failed sign-in attempts retain a distinct, compact error message. Authentication and access checks are unchanged.
+
+No database migration or repeat import is needed.
 
 ## Update
 
-Run these commands separately in your Stage Force folder:
+For the Mac installation using the `stageforce-real` Compose project, run separately, continuing only if the pull succeeds:
 
-```powershell
+```sh
 git pull --ff-only
-docker compose -f compose.local.yaml up -d --build
+docker compose -p stageforce-real -f compose.local.yaml up -d --build
 ```
 
-Only run the second command if the pull succeeded. Refresh the browser afterward. Existing Docker volumes and data remain in place; do not run `down -v`.
+If your installation uses the default project, omit `-p stageforce-real`. Refresh the browser afterward.
 
-47 automated tests, type checking and the production build pass locally. The Gmail adapter and HTTP review flow are covered with mocked Google services and synthetic data. Interactive browser QA and a live Workspace add-on test remain outstanding. The versioned image becomes available after successful publication: `ghcr.io/progries/stageforce:0.1.9`.
+Regression tests cover unauthenticated session checks, invalid login credentials and expiry during protected CRM requests. Interactive browser verification remains outstanding.
