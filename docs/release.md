@@ -16,7 +16,7 @@ Every push to main and pull request runs `.github/workflows/ci.yml`: tests, type
 
 A push to main that changes `package.json` or the release workflow starts a release. For later releases, update the version and release notes first.
 
-Alternatively, in GitHub Actions, select **Build and publish**, then **Run workflow** on main. Alternatively, push a version tag matching `package.json`, such as `v0.1.11`. The workflow tests the code and container before publishing amd64/arm64 images and creating a GitHub release with the matching version tag. The versioned image, after successful publication, is `ghcr.io/progries/stageforce:0.1.11`.
+Alternatively, in GitHub Actions, select **Build and publish**, then **Run workflow** on main. Alternatively, push a version tag matching `package.json`, such as `v0.1.12`. The workflow tests the code and container before publishing amd64/arm64 images and creating a GitHub release with the matching version tag. The versioned image, after successful publication, is `ghcr.io/progries/stageforce:0.1.12`.
 
 It uses the repository workflow token with contents and packages write permissions. No production credentials or customer data are needed. A green CI check alone does not publish an image; the release workflow must finish successfully.
 

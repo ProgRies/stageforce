@@ -1,4 +1,4 @@
-# Stage Force · 0.1.11
+# Stage Force · 0.1.12
 
 A self-hosted, shared CRM for a small team. The existing frosted desktop interface now uses SQLite on your server. It does not need Google Sheets, ChatGPT, an AI provider, Gmail credentials or a mail-sending service.
 
@@ -121,7 +121,7 @@ See [docs/release.md](docs/release.md) for source-only GitHub/GHCR publication.
 
 ## Gmail button
 
-The selected-message add-on and private test installation steps are in [docs/gmail-setup.md](docs/gmail-setup.md). Pair each account under the top-right gear → Gmail verbinden. A publicly reachable HTTPS deployment is required for Google delivery; the `.eml` workflow continues to work locally. Version 0.1.3 adds one database table automatically; back up before upgrading and do not repeat the initial spreadsheet import.
+The selected-message add-on supports organisation matching, contact selection and explicit CRM saving directly in Gmail. Existing installations need the updated Code.gs and a renewed CRM key; Google scopes stay unchanged. Installation steps are in [docs/gmail-setup.md](docs/gmail-setup.md). Pair each account under the top-right gear → Gmail verbinden. A publicly reachable HTTPS deployment is required for Google delivery; the `.eml` workflow continues to work locally. Version 0.1.12 upgrades to schema 5, preserving old capture-only key permissions; back up before upgrading and do not repeat the initial spreadsheet import.
 
 ## Review by issue type
 
@@ -133,7 +133,7 @@ Local cleanup can be moved to production using a full SQLite backup, including a
 
 **Importe → FastBill** accepts customer CSV exports and optional invoice context, with editable column mapping, suggested organisations, explicit field/contact confirmation and remembered skip decisions. A read-only API adapter can fetch customers, contacts and invoice context from local Docker without a public CRM URL. No billing writes, automatic CRM updates or permanent credential storage.
 
-Start with **Kunden → Export → CSV**, including contacts. [Export/API instructions and limits](docs/fastbill-import.md). Back up before upgrading to 0.1.11: database schema 4 includes FastBill review tables and email/contact associations. Do not repeat the original spreadsheet import.
+Start with **Kunden → Export → CSV**, including contacts. [Export/API instructions and limits](docs/fastbill-import.md). Back up before upgrading to 0.1.12: database schema 5 includes FastBill review tables, email/contact associations and scoped Gmail review permissions. Do not repeat the original spreadsheet import.
 
 ## Email wizard and communication view
 

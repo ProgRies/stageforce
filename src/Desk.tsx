@@ -19,7 +19,7 @@ const initials=(s:string)=>s.split(/\s+/).filter(Boolean).slice(0,2).map(s=>s[0]
 export default function Desk({user}:{user:User}){
   const [inlineSaving,setInlineSaving]=useState(false),[inlinePending,setInlinePending]=useState(false),[tour,setTour]=useState(false),[viewEpoch,setViewEpoch]=useState(0);
   const [data,setData]=useState<Dataset|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState<Failure|null>(null),[toast,setToast]=useState("");
-  const [mode,setMode]=useState<"orgs"|"calls">("orgs"),[query,setQuery]=useState(""),[filter,setFilter]=useState("Alle"),[reviewOnly,setReviewOnly]=useState(false),[selected,setSelected]=useState("");
+  const [mode,setMode]=useState<"orgs"|"calls">("orgs"),[query,setQuery]=useState(""),[filter,setFilter]=useState("Alle"),[reviewOnly,setReviewOnly]=useState(false),[selected,setSelected]=useState(()=>new URLSearchParams(window.location.search).get('organisation')||'');
   const [editing,setEditing]=useState(false),[draft,setDraft]=useState<Record<number,string>>({}),[note,setNote]=useState<Note>(emptyNote()),[baseVersion,setBaseVersion]=useState(""),[saving,setSaving]=useState(false),[saveError,setSaveError]=useState<Failure|null>(null),[conflictEntity,setConflictEntity]=useState<Entity|null>(null);
   const [queue,setQueue]=useState<QueueItem[]>([]),[done,setDone]=useState<string[]>([]),[skipped,setSkipped]=useState<string[]>([]),[settings,setSettings]=useState(false),[count,setCount]=useState(30),[days,setDays]=useState(90),[share,setShare]=useState(.6),[pendingCall,setPendingCall]=useState(false),[visibleCount,setVisibleCount]=useState(80);
   const [reviewCategory,setReviewCategory]=useState<ReviewSelection>("all"),[reviewDetail,setReviewDetail]=useState(false);

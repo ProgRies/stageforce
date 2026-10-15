@@ -76,7 +76,7 @@ test('version 1 database upgrades additively and retains users and organisations
  try{
   const id=await addUser(db,'alex@example.test','Alex',password),org=createOrg(db,{id},'Existing customer');
   db.exec('DROP TABLE gmail_keys; DELETE FROM schema_versions WHERE version=2; PRAGMA user_version=1');db.close();db=openDB(path);
-  assert.equal(db.prepare('PRAGMA user_version').get().user_version,4);
+  assert.equal(db.prepare('PRAGMA user_version').get().user_version,5);
   assert.equal(db.prepare('SELECT name FROM organisations WHERE id=?').get(org.id).name,'Existing customer');
   assert.equal(db.prepare('SELECT email FROM users WHERE id=?').get(id).email,'alex@example.test');
   assert.equal(db.prepare('SELECT count(*) n FROM gmail_keys').get().n,0);assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(),[]);
@@ -92,7 +92,7 @@ test('Apps Script adapter uses selected-message reads only and sends no attachme
  const calls=[],requests=[],store=new Map([['stageforceCaptureKey','sf_gmail_'+'a'.repeat(43)]]);
  function widget(){return new Proxy({},{get:(_,name)=>(...args)=>{calls.push([name,...args]);return widget();}});}
  const context=vm.createContext({
-  CardService:new Proxy({OpenAs:{FULL_SIZE:'FULL_SIZE'}},{get:(o,k)=>o[k]||(()=>widget())}),
+  CardService:new Proxy({OpenAs:{FULL_SIZE:'FULL_SIZE'},TextButtonStyle:{FILLED:'FILLED'}},{get:(o,k)=>o[k]||(()=>widget())}),
   PropertiesService:{getUserProperties:()=>({getProperty:k=>store.get(k),setProperty:(k,v)=>store.set(k,v),deleteProperty:k=>store.delete(k)})},
   Session:{getActiveUser:()=>({getEmail:()=>selected.mailbox})},
   GmailApp:{setCurrentMessageAccessToken:t=>calls.push(['access',t]),getMessageById:id=>{assert.equal(id,selected.gmailId);calls.push(['message',id]);return{

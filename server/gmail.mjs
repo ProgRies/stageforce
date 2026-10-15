@@ -3,20 +3,20 @@ import {hashToken,limited} from './auth.mjs';
 import {Problem,stageImport} from './crm.mjs';
 import {parseEmail} from './email.mjs';
 
-// A key can stage a selected message, never read CRM records or confirm an import.
+// Existing keys remain capture-only. Sidebar review requires explicitly issuing a new review key.
 export function gmailStatus(db,user){
- const row=db.prepare('SELECT created_at,expires_at,last_used_at FROM gmail_keys WHERE user_id=?').get(user.id);
+ const row=db.prepare('SELECT created_at,expires_at,last_used_at,sidebar_review FROM gmail_keys WHERE user_id=?').get(user.id);
  return {email:user.email,connected:!!row&&row.expires_at>Date.now(),...row};
 }
 export function revokeGmailKey(db,user){db.prepare('DELETE FROM gmail_keys WHERE user_id=?').run(user.id);}
-export function createGmailKey(db,user){
+export function createGmailKey(db,user,{sidebarReview=false}={}){
  const token='sf_gmail_'+randomBytes(32).toString('base64url'),created=Date.now(),expires=created+90*86400000;
- db.prepare('INSERT INTO gmail_keys(user_id,token_hash,created_at,expires_at) VALUES(?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET token_hash=excluded.token_hash,created_at=excluded.created_at,expires_at=excluded.expires_at,last_used_at=NULL').run(user.id,hashToken(token),created,expires);
+ db.prepare('INSERT INTO gmail_keys(user_id,token_hash,created_at,expires_at,sidebar_review) VALUES(?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET token_hash=excluded.token_hash,created_at=excluded.created_at,expires_at=excluded.expires_at,last_used_at=NULL,sidebar_review=excluded.sidebar_review').run(user.id,hashToken(token),created,expires,sidebarReview?1:0);
  return {...gmailStatus(db,user),token};
 }
 export function authorizeGmail(db,req,rateLimit=true){
  const match=/^Bearer (sf_gmail_[A-Za-z0-9_-]{43})$/.exec(req.headers.authorization||'');
- const user=match&&db.prepare('SELECT u.* FROM gmail_keys k JOIN users u ON u.id=k.user_id WHERE k.token_hash=? AND k.expires_at>? AND u.active=1').get(hashToken(match[1]),Date.now());
+ const user=match&&db.prepare('SELECT u.*,k.sidebar_review FROM gmail_keys k JOIN users u ON u.id=k.user_id WHERE k.token_hash=? AND k.expires_at>? AND u.active=1').get(hashToken(match[1]),Date.now());
  if(!user)throw new Problem('Gmail-Verbindung fehlt oder ist abgelaufen. Bitte im CRM neu verbinden.',401,'unauthorized');
  if(rateLimit&&limited(db,'gmail:'+user.id,20,60000))throw new Problem('Bitte eine Minute warten und erneut versuchen.',429);
  return user;

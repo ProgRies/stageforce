@@ -7,6 +7,7 @@ import {getSession,verifyPassword,createSession,limited,publicUser} from './auth
 import {Problem,listData,entity,history,search,save,createOrg,contactSave,linkSave,stageImport,importPreview,confirmImport,timelinePosition} from './crm.mjs';
 import {inspectCSV,csvRecords,stageFastbill,fastbillBatches,fastbillRows,fastbillPreview,decideFastbill,deleteFastbillBatch,fetchFastbillPage} from './fastbill.mjs';
 import {parseEmail} from './email.mjs';
+import {reviewGmail} from './gmail-review.mjs';
 import {gmailStatus,createGmailKey,revokeGmailKey,authorizeGmail,selectedGmailMessage,stageGmailMessage} from './gmail.mjs';
 export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:3000',staticDir=resolve('dist')}={}){
  const url=new URL(origin);if(url.origin!==origin.replace(/\/$/,''))throw Error('APP_URL must be an origin without a path.');origin=url.origin;const secure=url.protocol==='https:';if(process.env.NODE_ENV==='production'&&!secure)throw Error('Production APP_URL must use HTTPS.');let parsing=0;
@@ -18,12 +19,17 @@ export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:300
  try{const path=new URL(req.url,'http://internal').pathname;
  if(req.method==='GET'&&path==='/healthz')return json(res,200,{ok:db.prepare('SELECT 1 AS ok').get().ok===1});
  // Isolated server-to-server endpoint. No cookie/session authorization and no CORS.
- if(path==='/api/integrations/gmail/check'||path==='/api/integrations/gmail/import'){
+ if(path==='/api/integrations/gmail/check'||path==='/api/integrations/gmail/import'||path==='/api/integrations/gmail/review'){
   if(req.method!=='POST')throw new Problem('Methode nicht erlaubt.',405);
   if(req.headers.origin)throw new Problem('Nur für das Gmail-Add-on.',403);
-  const user=authorizeGmail(db,req);
+  const user=authorizeGmail(db,req,!path.endsWith('/review'));
   if(!String(req.headers['content-type']).startsWith('application/json'))throw new Problem('JSON erwartet.',415);
-  if(path.endsWith('/check')){await body(req,1024);return success(res,{email:user.email});}
+  if(path.endsWith('/check')){await body(req,1024);return success(res,{email:user.email,...(user.sidebar_review?{sidebarReview:true}:{})});}
+  if(path.endsWith('/review')){
+   const input=JSON.parse((await body(req,128*1024)).toString());
+   const current=authorizeGmail(db,req,false);
+   return success(res,reviewGmail(db,current,input,origin));
+  }
   if(parsing>=2)throw new Problem('Bitte kurz warten und erneut versuchen.',429);
   parsing++;try{
    const input=JSON.parse((await body(req,3*1024*1024)).toString());
@@ -67,7 +73,7 @@ export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:300
   const b=JSON.parse((await body(req)).toString());let data;
   switch(b.action){
    case 'gmailStatus':data={...gmailStatus(db,session),publicHttps:secure};break;
-   case 'gmailCreate':data={...createGmailKey(db,session),publicHttps:secure};break;
+   case 'gmailCreate':data={...createGmailKey(db,session,{sidebarReview:b.sidebarReview===true}),publicHttps:secure};break;
    case 'gmailRevoke':revokeGmailKey(db,session);data={...gmailStatus(db,session),publicHttps:secure};break;
    case 'load':data=listData(db);break;
    case 'detail':data={entity:entity(db,b.id,true),history:history(db,b.id,0,b.historyKind||'all')};break;

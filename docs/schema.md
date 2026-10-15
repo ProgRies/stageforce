@@ -40,3 +40,7 @@ Validate each private snapshot by comparing organisation, contact, activity and 
 The UI loads a compact organisation list and queries the full-text index for deeper matches. History is paged in batches of 40; email bodies are fetched on expansion. No attachments or mailbox mirror are stored. Search-index updates and business writes share the same transaction.
 
 Communication history and internal notes are separately filtered and paginated. Both use the reviewed event date, then the original email timestamp when present, then recording order. The wizard computes the proposed position from all communication rows, not just the first page. Unknown dates remain unknown; calls without a time sort after timed emails on the same date. Email import explicitly whitelists status, phase and follow-up changes, so it cannot override the last-contact date directly.
+
+## Schema 5: Gmail sidebar review
+
+Startup adds `gmail_keys.sidebar_review` with default 0. Existing keys retain capture-only permissions. Explicit key creation/renewal from the updated CRM settings sets this flag to 1 and rotates the key. The existing import queue and atomic `confirmImport` transaction remain the source of truth; no parallel email database or AI processing is introduced. The scoped sidebar API exposes limited matching/context and confirmation of the key owner's imports only. No customer data is rewritten by this migration.

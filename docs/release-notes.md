@@ -1,28 +1,23 @@
-# Stage Force 0.1.11
+# Stage Force 0.1.12
 
-Production deployment now defaults to `ghcr.io/progries/stageforce:latest`. Releases from `main` publish both `latest` and their version tag for amd64 and arm64 after tests and container smoke checks pass. Historical tag builds do not move `latest`.
+Review and save selected emails directly in the Gmail sidebar: confirm or find/create an organisation, select its contacts, check message text and timeline placement, then explicitly save. Stage-purple primary actions keep the native cards simple. Google's card interface does not support custom glass backgrounds.
 
-The complete production Compose configuration includes persistent storage, health checks, bounded logs and configurable Traefik settings for `stageforce.jaimo.me`. Local Compose continues to build from source and keeps its separate database.
+The same parser, conservative quote cleanup, duplicate detection, atomic save and conflict checks power both Gmail and the existing browser reviewer. Long text previews are paginated without truncating stored content. After saving, a link opens the organisation in the CRM. No new Gmail permissions, background scans, AI processing, sending or mailbox writes.
 
-No application behavior or database schema changes; no repeat import is needed.
+## Update
 
-## Production update
-
-Keep your existing `.env` and database volume. On the server, ensure `.env` contains `CRM_HOST=stageforce.jaimo.me` and `CRM_IMAGE=ghcr.io/progries/stageforce:latest`. On a fresh installation only, copy `.env.example` to `.env` and review the Traefik settings. Back up an existing database before updating.
+Back up the database before deployment. On the server:
 
 ```sh
+docker compose exec crm node server/cli.mjs backup /app/data/backups/before-0.1.12.sqlite
+docker compose cp crm:/app/data/backups/before-0.1.12.sqlite ./before-0.1.12.sqlite
 git pull --ff-only
 docker compose pull
 docker compose up -d
 ```
 
-## Mac local update
+Use `CRM_IMAGE=ghcr.io/progries/stageforce:latest` or `:0.1.12`. Startup applies schema 5 automatically. Do not repeat the original import. A rollback to an older version requires the matching database backup.
 
-For the existing `stageforce-real` instance:
+In Apps Script replace `Code.gs` with the current repository version, retain `CRM_ORIGIN='https://stageforce.jaimo.me'`, save and reload Gmail. Keep the existing manifest and its configured hostname. In the hosted CRM, renew your Gmail connection key; remove the old connection in the sidebar and connect with the replacement. Old keys remain capture-only and continue to offer the browser review path. See [Gmail setup](gmail-setup.md).
 
-```sh
-git pull --ff-only
-docker compose -p stageforce-real -f compose.local.yaml up -d --build
-```
-
-Use the same project name as before to retain your database. See [deployment instructions](deployment.md) for server accounts, data transfer and Gmail pairing.
+Automated tests cover scope isolation, legacy key preservation, ownership/expiry, duplicates/retries, organisation conflicts, selected contacts, full text preservation, date placement and the three-step Apps Script flow. A live Workspace/sidebar visual check remains necessary after deployment; Google services are mocked in automated tests.

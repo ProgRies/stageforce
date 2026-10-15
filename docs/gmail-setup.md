@@ -1,6 +1,16 @@
 # Gmail → Stage Force: first installation
 
-This is a private Google Workspace add-on, not a Chrome extension. It reads the selected message only after **Zur CRM-Prüfung übernehmen** is clicked. No background inbox scan, email sending, drafts, forwarding, labels, deletion, AI processing or attachment transfer. Incoming and sent messages use the same button.
+This is a private Google Workspace add-on, not a Chrome extension. It reads the selected message only after **E-Mail zuordnen** is clicked. No background inbox scan, email sending, drafts, forwarding, labels, deletion, AI processing or attachment transfer. Incoming and sent messages use the same button.
+
+## Upgrade an already-installed add-on to 0.1.12
+
+1. Back up the hosted database; deploy the new `latest` image (or pin `0.1.12`). Startup adds a permission flag to Gmail keys (schema 5). Existing CRM records and old capture keys are retained.
+2. Replace **Code.gs** in your existing Apps Script project with the current repository file. Keep `CRM_ORIGIN = 'https://stageforce.jaimo.me'`. Save, then reload Gmail. The manifest and its four Google scopes are unchanged; keep your configured hostname there.
+3. In the hosted CRM: **⚙ → Gmail verbinden → Schlüssel erneuern**. This explicitly grants CRM organisation lookup and import confirmation to the new key. Existing keys remain capture-only.
+4. In the Gmail sidebar: **Verbindung entfernen**, paste the replacement key into **Verbindungsschlüssel**, then **Verbinden**. Use the same primary account in Gmail and CRM.
+5. Open an email → **E-Mail zuordnen**. Complete the three steps below entirely in Gmail.
+
+If you use a versioned private deployment rather than the editor test installation, update that deployment to the new script version. Updating the Docker container does not update Apps Script automatically.
 
 ## 1. Update and deploy the CRM
 
@@ -29,18 +39,23 @@ Expected permissions: run as a Gmail add-on, read the open message when you inte
 2. Gear → **Gmail verbinden** → **Schlüssel erstellen**. Copy the key; it is displayed only during this opening of the settings menu.
 3. Paste it into **Verbindungsschlüssel** in the Gmail sidebar and click **Verbinden**. Google and CRM email addresses must match. Use the same account in both systems; mailbox aliases are not separate CRM identities in this version.
 
-The key is stored in Apps Script **User Properties**, never shared script properties or source code. It permits only the account's temporary import queue and an account-address check. It expires after 90 days. **Schlüssel erneuern** immediately invalidates the previous key; paste the replacement into the add-on after **Verbindung entfernen**. **Widerrufen** in the CRM invalidates it immediately. Removing the connection in Gmail only forgets its local copy; revoke it in the CRM too if the key should stop working everywhere. Password resets and account disabling also revoke keys.
+The key is stored in Apps Script **User Properties**, never shared script properties or source code. Keys created with the updated CRM settings allow the account-address check, temporary message capture, and the narrow sidebar review API. Review can search organisation names/IDs, identify existing participant contacts, show neighbouring timeline titles/dates, and confirm that user's own import. It cannot call general CRM APIs, edit arbitrary records, access FastBill or read other users' pending imports. Older keys remain capture-only until explicitly replaced. It expires after 90 days. **Schlüssel erneuern** immediately invalidates the previous key; paste the replacement into the add-on after **Verbindung entfernen**. **Widerrufen** in the CRM invalidates it immediately. Removing the connection in Gmail only forgets its local copy; revoke it in the CRM too if the key should stop working everywhere. Password resets and account disabling also revoke keys.
 
 Keep edit access to the Apps Script project restricted to trusted maintainers: an editor can change what the add-on executes. For testing colleagues, Google's test workflow requires project editor access; use a privately published, versioned Workspace deployment before rolling it out to users who should not edit code.
 
 ## 4. Test the complete flow
 
-1. Open one harmless received test email in Gmail; select the particular message within a conversation.
-2. Click **Zur CRM-Prüfung übernehmen**, then **Im CRM prüfen**.
-3. Log into the matching CRM account if needed. Check sender, date, organisation, quote cleanup and source link. Add a short summary, contact or follow-up if useful. Confirm explicitly.
-4. Verify the organisation history and last-contact date. The source link searches Gmail for the original RFC Message-ID under the correct mailbox; a fallback Gmail message link is used if that header is missing. It grants no mailbox access to colleagues. If a link cannot find a moved/deleted message, search the original mailbox manually.
-5. Import the same message again. It should identify the existing CRM message instead of creating a second interaction. Repeated clicks before confirmation reuse the pending review.
-6. Respond in Gmail as usual, then open your sent reply and use the button again if that reply belongs in the CRM. Responses are never captured automatically.
+1. Open one existing received email in Gmail; select the particular message within a conversation. Click **E-Mail zuordnen**. Only this click reads and transfers the selected message into your temporary CRM review queue.
+2. **Organisation (1 / 3):** confirm the suggested organisation with **Stimmt · weiter**, or use **Andere Organisation**. Suggestions update while typing; select a result. **+ Neue Organisation** suggests a name, with Lead as the default. New records are created only at final save.
+3. **Kontakte (2 / 3):** tick the people who belong to that organisation. Known contacts are labelled; team and quoted participants start unchecked. Unchecking a contact never deletes an existing contact.
+4. **Prüfen & speichern (3 / 3):** compare the cleaned message with Gmail, check date, direction and timeline placement, optionally add a short note. Choose **Vollständigen Text verwenden** if quote removal lost relevant text. Long messages have paginated previews; pagination does not truncate the saved text. If you change the date, the first save click refreshes the placement; confirm again after checking it.
+5. Click **Im CRM speichern**. The server commits organisation (if new), selected contacts and email together. **Organisation öffnen** then opens that record in the CRM for further editing. **Im CRM weiterbearbeiten** remains available before saving for custom text edits or more complex changes; unsaved sidebar choices are not transferred to the browser wizard.
+6. Reimport the same message: it must show the existing organisation and offer only **Quellverweis ergänzen**, never create a second timeline event. An older email must retain its historical date and not replace a newer last-contact date.
+7. Test an existing sent reply the same way. Replies are not captured automatically; the add-on never sends them.
+
+The native Gmail sidebar uses Google's card widgets. Stage's purple header/primary buttons are supported; custom CSS, backdrop blur and glass/gradient card backgrounds are not. The full CRM keeps its glass appearance. No AI is involved: parsing, quote removal and matching are deterministic suggestions subject to your confirmation.
+
+Only small per-message review choices are cached in Apps Script's user cache for up to one hour (Google may evict them sooner); message bodies and keys are not stored in that cache. If evicted, restart **E-Mail zuordnen**. The pending message remains in your CRM queue for up to 24 hours. Messages with more than 80 detected participants use the full CRM reviewer to keep the sidebar manageable.
 
 Only plain text and envelope fields cross to the CRM; no HTML, attachment bytes or Bcc list is transferred by the add-on. Quoted text can still exist inside the selected message. Cleanup is conservative and reversible in the review; inspect inline replies before saving. Pending imports are private to their owner and expire after 24 hours. Approved content becomes visible to CRM colleagues. The workflow does not change a message's Gmail state.
 
@@ -52,7 +67,7 @@ The existing `.eml` import remains available for other mail clients and localhos
 - **Account mismatch:** use the same primary Google/CRM email. Do not borrow a colleague's key.
 - **Expired key:** generate a replacement and pair again. Deleting browser cookies does not revoke the add-on key.
 - **Expired review:** reimport the message within Gmail; unsaved reviews expire after 24 hours.
-- **Rate/size limit:** at most 20 integration requests/minute/account (check and import each count), 30 pending messages, 3 MB JSON request and 500,000 text characters. Review the queue or record a relevant section manually.
+- **Rate/size limit:** at most 20 capture/check requests and 120 review/search requests per minute/account, 30 pending messages, 3 MB JSON request and 500,000 text characters. Review the queue or record a relevant section manually.
 - **Google permission/API error:** do not widen scopes. Note the action and error without copying email text or secrets into public issues; use the `.eml` fallback until resolved.
 
 Automated tests cover the HTTP boundary, account ownership, key expiry/revocation, additive schema upgrade, MIME/text parsing and the Apps Script adapter using mocked Google services. They do not replace installation and a real end-to-end Gmail test. That live test and browser visual QA have not been performed in the development environment.
@@ -70,4 +85,4 @@ Official references:
 
 **In Gmail suchen** is a normal external browser link; it works with a localhost CRM and needs neither an add-on nor a connection key. It targets your CRM email via Gmail's account selector and uses a quoted organisation name OR known `from:`/`to:` contact addresses. The query is URL-encoded and length-bounded. Verify the selected Gmail account if several are signed in. [Google's search syntax](https://support.google.com/mail/answer/7190?hl=en).
 
-The add-on's capture endpoint, token, review link (`/?import=...`), three-step reviewer and explicit confirmation are unchanged by the organisation layout update. Automated tests cover this contract, including selected-message reads without mailbox writes. The new timeline retains a message's original-source link. Test a received message, a sent reply and a duplicate after public HTTPS deployment; then verify the timeline, date and selected contacts. A UI update does not require replacing the Apps Script code or reconnecting a still-valid key.
+The original capture endpoint and browser review link (`/?import=...`) remain supported. Version 0.1.12 adds the separate, permission-gated sidebar review endpoint; the original capture-only key does not gain that permission automatically. Automated tests cover this contract, including selected-message reads without mailbox writes. The new timeline retains a message's original-source link. Test a received message, a sent reply and a duplicate after public HTTPS deployment; then verify the timeline, date and selected contacts. For the 0.1.12 sidebar review update, replace Code.gs and renew the CRM key as described above.

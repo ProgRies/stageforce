@@ -20,7 +20,7 @@ export default function SystemSettings(props:Props){
   if(action==='gmailCreate'&&gmail?.connected&&!window.confirm('Den bisherigen Gmail-Schlüssel ersetzen? Danach das Add-on neu verbinden.'))return;
   if(action==='gmailRevoke'&&!window.confirm('Gmail-Verbindung widerrufen? Bereits vorgemerkte Importe bleiben zum Prüfen verfügbar.'))return;
   const opened=visibility.current;setBusy(true);setError('');setKey('');setCopied(false);
-  try{const v=await api({action});if(opened===visibility.current){setGmail(v);setKey(v.token||'');}}catch(e:any){if(opened===visibility.current)setError(e.message);}finally{setBusy(false);}
+  try{const v=await api({action,...(action==='gmailCreate'?{sidebarReview:true}:{})});if(opened===visibility.current){setGmail(v);setKey(v.token||'');}}catch(e:any){if(opened===visibility.current)setError(e.message);}finally{setBusy(false);}
  }
  return <div className="system-settings" data-tour="settings" ref={ref}>
   <button ref={trigger} type="button" className="icon-button" title="Einstellungen" aria-label="Einstellungen" aria-expanded={open} aria-controls="system-settings-panel" onClick={()=>{if(open)close();else{setError('');setOpen(true);}}}><Settings size={19}/></button>
@@ -28,9 +28,10 @@ export default function SystemSettings(props:Props){
    <header><strong>Einstellungen</strong><button type="button" className="icon-button" aria-label="Einstellungen schließen" onClick={()=>{close();trigger.current?.focus();}}><X size={16}/></button></header>
    <div className="settings-row"><span>Darstellung</span><AppearanceControls/></div>
    {props.onRefresh&&<div className="settings-row"><span className={`connection ${props.stale?'stale':''}`} title={props.loadedAt?`Geladen ${new Date(props.loadedAt).toLocaleTimeString('de-DE')}`:undefined}><i/>{props.stale?'Veraltet':props.loadedAt?'Live':'Laden …'}</span><button type="button" className="text-button" disabled={props.disabled||props.loading} onClick={props.onRefresh}><RefreshCw size={15} className={props.loading?'spin':''}/>Aktualisieren</button></div>}
-   {props.signedIn&&<details className="settings-gmail"><summary>Gmail verbinden</summary><p>Eine ausgewählte Nachricht übernehmen und im CRM prüfen.</p>
+   {props.signedIn&&<details className="settings-gmail"><summary>Gmail verbinden</summary><p>Im Gmail-Add-on Organisation und Kontakte prüfen, dann ausdrücklich im CRM speichern. Der Schlüssel erlaubt dafür die CRM-Suche und Importbestätigung.</p>
     {gmail&&!gmail.publicHttps&&<p>Für Gmail muss dieses CRM über öffentlich erreichbares HTTPS laufen. Lokal funktioniert der .eml-Import.</p>}
     {gmail?.connected&&<small>Verbunden · gültig bis {new Date(gmail.expires_at).toLocaleDateString('de-DE')}</small>}
+    {gmail?.connected&&!gmail.sidebar_review&&<small>Für die Prüfung direkt in Gmail: Schlüssel erneuern und das Add-on neu verbinden.</small>}
     {gmail?.last_used_at&&<small>Zuletzt verwendet: {new Date(gmail.last_used_at).toLocaleString('de-DE')}</small>}
     <div className="settings-key-actions"><button type="button" className="button secondary small" disabled={busy||!gmail} onClick={()=>connection('gmailCreate')}>{gmail?.connected?'Schlüssel erneuern':'Schlüssel erstellen'}</button>{gmail?.connected&&<button type="button" className="text-button" disabled={busy} onClick={()=>connection('gmailRevoke')}>Widerrufen</button>}</div>
     {key&&<div className="settings-key"><label className="field"><span>Einmalig im Gmail-Add-on einfügen</span><input aria-label="Gmail-Verbindungsschlüssel" readOnly value={key} onFocus={e=>e.target.select()}/></label><button type="button" className="text-button" onClick={async()=>{try{await navigator.clipboard.writeText(key);setCopied(true);}catch{setError('Bitte den Schlüssel im Feld markieren und kopieren.');}}}>{copied?<Check size={14}/>:<Copy size={14}/>} {copied?'Kopiert':'Kopieren'}</button><small>Nur für dein Konto. Wird nach dem Schließen nicht erneut angezeigt.</small></div>}

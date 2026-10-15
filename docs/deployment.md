@@ -4,7 +4,7 @@
 
 The production Compose file runs the published `ghcr.io/progries/stageforce:latest` image on amd64 or arm64. It includes persistent SQLite storage, health checks, bounded logs, graceful shutdown and a read-only root filesystem. It does not install Traefik or configure DNS. Run one CRM instance on local storage.
 
-The `latest` tag advances on releases from `main`; updates still require an explicit pull and `up`. To pin a release for rollback, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.1.11` (or the relevant published version).
+The `latest` tag advances on releases from `main`; updates still require an explicit pull and `up`. To pin a release for rollback, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.1.12` (or the relevant published version).
 
 ### 1. Prepare routing and configuration
 
@@ -31,7 +31,7 @@ Copy `.env.example` only on the first installation. Review `.env`:
 | `TRAEFIK_CERTRESOLVER` | `letsencrypt`, existing certificate resolver |
 | `TRAEFIK_MIDDLEWARES` | `default@file`, existing middleware; an explicitly empty value disables this assignment |
 
-Compose derives `APP_URL=https://stageforce.jaimo.me` from `CRM_HOST`. No application port is exposed directly to the host. Do not add a second browser login/SSO challenge in front of `/api/integrations/gmail/`: Google authenticates there with the application's import key. The administrator should review the existing middleware rather than broadly disable server security. Do not log request bodies or Authorization headers.
+Compose derives `APP_URL=https://stageforce.jaimo.me` from `CRM_HOST`. No application port is exposed directly to the host. Do not add a second browser login/SSO challenge in front of `/api/integrations/gmail/`: Google authenticates there with the application’s scoped Gmail key. The administrator should review the existing middleware rather than broadly disable server security. Do not log request bodies or Authorization headers.
 
 ### 2. Pull and start
 
@@ -70,13 +70,13 @@ Choose a password of at least 12 characters at the hidden prompt. There is no si
 1. In Apps Script, set `CRM_ORIGIN` in `Code.gs` to `https://stageforce.jaimo.me`. Replace the example hostname in all three manifest entries: fetch allowlist, logo URL and open-link prefix. Preserve their existing paths and trailing slashes. Save and reload Gmail.
 2. Log into **the hosted CRM** as `ries@jaimo-solutions.com`, matching the primary Google account. Open **⚙ → Gmail verbinden → Schlüssel erstellen**.
 3. Paste the new key into **Verbindungsschlüssel** in the Gmail sidebar and click **Verbinden**. A key from a separate localhost database will not authenticate against this server.
-4. Open an existing email, click **Zur CRM-Prüfung übernehmen**, then **Im CRM prüfen**. Confirm the organisation, contacts and timeline placement in the CRM. Reimport it to check duplicate handling.
+4. Open an existing email, click **E-Mail zuordnen**, then confirm the organisation, contacts and timeline placement in the Gmail sidebar. Click **Im CRM speichern**. Reimport it to check duplicate handling.
 
 The add-on only reads the selected message on request. It does not send, draft, delete or modify email. See [gmail-setup.md](gmail-setup.md) for installation and troubleshooting. Live Google delivery must be tested after deployment; repository/container checks cannot verify your server's DNS, TLS or Workspace policy.
 
 ## Boundaries
 
-One Node service and one SQLite volume on the same host. Traefik terminates HTTPS. Production `APP_URL` must equal the browser's origin exactly (scheme and hostname). Browser mutations require Origin and session CSRF checks. The two dedicated Gmail endpoints instead require an import-only bearer key, reject browser Origin headers and never authorize CRM reads or confirmation. It does not trust forwarded host headers. No server port is published in the production Compose file.
+One Node service and one SQLite volume on the same host. Traefik terminates HTTPS. Production `APP_URL` must equal the browser's origin exactly (scheme and hostname). Browser mutations require Origin and session CSRF checks. The dedicated Gmail endpoints require a separate bearer key and reject browser Origin headers. Capture-only keys cannot read CRM data or confirm imports. Newly issued sidebar-review keys additionally permit limited organisation search, review context and explicit confirmation of the owning user’s imports, never general CRM API access. It does not trust forwarded host headers. No server port is published in the production Compose file.
 
 The container runs as the unprivileged `node` user (UID 1000). Docker initializes the named volume from the image's owned `/app/data`. If using a host bind mount instead, provision that directory for UID/GID 1000; do not make it world-writable. The production root filesystem is read-only, with a writable data volume and bounded `/tmp`.
 
