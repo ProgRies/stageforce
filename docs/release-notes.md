@@ -1,14 +1,21 @@
-# Stage Force 0.1.8
+# Stage Force 0.1.9
 
-Historical spreadsheet entries stored as **Kontakt** now appear in the organisation's communication timeline and in email placement previews. They retain their original dates, wording and generic contact label; the app does not guess whether they were phone calls or emails.
-
-This fixes a display regression from 0.1.7. No database migration, repeat import or contact-date rewrite is needed. Undated internal notes remain under **Mehr Details**. Recovering dates from spreadsheet revisions is a separate, private review process; no historical customer data is included in this release.
+- Connected timeline cards for emails and calls, newest first. Historical generic **Kontakt** entries keep their original wording and dates.
+- Inline call entry, contact editing and organisation linking.
+- Visible right-hand fields for status, phase, owner, follow-up, summary, FastBill URL and review notes. Explicit save, unsaved-edit warnings and version checks protect changes. Missing expected FastBill links are highlighted.
+- **In Gmail suchen** opens an organisation/contact search in a new tab for the current CRM account. No email access or changes.
+- Top-right question mark opens a guided spotlight tour, with keyboard navigation and Escape to close.
+- Gmail add-on capture and the three-step email reviewer remain compatible. No database schema change or repeat import.
 
 ## Update
 
-```sh
+Run these commands separately in your Stage Force folder:
+
+```powershell
 git pull --ff-only
 docker compose -f compose.local.yaml up -d --build
 ```
 
-Refresh the browser afterward. 44 automated tests, type checking and the production build pass locally. Interactive browser verification remains outstanding. The versioned image is available after successful publication: `ghcr.io/progries/stageforce:0.1.8`.
+Only run the second command if the pull succeeded. Refresh the browser afterward. Existing Docker volumes and data remain in place; do not run `down -v`.
+
+47 automated tests, type checking and the production build pass locally. The Gmail adapter and HTTP review flow are covered with mocked Google services and synthetic data. Interactive browser QA and a live Workspace add-on test remain outstanding. The versioned image becomes available after successful publication: `ghcr.io/progries/stageforce:0.1.9`.

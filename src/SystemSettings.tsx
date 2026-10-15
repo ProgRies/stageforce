@@ -22,7 +22,7 @@ export default function SystemSettings(props:Props){
   const opened=visibility.current;setBusy(true);setError('');setKey('');setCopied(false);
   try{const v=await api({action});if(opened===visibility.current){setGmail(v);setKey(v.token||'');}}catch(e:any){if(opened===visibility.current)setError(e.message);}finally{setBusy(false);}
  }
- return <div className="system-settings" ref={ref}>
+ return <div className="system-settings" data-tour="settings" ref={ref}>
   <button ref={trigger} type="button" className="icon-button" title="Einstellungen" aria-label="Einstellungen" aria-expanded={open} aria-controls="system-settings-panel" onClick={()=>{if(open)close();else{setError('');setOpen(true);}}}><Settings size={19}/></button>
   {open&&<section id="system-settings-panel" className="settings-popover glass" aria-label="Einstellungen">
    <header><strong>Einstellungen</strong><button type="button" className="icon-button" aria-label="Einstellungen schließen" onClick={()=>{close();trigger.current?.focus();}}><X size={16}/></button></header>

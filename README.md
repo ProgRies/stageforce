@@ -1,4 +1,4 @@
-# Stage Force · 0.1.8
+# Stage Force · 0.1.9
 
 A self-hosted, shared CRM for a small team. The existing frosted desktop interface now uses SQLite on your server. It does not need Google Sheets, ChatGPT, an AI provider, Gmail credentials or a mail-sending service.
 
@@ -43,7 +43,7 @@ docker compose up -d --build
 docker compose exec crm node server/cli.mjs user:add you@example.com "Your Name"
 ```
 
-The startup command builds the source locally. `.env` selects the local `stageforce:0.1.8` image; no registry account is required. A versioned registry image is available only after a successful release workflow. Open the HTTPS address and log in after creating the account. No default password, shared password or public registration exists.
+The startup command builds the source locally. `.env` selects the local `stageforce:0.1.9` image; no registry account is required. A versioned registry image is available only after a successful release workflow. Open the HTTPS address and log in after creating the account. No default password, shared password or public registration exists.
 
 All colleagues have equal CRM read/edit access. Each action uses their individual account. Account management is through CLI only. Local accounts do not grant access to a colleague's mailbox.
 
@@ -123,10 +123,18 @@ Local cleanup can be moved to production using a full SQLite backup, including a
 
 **Importe → FastBill** accepts customer CSV exports and optional invoice context, with editable column mapping, suggested organisations, explicit field/contact confirmation and remembered skip decisions. A read-only API adapter can fetch customers, contacts and invoice context from local Docker without a public CRM URL. No billing writes, automatic CRM updates or permanent credential storage.
 
-Start with **Kunden → Export → CSV**, including contacts. [Export/API instructions and limits](docs/fastbill-import.md). Back up before upgrading to 0.1.8: database schema 4 includes FastBill review tables and email/contact associations. Do not repeat the original spreadsheet import.
+Start with **Kunden → Export → CSV**, including contacts. [Export/API instructions and limits](docs/fastbill-import.md). Back up before upgrading to 0.1.9: database schema 4 includes FastBill review tables and email/contact associations. Do not repeat the original spreadsheet import.
 
 ## Email wizard and communication view
 
 **Importe → E-Mail** uses the same three steps for Gmail captures and `.eml` files: confirm or create an organisation, check its contacts, and preview the email between neighbouring events. Final Save commits a new organisation, selected contacts and the message together. [Workflow and matching rules](docs/email-wizard.md).
 
 Organisation pages show a compact name/status header, newest-first email/call timeline, and a right-hand overview. Contacts, internal notes, edit history, sources and other details open on demand. A small call form records reached/not reached with optional notes and follow-up. **Kunde** means confirmed obligation to pay; free usage and non-paying agencies are Leads. Historical classifications are retained for review rather than inferred from invoice wording or account type.
+
+## Organisation workspace
+
+Communication appears as connected email and call cards, newest first. Enter calls in place. The right column shows contacts, linked organisations and editable status, phase, owner, follow-up, summary, FastBill URL and review notes. Changes are explicit: **Speichern** saves; switching records or leaving with unsaved edits warns first. Fields use version checks so concurrent changes cannot be silently overwritten. Contact and relationship editors also open in place.
+
+**In Gmail suchen** opens a new tab, targeting the signed-in CRM user's email address. It searches the organisation name (without a leading Stadt/Stadtverwaltung/Gemeinde) or known sender/recipient addresses. Gmail may ask you to choose/sign into the matching account. It grants no mailbox access and imports nothing. Edit the search in Gmail if needed, then use the add-on or download an `.eml`.
+
+The question mark at the top right starts a keyboard-accessible spotlight tour. Use **Weiter**, **Zurück** or arrow keys; Escape closes it. The tour doesn't edit data.

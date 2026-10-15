@@ -17,6 +17,19 @@ export function validDate(s: string) { if(!/^\d{4}-\d{2}-\d{2}$/.test(s))return 
 export function serialDate(s: string) { if(!validDate(s)) throw new Error("Ungültiges Datum."); return Date.parse(s+"T00:00:00Z")/86400000+25569; }
 export function formatDate(value: unknown) { const s=dateISO(value); return s ? new Intl.DateTimeFormat("de-DE",{day:"2-digit",month:"2-digit",year:"numeric",timeZone:"UTC"}).format(new Date(s+"T12:00:00Z")) : "—"; }
 export function fastbillURL(value: unknown): string { try { const u=new URL(String(value)); return u.protocol==="https:" && !u.username && !u.password && (u.hostname==="fastbill.com"||u.hostname.endsWith(".fastbill.com")) ? u.href : ""; } catch { return ""; } }
+// A normal browser shortcut, with no mailbox API or extra permission.
+export function gmailSearch(e:Entity,mailbox:string) {
+ const name=text(e,1).replace(/^(?:Stadtverwaltung|Stadt|Gemeinde)\s+(?:der\s+)?/i,'').trim()||text(e,1);
+ const phrase=Array.from(name.replace(/["{}\r\n]/g,' ').replace(/\s+/g,' ').trim()).slice(0,100).join('');
+ const addresses=[text(e,13),...jsonList(e.values[20]).flatMap(c=>Array.isArray(c.e_mails)?c.e_mails:[])];
+ const emails=[...new Set(addresses.flatMap(a=>String(a).match(/[a-z0-9.!#$%&'*+/=?^_`|~-]+@[a-z0-9.-]+\.[a-z]{2,}/gi)||[]).map(a=>a.toLowerCase()))].filter(a=>a!==mailbox.toLowerCase()).slice(0,12);
+ const terms=phrase?[`"${phrase}"`]:[];
+ const asQuery=(parts:string[])=>parts.length>1?`{${parts.join(' ')}}`:parts[0]||'';
+ const base=`https://mail.google.com/mail/u/?authuser=${encodeURIComponent(mailbox)}#search/`;
+ for(const email of emails){const next=[...terms,`from:${email}`,`to:${email}`];if((base+encodeURIComponent(asQuery(next))).length<=1900)terms.push(`from:${email}`,`to:${email}`);}
+ const query=asQuery(terms);
+ return {query,url:base+encodeURIComponent(query)};
+}
 export function websiteURL(value: unknown) { const s=String(value||"").trim(); if(!s)return "";try{const u=new URL(/^https?:\/\//i.test(s)?s:"https://"+s);return ["http:","https:"].includes(u.protocol)&&!u.username&&!u.password?u.href:"";}catch{return "";} }
 export function needsFastbill(e: Entity) { return ["Kunde","Ehemaliger Kunde"].includes(text(e,9)) || text(e,10)==="Angebot"; }
 export function phone(e: Entity) { const primary=text(e,14).trim();if(primary.replace(/\D/g,"").length>=6)return primary; for(const c of jsonList(e.values[20]))for(const p of c.telefone||[])if(String(p).replace(/\D/g,"").length>=6)return String(p);return ""; }

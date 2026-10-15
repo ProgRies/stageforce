@@ -1,0 +1,75 @@
+import {useEffect,useLayoutEffect,useRef,useState} from 'react';
+import {createPortal} from 'react-dom';
+import {ArrowLeft,ArrowRight,X} from 'lucide-react';
+
+const steps=[
+ {target:'organisations',title:'Dein gemeinsames CRM',body:'Hier findest du Kunden und Leads. Jeder im Team sieht denselben gespeicherten Stand.'},
+ {target:'list',title:'Organisation finden',body:'Suche nach Name, Ort oder Kontakt. Unter Prüfen ist diese Spalte nach offenen Themen sortiert.'},
+ {target:'timeline',title:'Der letzte Kontakt steht oben',body:'Die verbundenen Karten zeigen E-Mails und Anrufe. Öffne eine Karte für den vollständigen Eintrag. Über „Anruf eintragen“ ergänzt du ein Gespräch direkt hier.'},
+ {target:'contacts',title:'Menschen und Beziehungen',body:'Kontakte sind hier sichtbar. Mit dem Stift bearbeitest du sie direkt. Verknüpfte Organisationen zeigen zum Beispiel eine betreuende Agentur.'},
+ {target:'fields',title:'Direkt bearbeiten',body:'Status, Phase und Wiedervorlage kannst du hier ändern. Speichern übernimmt deine Eingaben. Kunde bedeutet bestätigte Zahlungspflicht. FastBill öffnet die hinterlegte Kundenseite.'},
+ {target:'gmail',title:'Im eigenen Postfach nachsehen',body:'Öffnet Gmail mit einer Suche nach dieser Organisation und ihren Kontaktadressen. Das CRM liest dadurch keine E-Mails. Relevante Nachrichten kannst du danach gezielt importieren.'},
+ {target:'calls',title:'Deine Anrufliste',body:'Erstelle eine Tagesliste aus Wiedervorlagen, Kunden mit längerer Kontaktpause und neuen Leads. Trage nach jedem Anruf das Ergebnis ein.'},
+ {target:'review',title:'Offene Fragen abarbeiten',body:'Wähle ein Thema, zum Beispiel fehlende Telefonnummern. Prüfe die betroffenen Organisationen anhand deiner E-Mails oder FastBill und ergänze die Angaben.'},
+ {target:'imports',title:'Informationen übernehmen',body:'E-Mail-Datei ablegen oder die ausgewählte Nachricht per Gmail-Add-on vormerken. Danach prüfst du Organisation, Kontakte und die Position im Verlauf. Erst deine Bestätigung speichert den Eintrag. Hier findest du auch den FastBill-Import.'},
+ {target:'settings',title:'Dein Arbeitsplatz',body:'Im Zahnrad findest du Darstellung, Hintergrundanimation, Aktualisierung und die Gmail-Verbindung. Diese Einführung kannst du jederzeit über das Fragezeichen wieder starten.'},
+];
+type Rect={top:number;left:number;width:number;height:number};
+export default function GuidedTour({onClose}:{onClose:()=>void}){
+ const [available]=useState(()=>steps.filter(s=>{const el=document.querySelector(`[data-tour="${s.target}"]`);return el&&el.getClientRects().length&&!el.closest('[hidden]');}));
+ const [index,setIndex]=useState(0),[rect,setRect]=useState<Rect|null>(null),[viewport,setViewport]=useState({w:window.innerWidth,h:window.innerHeight}),[cardHeight,setCardHeight]=useState(240);
+ const dialog=useRef<HTMLDivElement>(null),next=useRef<HTMLButtonElement>(null),closeRef=useRef(onClose);closeRef.current=onClose;
+ const step=available[index];
+ useEffect(()=>{
+  const focused=document.activeElement as HTMLElement|null,root=document.querySelector<HTMLElement>('.app-shell');
+  const previouslyInert=root?.inert;if(root)root.inert=true;
+  const key=(e:KeyboardEvent)=>{
+   if(e.key==='Escape'){e.preventDefault();closeRef.current();}
+   if(e.key==='ArrowRight'){e.preventDefault();setIndex(i=>Math.min(i+1,available.length-1));}
+   if(e.key==='ArrowLeft'){e.preventDefault();setIndex(i=>Math.max(0,i-1));}
+   if(e.key==='Tab'){
+    const controls=Array.from(dialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled)')||[]),first=controls[0],last=controls[controls.length-1];
+    if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}
+    else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}
+   }
+  };
+  document.addEventListener('keydown',key);next.current?.focus();
+  return()=>{document.removeEventListener('keydown',key);if(root)root.inert=!!previouslyInert;focused?.focus({preventScroll:true});};
+ },[available.length]);
+ useLayoutEffect(()=>{
+  if(!step){closeRef.current();return;}
+  const el=document.querySelector<HTMLElement>(`[data-tour="${step.target}"]`);
+  el?.scrollIntoView({block:'nearest',inline:'nearest',behavior:'instant'});
+  const measure=()=>{
+   setViewport({w:window.innerWidth,h:window.innerHeight});
+   if(!el||!el.getClientRects().length){setRect(null);return;}
+   const r=el.getBoundingClientRect(),clip=el.closest('.detail-pane')?.getBoundingClientRect();
+   const left=Math.max(8,r.left-7),top=Math.max(8,r.top-7,clip?clip.top+4:0);
+   const right=Math.min(window.innerWidth-8,r.right+7),bottom=Math.min(window.innerHeight-8,r.bottom+7,clip?clip.bottom-4:window.innerHeight);
+   setRect({top,left,width:Math.max(0,right-left),height:Math.max(0,bottom-top)});
+   if(dialog.current)setCardHeight(dialog.current.getBoundingClientRect().height);
+  };
+  measure();const observer=new ResizeObserver(measure);if(el)observer.observe(el);if(dialog.current)observer.observe(dialog.current);
+  window.addEventListener('resize',measure);window.addEventListener('scroll',measure,true);
+  return()=>{observer.disconnect();window.removeEventListener('resize',measure);window.removeEventListener('scroll',measure,true);};
+ },[step]);
+ if(!step)return null;
+ const width=Math.min(360,viewport.w-32),r=rect||{top:16,left:16,width:0,height:0};
+ let left=r.left,top=r.top+r.height+18;
+ if(top+cardHeight>viewport.h-16){
+  if(r.top-cardHeight-18>=16)top=r.top-cardHeight-18;
+  else if(r.left+ r.width+width+34<viewport.w){left=r.left+r.width+18;top=r.top;}
+  else if(r.left-width-18>=16){left=r.left-width-18;top=r.top;}
+  else{top=viewport.h-cardHeight-16;left=viewport.w-width-16;}
+ }
+ left=Math.max(16,Math.min(left,viewport.w-width-16));top=Math.max(16,Math.min(top,viewport.h-cardHeight-16));
+ return createPortal(<div className="guided-tour">
+  <div className="tour-blocker"/>
+  {rect?<><div className="tour-shade" style={{top:0,left:0,right:0,height:r.top}}/><div className="tour-shade" style={{top:r.top+r.height,left:0,right:0,bottom:0}}/><div className="tour-shade" style={{top:r.top,left:0,width:r.left,height:r.height}}/><div className="tour-shade" style={{top:r.top,left:r.left+r.width,right:0,height:r.height}}/><div className="tour-spotlight" style={r}/></>:<div className="tour-shade" style={{inset:0}}/>}
+  <div className="tour-card" ref={dialog} role="dialog" aria-modal="true" aria-labelledby="tour-title" aria-describedby="tour-body" style={{top,left,width}}>
+   <header><small>{index+1} / {available.length}</small><button className="icon-button" aria-label="Einführung schließen" onClick={onClose}><X size={18}/></button></header>
+   <div aria-live="polite"><h2 id="tour-title">{step.title}</h2><p id="tour-body">{step.body}</p></div>
+   <footer><button className="text-button" disabled={!index} onClick={()=>setIndex(i=>i-1)}><ArrowLeft size={16}/>Zurück</button><button ref={next} className="button primary" onClick={()=>index===available.length-1?onClose():setIndex(i=>i+1)}>{index===available.length-1?'Fertig':'Weiter'}<ArrowRight size={16}/></button></footer>
+  </div>
+ </div>,document.body);
+}

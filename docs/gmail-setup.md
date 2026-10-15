@@ -72,3 +72,9 @@ Official references:
 - [Extend the selected-message UI](https://developers.google.com/workspace/add-ons/gmail/extending-message-ui)
 - [URL allowlists](https://developers.google.com/apps-script/manifest/allowlist-url)
 - [User Properties](https://developers.google.com/apps-script/guides/properties)
+
+## Organisation search shortcut (0.1.9)
+
+**In Gmail suchen** is a normal external browser link; it works with a localhost CRM and needs neither an add-on nor a connection key. It targets your CRM email via Gmail's account selector and uses a quoted organisation name OR known `from:`/`to:` contact addresses. The query is URL-encoded and length-bounded. Verify the selected Gmail account if several are signed in. [Google's search syntax](https://support.google.com/mail/answer/7190?hl=en).
+
+The add-on's capture endpoint, token, review link (`/?import=...`), three-step reviewer and explicit confirmation are unchanged by the organisation layout update. Automated tests cover this contract, including selected-message reads without mailbox writes. The new timeline retains a message's original-source link. Test a received message, a sent reply and a duplicate after public HTTPS deployment; then verify the timeline, date and selected contacts. A UI update does not require replacing the Apps Script code or reconnecting a still-valid key.

@@ -1,9 +1,11 @@
 # Production deployment behind the same Traefik as Glass Board.
 # Initial build: docker compose up -d --build
-# With a published image: docker compose pull && docker compose up -d --no-build
+# With a published image, run separately:
+# docker compose pull
+# docker compose up -d --no-build
 services:
   crm:
-    image: ${CRM_IMAGE:-stageforce:0.1.8}
+    image: ${CRM_IMAGE:-stageforce:0.1.9}
     build: .
     restart: unless-stopped
     init: true

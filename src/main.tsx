@@ -6,6 +6,7 @@ import SystemSettings from './SystemSettings';
 import {request,setCSRF} from './api';
 import './style.css';
 import './appearance.css';
+import './workspace.css';
 function App(){const[user,setUser]=useState<any>(null),[loading,setLoading]=useState(true),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false);
  useEffect(()=>{request('/api/session').then(r=>{setCSRF(r.csrf);setUser(r.user);}).catch(()=>{}).finally(()=>setLoading(false));const expire=()=>{setUser(null);setError('Sitzung abgelaufen. Bitte erneut anmelden.');};window.addEventListener('session-expired',expire);return()=>window.removeEventListener('session-expired',expire);},[]);
  async function login(e:React.FormEvent){e.preventDefault();setBusy(true);setError('');try{const r=await request('/api/login',{email,password});setCSRF(r.csrf);setUser(r.user);setPassword('');}catch(e:any){setError(e.message||'Anmeldung fehlgeschlagen.');}finally{setBusy(false);}}
