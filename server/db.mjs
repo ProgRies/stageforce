@@ -8,11 +8,11 @@ export function openDB(path=resolve(process.env.DATA_DIR||'data','crm.sqlite')){
  if(path!==':memory:')mkdirSync(dirname(path),{recursive:true,mode:0o700});
  const db=new DatabaseSync(path,{timeout:5000});
  db.exec('PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;');
- const version=db.prepare('PRAGMA user_version').get().user_version;if(version>5)throw Error('Database is newer than this application. Upgrade the application.');
- transaction(db,()=>{db.exec(readFileSync(new URL('./schema.sql',import.meta.url),'utf8'));if(!db.prepare('PRAGMA table_info(gmail_keys)').all().some(c=>c.name==='sidebar_review'))db.exec('ALTER TABLE gmail_keys ADD COLUMN sidebar_review INTEGER NOT NULL DEFAULT 0 CHECK(sidebar_review IN (0,1))');db.exec("INSERT OR IGNORE INTO schema_versions VALUES(5,datetime('now')); PRAGMA user_version=5");});
+ const version=db.prepare('PRAGMA user_version').get().user_version;if(version>7)throw Error('Database is newer than this application. Upgrade the application.');
+ transaction(db,()=>{db.exec(readFileSync(new URL('./schema.sql',import.meta.url),'utf8'));db.exec('DROP TABLE IF EXISTS gmail_keys');db.exec("INSERT OR IGNORE INTO schema_versions VALUES(7,datetime('now')); PRAGMA user_version=7");});
  if(path!==':memory:')chmodSync(path,0o600);return db;
 }
-export function transaction(db,fn){db.exec('BEGIN IMMEDIATE');try{const value=fn();db.exec('COMMIT');return value;}catch(e){db.exec('ROLLBACK');throw e;}}
+export function transaction(db,fn){const nested=db.isTransaction,point='s'+uid().replaceAll('-','');db.exec(nested?'SAVEPOINT '+point:'BEGIN IMMEDIATE');try{const value=fn();db.exec(nested?'RELEASE '+point:'COMMIT');return value;}catch(e){db.exec(nested?'ROLLBACK TO '+point:'ROLLBACK');if(nested)db.exec('RELEASE '+point);throw e;}}
 export async function backupDB(db,path){mkdirSync(dirname(resolve(path)),{recursive:true,mode:0o700});await backup(db,path);chmodSync(path,0o600);}
 export function reindex(db,id){
  const o=db.prepare('SELECT * FROM organisations WHERE id=?').get(id);if(!o)return;

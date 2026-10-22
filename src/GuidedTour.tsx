@@ -11,8 +11,8 @@ const steps=[
  {target:'gmail',title:'Im eigenen Postfach nachsehen',body:'Öffnet Gmail mit einer Suche nach dieser Organisation und ihren Kontaktadressen. Das CRM liest dadurch keine E-Mails. Relevante Nachrichten kannst du danach gezielt importieren.'},
  {target:'calls',title:'Deine Anrufliste',body:'Erstelle eine Tagesliste aus Wiedervorlagen, Kunden mit längerer Kontaktpause und neuen Leads. Trage nach jedem Anruf das Ergebnis ein.'},
  {target:'review',title:'Offene Fragen abarbeiten',body:'Wähle ein Thema, zum Beispiel fehlende Telefonnummern. Prüfe die betroffenen Organisationen anhand deiner E-Mails oder FastBill und ergänze die Angaben.'},
- {target:'imports',title:'Informationen übernehmen',body:'E-Mail-Datei ablegen oder die ausgewählte Nachricht per Gmail-Add-on vormerken. Danach prüfst du Organisation, Kontakte und die Position im Verlauf. Erst deine Bestätigung speichert den Eintrag. Hier findest du auch den FastBill-Import.'},
- {target:'settings',title:'Dein Arbeitsplatz',body:'Im Zahnrad findest du Darstellung, Hintergrundanimation, Aktualisierung und die Gmail-Verbindung. Diese Einführung kannst du jederzeit über das Fragezeichen wieder starten.'},
+ {target:'imports',title:'Informationen übernehmen',body:'Mit der Browser-Erweiterung speicherst du ausgewählte Gmail-Nachrichten direkt bei der passenden Organisation. Hier findest du auch den FastBill-Import.'},
+ {target:'settings',title:'Dein Arbeitsplatz',body:'Im Zahnrad findest du Darstellung, Hintergrundanimation, Aktualisierung und die Browser-Verbindung. Diese Einführung kannst du jederzeit über das Fragezeichen wieder starten.'},
 ];
 type Rect={top:number;left:number;width:number;height:number};
 export default function GuidedTour({onClose}:{onClose:()=>void}){

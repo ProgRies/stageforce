@@ -1,23 +1,23 @@
-# Stage Force 0.1.12
+# StageForce 0.3.0-local / extension 0.4.0
 
-Review and save selected emails directly in the Gmail sidebar: confirm or find/create an organisation, select its contacts, check message text and timeline placement, then explicitly save. Stage-purple primary actions keep the native cards simple. Google's card interface does not support custom glass backgrounds.
+- Durable saved-email badges and read-only reopening from SQLite.
+- 75/25 popup, bounded initial email preview, keyboard isolation.
+- Signature phone suggestions and attachment metadata references.
+- Click-to-dial with notes in the CRM and extension; organisation/contact saved before dialling; cancel preserves them without a call event.
+- Schema 7 preserves existing users, keys and CRM records.
+- 57 automated tests, typecheck, build and Chromium fixture checks pass. Live Gmail, Docker Desktop and Mac/iPhone calling require a local check.
 
-The same parser, conservative quote cleanup, duplicate detection, atomic save and conflict checks power both Gmail and the existing browser reviewer. Long text previews are paginated without truncating stored content. After saving, a link opens the organisation in the CRM. No new Gmail permissions, background scans, AI processing, sending or mailbox writes.
+See [Update instructions](update-local.md).
 
-## Update
+# StageForce 0.2.0-local
 
-Back up the database before deployment. On the server:
+Local development version; not published or deployed.
 
-```sh
-docker compose exec crm node server/cli.mjs backup /app/data/backups/before-0.1.12.sqlite
-docker compose cp crm:/app/data/backups/before-0.1.12.sqlite ./before-0.1.12.sqlite
-git pull --ff-only
-docker compose pull
-docker compose up -d
-```
+- Chrome extension v0.3.0: lighter, simplified two-column popup; actual organisation search, conservative automatic matching, contact selection and optional organisation links.
+- Personal revocable keys; localhost testing and later HTTPS hosting; matching sends headers only, Save sends message text.
+- One atomic save for the email and related records; repeat-save protection.
+- Existing CRM interface and SQLite records retained. Connection settings now pair the browser extension.
+- Gmail Apps Script implementation, endpoints and installation instructions removed.
+- Schema 6 adds extension credentials and drops obsolete Gmail add-on credentials. Back up before using any existing database; older binaries cannot open schema 6. Rollback requires the previous database backup.
 
-Use `CRM_IMAGE=ghcr.io/progries/stageforce:latest` or `:0.1.12`. Startup applies schema 5 automatically. Do not repeat the original import. A rollback to an older version requires the matching database backup.
-
-In Apps Script replace `Code.gs` with the current repository version, retain `CRM_ORIGIN='https://stageforce.jaimo.me'`, save and reload Gmail. Keep the existing manifest and its configured hostname. In the hosted CRM, renew your Gmail connection key; remove the old connection in the sidebar and connect with the replacement. Old keys remain capture-only and continue to offer the browser review path. See [Gmail setup](gmail-setup.md).
-
-Automated tests cover scope isolation, legacy key preservation, ownership/expiry, duplicates/retries, organisation conflicts, selected contacts, full text preservation, date placement and the three-step Apps Script flow. A live Workspace/sidebar visual check remains necessary after deployment; Google services are mocked in automated tests.
+Start with [local setup](extension-setup.md). Production data is not included.

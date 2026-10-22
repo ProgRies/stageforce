@@ -20,18 +20,18 @@ export function listData(db){
  return{entities,links:db.prepare('SELECT * FROM organisation_links').all(),loadedAt:now()};
 }
 const communicationSQL="(a.message_id IS NOT NULL OR a.kind='Kontakt' OR lower(a.kind) LIKE '%mail%' OR lower(a.kind) LIKE '%telefon%' OR lower(a.kind) LIKE '%anruf%' OR lower(a.kind) LIKE '%phone%' OR lower(a.kind) LIKE '%call%')";
-const historyOrder="a.occurred_on DESC, COALESCE(m.sent_at, '') DESC, a.created_at DESC, a.rowid DESC";
-const historyItem=a=>({ereignis_id:a.id,datum:a.occurred_on,art:a.kind,text:a.body,autor_name:a.user_name||a.author_label||'',message_id:a.message_id,subject:a.subject,direction:a.direction,sent_at:a.sent_at,attachments:a.attachments_json?JSON.parse(a.attachments_json):[],is_contact:!!a.is_contact});
+const historyOrder="a.occurred_on DESC, COALESCE(m.sent_at, ca.started_at, '') DESC, a.created_at DESC, a.rowid DESC";
+const historyItem=a=>({ereignis_id:a.id,datum:a.occurred_on,art:a.kind,text:a.body,autor_name:a.user_name||a.author_label||'',message_id:a.message_id,subject:a.subject,direction:a.direction,sent_at:a.sent_at||a.call_started_at,call_phone:a.call_phone,call_contact:a.call_contact,call_contact_id:a.call_contact_id,call_source:a.call_source,attachments:a.attachments_json?JSON.parse(a.attachments_json):[],is_contact:!!a.is_contact});
 export function history(db,id,offset=0,kind='all'){
  getOrg(db,id);if(!['all','communication','internal'].includes(kind))throw new Problem('Ungültiger Verlauf.');const safe=Math.max(0,Math.floor(Number(offset)||0));
  const filter=kind==='communication'?' AND '+communicationSQL:kind==='internal'?' AND NOT '+communicationSQL:'';
- const rows=db.prepare(`SELECT a.*,u.name AS user_name,m.subject,m.direction,m.sent_at,m.attachments_json FROM activities a LEFT JOIN users u ON u.id=a.author_id LEFT JOIN messages m ON m.id=a.message_id WHERE a.organisation_id=?${filter} ORDER BY ${historyOrder} LIMIT 40 OFFSET ?`).all(id,safe);
+ const rows=db.prepare(`SELECT a.*,u.name AS user_name,m.subject,m.direction,m.sent_at,m.attachments_json,ca.started_at AS call_started_at,ca.phone AS call_phone,c.name AS call_contact,ca.contact_id AS call_contact_id,ca.source_message_id AS call_source FROM activities a LEFT JOIN users u ON u.id=a.author_id LEFT JOIN messages m ON m.id=a.message_id LEFT JOIN call_attempts ca ON ca.activity_id=a.id LEFT JOIN contacts c ON c.id=ca.contact_id WHERE a.organisation_id=?${filter} ORDER BY ${historyOrder} LIMIT 40 OFFSET ?`).all(id,safe);
  return{items:rows.map(historyItem),total:db.prepare(`SELECT count(*) AS n FROM activities a WHERE a.organisation_id=?${filter}`).get(id).n};
 }
 export function timelinePosition(db,user,b){
  const p=importPreview(db,user,b.importId);if(!validDate(b.date)||b.date>todayBerlin())throw new Problem('Bitte ein gültiges E-Mail-Datum angeben.');
  if(!b.id)return{position:1,total:1,before:null,after:null,sameDay:0};getOrg(db,b.id);
- const rows=db.prepare(`SELECT a.id,a.occurred_on,a.kind,substr(a.body,1,180) body,a.message_id,a.created_at,m.subject,m.sent_at FROM activities a LEFT JOIN messages m ON m.id=a.message_id WHERE a.organisation_id=? AND ${communicationSQL} ORDER BY ${historyOrder}`).all(b.id);
+ const rows=db.prepare(`SELECT a.id,a.occurred_on,a.kind,substr(a.body,1,180) body,a.message_id,a.created_at,m.subject,m.sent_at FROM activities a LEFT JOIN messages m ON m.id=a.message_id LEFT JOIN call_attempts ca ON ca.activity_id=a.id LEFT JOIN contacts c ON c.id=ca.contact_id WHERE a.organisation_id=? AND ${communicationSQL} ORDER BY ${historyOrder}`).all(b.id);
  const at=rows.findIndex(r=>(r.occurred_on||'')<b.date||((r.occurred_on||'')===b.date&&(r.sent_at||'')<=(p.sentAt||'')));
  const index=at<0?rows.length:at;
  return{position:index+1,total:rows.length+1,before:rows[index-1]?historyItem(rows[index-1]):null,after:rows[index]?historyItem(rows[index]):null,sameDay:rows.filter(r=>r.occurred_on===b.date).length};
@@ -67,7 +67,10 @@ function mailParticipants(db,p,user){
  return [...people.values()].slice(0,200);
 }
 export function importPreview(db,user,id){
- const row=db.prepare('SELECT * FROM email_imports WHERE id=? AND user_id=? AND expires_at>?').get(id,user.id,Date.now());if(!row)throw new Problem('Import nicht gefunden oder abgelaufen.',404);const p=JSON.parse(row.payload_json),participants=mailParticipants(db,p,user),candidates=new Map();
+ const row=db.prepare('SELECT * FROM email_imports WHERE id=? AND user_id=? AND expires_at>?').get(id,user.id,Date.now());if(!row)throw new Problem('Import nicht gefunden oder abgelaufen.',404);return matchEmail(db,user,JSON.parse(row.payload_json),id);
+}
+export function matchEmail(db,user,p,id=''){
+ const participants=mailParticipants(db,p,user),candidates=new Map();
  const direction=participants.some(a=>a.role==='sender'&&a.internal)?'outgoing':p.direction;const preferred=direction==='outgoing'?'recipient':'sender';
  const add=(o,score,reason)=>{if(!candidates.has(o.id)||candidates.get(o.id).score<score)candidates.set(o.id,{id:o.id,name:o.name,score,reason});};
  for(const a of participants.filter(a=>!a.internal)){

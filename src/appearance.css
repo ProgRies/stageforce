@@ -95,10 +95,10 @@
 .settings-popover header{margin-bottom:8px;font-size:14px}
 .settings-row{min-height:51px;font-size:13px;border-bottom:1px solid var(--line)}
 .settings-row .text-button{gap:7px}
-.settings-gmail{font-size:13px;padding-top:16px}
-.settings-gmail summary{cursor:pointer}
-.settings-gmail p,.settings-gmail small{display:block;font-size:12px;line-height:1.65;color:var(--theme-text-secondary,#667e8f);margin-top:12px}
-.settings-gmail a{display:inline-block;margin-top:16px;color:var(--action);font-size:12px}
+.settings-extension{font-size:13px;padding-top:16px}
+.settings-extension summary{cursor:pointer}
+.settings-extension p,.settings-extension small{display:block;font-size:12px;line-height:1.65;color:var(--theme-text-secondary,#667e8f);margin-top:12px}
+.settings-extension a{display:inline-block;margin-top:16px;color:var(--action);font-size:12px}
 .settings-key-actions{display:flex;align-items:center;gap:12px;margin-top:15px}
 .settings-key{margin-top:16px;border-top:1px solid var(--line);padding-top:14px}
 .settings-key input{font-size:12px}

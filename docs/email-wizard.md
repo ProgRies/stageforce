@@ -1,6 +1,6 @@
 # Email review and organisation timeline
 
-Stage Force 0.1.7 uses one review wizard for `.eml` uploads and Gmail add-on captures. It does not read a mailbox autonomously, send email, create email drafts, forward, delete, label or mark messages as read. No AI processes the content.
+The CRM file importer uses a review wizard for `.eml` uploads. The browser extension has its own compact popup. It does not read a mailbox autonomously, send email, create email drafts, forward, delete, label or mark messages as read. No AI processes the content.
 
 ## 1. Organisation
 

@@ -30,7 +30,6 @@ CREATE TABLE IF NOT EXISTS migration_archive(id TEXT PRIMARY KEY,organisation_id
 CREATE VIRTUAL TABLE IF NOT EXISTS search_docs USING fts5(organisation_id UNINDEXED,content,tokenize='unicode61 remove_diacritics 2');
 INSERT OR IGNORE INTO schema_versions VALUES(1,datetime('now'));
 
-CREATE TABLE IF NOT EXISTS gmail_keys(user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,token_hash TEXT NOT NULL UNIQUE,created_at INTEGER NOT NULL,expires_at INTEGER NOT NULL,last_used_at INTEGER);
 INSERT OR IGNORE INTO schema_versions VALUES(2,datetime('now'));
 
 CREATE TABLE IF NOT EXISTS fastbill_batches(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),scope TEXT NOT NULL,label TEXT NOT NULL,created_at TEXT NOT NULL);
@@ -42,3 +41,9 @@ INSERT OR IGNORE INTO schema_versions VALUES(3,datetime('now'));
 
 CREATE TABLE IF NOT EXISTS activity_contacts(activity_id TEXT NOT NULL REFERENCES activities(id) ON DELETE CASCADE,contact_id TEXT NOT NULL REFERENCES contacts(id),PRIMARY KEY(activity_id,contact_id));
 INSERT OR IGNORE INTO schema_versions VALUES(4,datetime('now'));
+
+CREATE TABLE IF NOT EXISTS extension_keys(user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,token_hash TEXT NOT NULL UNIQUE,created_at INTEGER NOT NULL,expires_at INTEGER NOT NULL,last_used_at INTEGER);
+
+
+CREATE TABLE IF NOT EXISTS extension_message_refs(mailbox TEXT NOT NULL,gmail_id TEXT NOT NULL,message_id TEXT NOT NULL REFERENCES messages(id),PRIMARY KEY(mailbox,gmail_id));
+CREATE TABLE IF NOT EXISTS call_attempts(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),organisation_id TEXT NOT NULL REFERENCES organisations(id),contact_id TEXT NOT NULL REFERENCES contacts(id),phone TEXT NOT NULL,started_at TEXT NOT NULL,source_message_id TEXT REFERENCES messages(id),activity_id TEXT UNIQUE REFERENCES activities(id));

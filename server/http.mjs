@@ -1,3 +1,5 @@
+import {prepareCall,saveCall,cancelCall} from './calls.mjs';
+import {extensionStatus,extensionCreate,extensionRevoke,authorizeExtension,extensionAction} from './extension.mjs';
 import {createServer} from 'node:http';
 import {readFile} from 'node:fs/promises';
 import {resolve,extname} from 'node:path';
@@ -7,8 +9,6 @@ import {getSession,verifyPassword,createSession,limited,publicUser} from './auth
 import {Problem,listData,entity,history,search,save,createOrg,contactSave,linkSave,stageImport,importPreview,confirmImport,timelinePosition} from './crm.mjs';
 import {inspectCSV,csvRecords,stageFastbill,fastbillBatches,fastbillRows,fastbillPreview,decideFastbill,deleteFastbillBatch,fetchFastbillPage} from './fastbill.mjs';
 import {parseEmail} from './email.mjs';
-import {reviewGmail} from './gmail-review.mjs';
-import {gmailStatus,createGmailKey,revokeGmailKey,authorizeGmail,selectedGmailMessage,stageGmailMessage} from './gmail.mjs';
 export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:3000',staticDir=resolve('dist')}={}){
  const url=new URL(origin);if(url.origin!==origin.replace(/\/$/,''))throw Error('APP_URL must be an origin without a path.');origin=url.origin;const secure=url.protocol==='https:';if(process.env.NODE_ENV==='production'&&!secure)throw Error('Production APP_URL must use HTTPS.');let parsing=0;
  const json=(res,status,data)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(JSON.stringify(data));};
@@ -18,26 +18,13 @@ export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:300
  const server=createServer(async(req,res)=>{res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');res.setHeader('X-Frame-Options','DENY');res.setHeader('Permissions-Policy','camera=(), microphone=(), geolocation=()');res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");if(secure)res.setHeader('Strict-Transport-Security','max-age=31536000');
  try{const path=new URL(req.url,'http://internal').pathname;
  if(req.method==='GET'&&path==='/healthz')return json(res,200,{ok:db.prepare('SELECT 1 AS ok').get().ok===1});
- // Isolated server-to-server endpoint. No cookie/session authorization and no CORS.
- if(path==='/api/integrations/gmail/check'||path==='/api/integrations/gmail/import'||path==='/api/integrations/gmail/review'){
-  if(req.method!=='POST')throw new Problem('Methode nicht erlaubt.',405);
-  if(req.headers.origin)throw new Problem('Nur für das Gmail-Add-on.',403);
-  const user=authorizeGmail(db,req,!path.endsWith('/review'));
-  if(!String(req.headers['content-type']).startsWith('application/json'))throw new Problem('JSON erwartet.',415);
-  if(path.endsWith('/check')){await body(req,1024);return success(res,{email:user.email,...(user.sidebar_review?{sidebarReview:true}:{})});}
-  if(path.endsWith('/review')){
-   const input=JSON.parse((await body(req,128*1024)).toString());
-   const current=authorizeGmail(db,req,false);
-   return success(res,reviewGmail(db,current,input,origin));
-  }
-  if(parsing>=2)throw new Problem('Bitte kurz warten und erneut versuchen.',429);
-  parsing++;try{
-   const input=JSON.parse((await body(req,3*1024*1024)).toString());
-   let parsed;try{parsed=await selectedGmailMessage(input,user);}catch(e){if(e instanceof Problem)throw e;throw new Problem('Nachricht konnte nicht gelesen werden. Bitte .eml-Import verwenden.');}
-   // A key may have been revoked while MIME parsing yielded to another request.
-   const current=authorizeGmail(db,{headers:req.headers},false);
-   const id=stageGmailMessage(db,current,parsed);return success(res,{reviewUrl:origin+'/?import='+encodeURIComponent(id)});
-  }finally{parsing--;}
+ if(path==='/api/integrations/extension'){
+  if(req.method!=='POST')throw new Problem('Method not allowed.',405);
+  const user=authorizeExtension(db,req);
+  if(!String(req.headers['content-type']).startsWith('application/json'))throw new Problem('JSON required.',415);
+  const input=JSON.parse((await body(req,3*1024*1024)).toString());
+  const current=authorizeExtension(db,req,false);
+  return success(res,extensionAction(db,current,input,origin));
  }
  if(req.method==='POST'){
   if(req.headers.origin!==origin)throw new Problem('Unzulässiger Ursprung.',403,'forbidden');
@@ -72,15 +59,18 @@ export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:300
   if(!String(req.headers['content-type']).startsWith('application/json'))throw new Problem('JSON erwartet.',415);
   const b=JSON.parse((await body(req)).toString());let data;
   switch(b.action){
-   case 'gmailStatus':data={...gmailStatus(db,session),publicHttps:secure};break;
-   case 'gmailCreate':data={...createGmailKey(db,session,{sidebarReview:b.sidebarReview===true}),publicHttps:secure};break;
-   case 'gmailRevoke':revokeGmailKey(db,session);data={...gmailStatus(db,session),publicHttps:secure};break;
+   case 'extensionStatus':data=extensionStatus(db,session);break;
+   case 'extensionCreate':data=extensionCreate(db,session);break;
+   case 'extensionRevoke':data=extensionRevoke(db,session);break;
    case 'load':data=listData(db);break;
    case 'detail':data={entity:entity(db,b.id,true),history:history(db,b.id,0,b.historyKind||'all')};break;
    case 'history':data=history(db,b.id,b.offset,b.kind||'all');break;
    case 'search':data={ids:search(db,b.query)};break;
    case 'save':data=save(db,session,b);break;
    case 'create':data={entity:createOrg(db,session,b.name)};break;
+   case 'callPrepare':data=prepareCall(db,session,b);break;
+   case 'callCancel':data=cancelCall(db,session,b);break;
+   case 'callSave':data=saveCall(db,session,b);break;
    case 'contact':data=contactSave(db,session,b);break;
    case 'link':data=linkSave(db,session,b);break;
    case 'imports':data={items:db.prepare('SELECT id,payload_json FROM email_imports WHERE user_id=? AND expires_at>? ORDER BY rowid DESC').all(session.id,Date.now()).map(r=>{const p=JSON.parse(r.payload_json);return{id:r.id,subject:p.subject,sentAt:p.sentAt,direction:p.direction};})};break;

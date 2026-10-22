@@ -29,7 +29,7 @@ FastBill stays authoritative for billing. Customer URLs remain manually entered 
 
 ## Test the API locally
 
-You do **not** need a publicly hosted CRM or a Google add-on. Your Docker container needs outgoing HTTPS access to `my.fastbill.com`.
+You do **not** need a publicly hosted CRM . Your Docker container needs outgoing HTTPS access to `my.fastbill.com`.
 
 1. In FastBill, the main account user opens **Einstellungen → Übersicht → API-Key**.
 2. In Stage Force, choose **Importe → FastBill → API abrufen**.

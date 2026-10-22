@@ -1,6 +1,6 @@
 # Database and migration
 
-`server/schema.sql` is the executable schema. Tables use foreign keys and stable text IDs. `PRAGMA user_version` tracks the schema version; future application versions must introduce an explicit versioned migration before changing a deployed database. An older binary refuses a newer schema. Current version: 4. Version 2 added `gmail_keys`; version 3 added the four FastBill import tables below; version 4 adds `activity_contacts`. Startup applies these additive changes in a transaction and preserves existing CRM data. Back up before upgrading. Older binaries refuse newer databases; rollback requires restoring the pre-upgrade backup.
+`server/schema.sql` is the executable schema. Tables use foreign keys and stable text IDs. `PRAGMA user_version` tracks the schema version; future application versions must introduce an explicit versioned migration before changing a deployed database. An older binary refuses a newer schema. Current version: 7. Version 3 added FastBill import tables; version 4 added `activity_contacts`; version 6 replaces legacy integration credentials. Startup applies these additive changes in a transaction and preserves existing CRM data. Back up before upgrading. Older binaries refuse newer databases; rollback requires restoring the pre-upgrade backup.
 
 | Table | Purpose / relationship |
 | --- | --- |
@@ -9,7 +9,7 @@
 | organisation_contacts | Organisation ↔ contact membership; at most one primary contact per organisation |
 | contact_addresses | Multiple email addresses/phone numbers per contact; primary address ordered first |
 | activities | One interaction/note per row; linked organisation and optional signed-in author/message |
-| activity_contacts | Explicitly reviewed email activity ↔ contact associations; no backfill/inferred links for old messages |
+| activity_contacts | Explicitly reviewed email/call activity ↔ contact associations; no backfill/inferred links for old messages |
 | messages | Approved text, subject, participants, sent timestamp, direction, attachment metadata and unique deduplication key |
 | message_sources | Mailbox owner and optional original URL; multiple colleagues may reference one message |
 | followups | Next action and due date; at most one current follow-up per organisation in v0.1 |
@@ -18,7 +18,6 @@
 | source_references | Original provenance attached to an organisation, contact or activity |
 | audit_log | Author, timestamp and structured before/after values for organisation edits; contact/link/import events |
 | users / sessions | Local accounts, salted scrypt password hashes, hashed opaque session tokens and CSRF tokens |
-| gmail_keys | One revocable, hashed import-only credential per user; creation, expiry and last-use timestamps |
 | email_imports | Per-user, short-lived review payload; removed on confirmation/discard/expiry |
 | fastbill_batches / fastbill_rows | Per-user review runs and whitelisted source payloads; deleting a run cascades to staged rows |
 | fastbill_decisions | Account-scoped fingerprints, applied/ignored decision, reviewer, target and note; survives run deletion |
@@ -41,6 +40,10 @@ The UI loads a compact organisation list and queries the full-text index for dee
 
 Communication history and internal notes are separately filtered and paginated. Both use the reviewed event date, then the original email timestamp when present, then recording order. The wizard computes the proposed position from all communication rows, not just the first page. Unknown dates remain unknown; calls without a time sort after timed emails on the same date. Email import explicitly whitelists status, phase and follow-up changes, so it cannot override the last-contact date directly.
 
-## Schema 5: Gmail sidebar review
+## Schema 6: browser extension
 
-Startup adds `gmail_keys.sidebar_review` with default 0. Existing keys retain capture-only permissions. Explicit key creation/renewal from the updated CRM settings sets this flag to 1 and rotates the key. The existing import queue and atomic `confirmImport` transaction remain the source of truth; no parallel email database or AI processing is introduced. The scoped sidebar API exposes limited matching/context and confirmation of the key owner's imports only. No customer data is rewritten by this migration.
+Adds `extension_keys` (one hashed, revocable, expiring credential per user). Removes obsolete Gmail add-on credentials. CRM records, contacts and messages are preserved. Existing databases require a backup before upgrade; rollback needs the matching pre-upgrade database.
+
+## Schema 7: durable identity and calls
+
+`extension_message_refs` maps mailbox plus stable Gmail identifier to a stored message. `call_attempts` records the click timestamp, dialled number, user, organisation/contact and optional source message. Save links it to one activity; cancel deletes the pending row. Existing data is preserved. Timed calls sort by original click time alongside email timestamps. Calls do not imply successful contact.
