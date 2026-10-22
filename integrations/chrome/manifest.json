@@ -1,5 +1,5 @@
 {
- "manifest_version":3,"name":"Stage Force · Gmail","version":"0.4.0","minimum_chrome_version":"120",
+ "manifest_version":3,"name":"Stage Force · Gmail","version":"0.4.1","minimum_chrome_version":"120",
  "description":"Review one Gmail message and save it to your own Stage Force CRM.",
  "permissions":["storage"],
  "optional_host_permissions":["http://localhost/*","http://127.0.0.1/*","https://*/*"],

@@ -24,7 +24,7 @@ chrome.runtime.onMessage.addListener((message,sender,reply)=>{
   if(!sender.tab||new URL(sender.url).origin!=='https://mail.google.com')throw Error('Gmail only.');
   if(message.type==='options'){await chrome.runtime.openOptionsPage();return{};}
   const {connection}=await chrome.storage.local.get('connection');if(!connection)throw Error('Connect Stage Force first — use the connection button.');
-  if(message.type==='status')return{origin:connection.origin,email:connection.email};
+  if(message.type==='status'){const checked=await request(connection,{action:'check'});return{origin:connection.origin,email:checked.email,appearance:checked.appearance||'system'};}
   if(message.type==='open'){
    if(typeof message.organisationId!=='string'||message.organisationId.length>100)throw Error('Invalid organisation.');
    await chrome.tabs.create({url:validOrigin(connection.origin)+'/?organisation='+encodeURIComponent(message.organisationId)});return{};

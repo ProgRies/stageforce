@@ -1,6 +1,6 @@
 # Database and migration
 
-`server/schema.sql` is the executable schema. Tables use foreign keys and stable text IDs. `PRAGMA user_version` tracks the schema version; future application versions must introduce an explicit versioned migration before changing a deployed database. An older binary refuses a newer schema. Current version: 7. Version 3 added FastBill import tables; version 4 added `activity_contacts`; version 6 replaces legacy integration credentials. Startup applies these additive changes in a transaction and preserves existing CRM data. Back up before upgrading. Older binaries refuse newer databases; rollback requires restoring the pre-upgrade backup.
+`server/schema.sql` is the executable schema. Tables use foreign keys and stable text IDs. `PRAGMA user_version` tracks the schema version; future application versions must introduce an explicit versioned migration before changing a deployed database. An older binary refuses a newer schema. Current version: 8. Version 3 added FastBill import tables; version 4 added `activity_contacts`; version 6 replaces legacy integration credentials. Startup applies these additive changes in a transaction and preserves existing CRM data. Back up before upgrading. Older binaries refuse newer databases; rollback requires restoring the pre-upgrade backup.
 
 | Table | Purpose / relationship |
 | --- | --- |
@@ -47,3 +47,7 @@ Adds `extension_keys` (one hashed, revocable, expiring credential per user). Rem
 ## Schema 7: durable identity and calls
 
 `extension_message_refs` maps mailbox plus stable Gmail identifier to a stored message. `call_attempts` records the click timestamp, dialled number, user, organisation/contact and optional source message. Save links it to one activity; cancel deletes the pending row. Existing data is preserved. Timed calls sort by original click time alongside email timestamps. Calls do not imply successful contact.
+
+## Schema 8: appearance
+
+`user_appearance` stores each user’s light, dark or system preference. CRM settings save the preference through the authenticated API; the extension reads it when opening its popup.

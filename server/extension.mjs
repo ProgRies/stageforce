@@ -1,3 +1,4 @@
+import {appearance} from './appearance.mjs';
 import {prepareCall,saveCall,cancelCall,mergePhones} from './calls.mjs';
 import {randomBytes,createHash} from 'node:crypto';
 import {hashToken,limited,email} from './auth.mjs';
@@ -29,7 +30,7 @@ function existingMessage(db,user,b){const {mailbox,gmailId}=identity(b,user);let
 function attachReference(db,user,b,mid){const {mailbox,gmailId}=identity(b,user);if(gmailId)db.prepare('INSERT OR IGNORE INTO extension_message_refs VALUES(?,?,?)').run(mailbox,gmailId,mid);}
 function attachmentRefs(value){if(value===undefined)return[];if(!Array.isArray(value)||value.length>100)throw new Problem('Too many attachment references.');return value.map(a=>({name:field(a.name,500),size:field(a.size||'',100),type:field(a.type||'',100),referenceOnly:true})).filter(a=>a.name);}
 export function extensionAction(db,user,b,origin){
- if(b.action==='check')return{email:user.email};
+ if(b.action==='check')return{email:user.email,appearance:appearance(db,user)||'system'};
  if(b.action==='messageStatus'){
   const m=existingMessage(db,user,b);if(!m)return{saved:false};
   const organisation=brief(getOrg(db,m.organisation_id));if(!b.detail)return{saved:true,organisation};

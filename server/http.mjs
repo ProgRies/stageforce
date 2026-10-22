@@ -1,3 +1,4 @@
+import {appearance,saveAppearance} from './appearance.mjs';
 import {prepareCall,saveCall,cancelCall} from './calls.mjs';
 import {extensionStatus,extensionCreate,extensionRevoke,authorizeExtension,extensionAction} from './extension.mjs';
 import {createServer} from 'node:http';
@@ -28,11 +29,11 @@ export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:300
  }
  if(req.method==='POST'){
   if(req.headers.origin!==origin)throw new Problem('Unzulässiger Ursprung.',403,'forbidden');
-  if(path==='/api/login'){if(!String(req.headers['content-type']).startsWith('application/json'))throw new Problem('JSON erwartet.',415);const b=JSON.parse((await body(req,8192)).toString());const address=String(b.email||'').trim().toLowerCase();if(limited(db,'global-login',200)||limited(db,'login:'+address,10))throw new Problem('Zu viele Versuche. Bitte in zehn Minuten erneut versuchen.',429,'rate_limited');const user=db.prepare('SELECT * FROM users WHERE email=? COLLATE NOCASE AND active=1').get(address);const valid=await verifyPassword(b.password,user?.password_hash);if(!valid||!user)throw new Problem('Anmeldung fehlgeschlagen.',401,'unauthorized');const session=createSession(db,user);res.setHeader('Set-Cookie',cookie(session.token));return success(res,{user:session.user,csrf:session.csrf});}
+  if(path==='/api/login'){if(!String(req.headers['content-type']).startsWith('application/json'))throw new Problem('JSON erwartet.',415);const b=JSON.parse((await body(req,8192)).toString());const address=String(b.email||'').trim().toLowerCase();if(limited(db,'global-login',200)||limited(db,'login:'+address,10))throw new Problem('Zu viele Versuche. Bitte in zehn Minuten erneut versuchen.',429,'rate_limited');const user=db.prepare('SELECT * FROM users WHERE email=? COLLATE NOCASE AND active=1').get(address);const valid=await verifyPassword(b.password,user?.password_hash);if(!valid||!user)throw new Problem('Anmeldung fehlgeschlagen.',401,'unauthorized');const session=createSession(db,user);res.setHeader('Set-Cookie',cookie(session.token));return success(res,{user:session.user,csrf:session.csrf,appearance:appearance(db,user)});}
  }
  if(path.startsWith('/api/')){
   const session=getSession(db,req);if(!session)throw new Problem('Bitte anmelden.',401,'unauthorized');
-  if(req.method==='GET'&&path==='/api/session')return success(res,{user:publicUser(session),csrf:session.csrf});
+  if(req.method==='GET'&&path==='/api/session')return success(res,{user:publicUser(session),csrf:session.csrf,appearance:appearance(db,session)});
   if(req.method!=='POST')throw new Problem('Methode nicht erlaubt.',405);
   if(req.headers['x-csrf-token']!==session.csrf)throw new Problem('Sicherheitsprüfung fehlgeschlagen. Bitte neu anmelden.',403,'forbidden');
   if(path==='/api/logout'){db.prepare('DELETE FROM sessions WHERE token_hash=?').run(session.token_hash);res.setHeader('Set-Cookie',cookie('',0));return success(res,{});}
@@ -59,6 +60,7 @@ export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:300
   if(!String(req.headers['content-type']).startsWith('application/json'))throw new Problem('JSON erwartet.',415);
   const b=JSON.parse((await body(req)).toString());let data;
   switch(b.action){
+   case 'appearanceSave':data=saveAppearance(db,session,b);break;
    case 'extensionStatus':data=extensionStatus(db,session);break;
    case 'extensionCreate':data=extensionCreate(db,session);break;
    case 'extensionRevoke':data=extensionRevoke(db,session);break;

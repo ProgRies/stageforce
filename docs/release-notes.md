@@ -1,3 +1,10 @@
+# StageForce 0.3.1-local / extension 0.4.1
+
+- Light, dark and system themes cover phone controls, note fields and settings.
+- Extension popups follow the signed-in CRM user’s theme, with matching surfaces and static gradients.
+- Add Note creates an internal note; call events use the contact phone controls.
+- Schema 8 stores per-user theme preferences and preserves existing data.
+
 # StageForce 0.3.0-local / extension 0.4.0
 
 - Durable saved-email badges and read-only reopening from SQLite.
