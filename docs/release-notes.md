@@ -1,3 +1,9 @@
+## Extension 0.4.6 · CRM 0.3.6-local
+
+- Failed authentication or connection checks disable email saving and show a retry action while preserving the draft.
+- Save success requires an explicit CRM acknowledgement; missing or malformed responses cannot mark an email as saved.
+- Worker reloads preserve an existing pairing. After reloading the extension, refresh Gmail to replace its old content-script context.
+
 ## 0.3.6-local · extension 0.4.5
 
 - Gmail buttons distinguish saved mail (green), connection issues (amber), and messages ready to import (a brief StageForce shimmer). Click and save animations respect reduced-motion preferences.
