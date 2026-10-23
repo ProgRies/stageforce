@@ -1,5 +1,11 @@
 ## 0.3.9-local
 
+## 0.3.10-local · extension 0.4.12
+
+Centered the collapsed sidebar logo and placed organisation status below the name. Contact editing uses inset icons and accessible field names. The popup shows connection settings only while disconnected and no longer offers a manual animation pause control; system reduced-motion settings remain respected.
+
+Rebuild the CRM, reload the extension and refresh Gmail. No database migration is required.
+
 - Edit call notes and notes directly in their timeline cards. Preserve event dates, authors and contact links; audit edits and reject conflicting changes.
 - Toggle a contact pencil to an X. Closing discards its draft; saving updates the card and collapses its editor without clearing the timeline or loaded older activities.
 - Use StageForce confirmation dialogs inside the CRM, and the organisation creation form in FastBill imports. Browser tab-close protection still applies to unsaved work.

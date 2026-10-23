@@ -1,4 +1,4 @@
-# StageForce · 0.3.9-local
+# StageForce · 0.3.10-local
 
 Two parts: **StageForce**, the web interface and internal API for SQLite, and the **Chrome extension**, which imports selected Gmail emails. Everything in this package is for local development. Nothing has been published or deployed.
 
@@ -8,7 +8,7 @@ With Docker Desktop running, open a terminal in this folder:
 
 ```sh
 docker compose up -d --build
-docker compose exec crm node server/cli.mjs user:add ries@jaimo-solutions.com "Christian Ries"
+docker compose exec crm node server/cli.mjs user:add you@example.com "Your Name"
 ```
 
 Use the Gmail address you will import from. Choose a password of at least 12 characters at the hidden prompt. Open http://localhost:3000 and sign in. Your database starts empty and persists across rebuilds.
@@ -44,7 +44,7 @@ APP_URL=http://localhost:3000 node server/http.mjs
 
 After source edits, rebuild Docker with `docker compose up -d --build`. For extension edits, click Reload in `chrome://extensions` and refresh Gmail.
 
-Schema 8 adds per-user theme preferences alongside durable email identities and call preparation/logging. Existing CRM data and credentials are preserved. Back up the database before upgrading; older versions cannot open schema 8. The extension starts at v0.4.11; CRM version is 0.3.9-local.
+Schema 8 adds per-user theme preferences alongside durable email identities and call preparation/logging. Existing CRM data and credentials are preserved. Back up the database before upgrading; older versions cannot open schema 8. The extension starts at v0.4.12; CRM version is 0.3.10-local.
 
 [Future hosting and backups](docs/deployment.md) · [Schema](docs/schema.md) · [Release notes](docs/release-notes.md)
 
