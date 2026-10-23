@@ -175,22 +175,22 @@ button:active{transform:scale(.97)}
 .label{position:relative}
 button[data-state="ready"]::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(110deg,transparent 30%,#ffffff30 48%,transparent 65%);transform:translateX(-120%);animation:sf-shimmer 3.5s ease-in-out 2}
 button[data-state="ready"]:hover .symbol{animation:sf-spark .55s ease both}
-button[data-state="saved"]{color:#145438;background:#e2f4e9;border-color:#76b88e;box-shadow:0 2px 5px #134e2e12}
-button[data-state="saved"]:hover{background:#d2efdd}
+button[data-state="saved"]{color:#344054;background:#fff;border-color:#34b979;box-shadow:none}
+button[data-state="saved"]:hover{background:#f0fdf6;box-shadow:0 2px 8px #34b97918}
 button[data-state="disconnected"],button[data-state="offline"],button[data-state="attention"]{color:#755018;background:#fff3d7;border-color:#c6a96c;box-shadow:none}
 button[data-state="checking"]{color:#526078;background:#edf0f7;border-color:#bbc3d3;box-shadow:none}
 button.celebrate .symbol{animation:sf-success .45s ease both}
 @keyframes sf-shimmer{0%,55%{transform:translateX(-120%)}90%,100%{transform:translateX(120%)}}
 @keyframes sf-spark{50%{transform:rotate(60deg) scale(1.2)}100%{transform:rotate(0) scale(1)}}
 @keyframes sf-success{0%{transform:scale(.6)}60%{transform:scale(1.25)}100%{transform:scale(1)}}
-@media(prefers-color-scheme:dark){button[data-state="saved"]{color:#c5f3d5;background:#173e2c;border-color:#4f9a70}button[data-state="saved"]:hover{background:#1d4a35}button[data-state="disconnected"],button[data-state="offline"],button[data-state="attention"]{color:#f4d598;background:#40341f;border-color:#927645}button[data-state="checking"]{color:#ccd5e8;background:#273047;border-color:#65718b}}
+@media(prefers-color-scheme:dark){button[data-state="saved"]{color:#e7edf7;background:#1f2430;border-color:#57d9a3}button[data-state="saved"]:hover{background:#283b35}button[data-state="disconnected"],button[data-state="offline"],button[data-state="attention"]{color:#f4d598;background:#40341f;border-color:#927645}button[data-state="checking"]{color:#ccd5e8;background:#273047;border-color:#65718b}}
 @media(prefers-reduced-motion:reduce){button{transition:none}button:hover,button:active{transform:none}button::after,button .symbol{animation:none!important}}
 `;
 function messageButton(n){return n.querySelector('[data-stageforce-button]')?.shadowRoot?.querySelector('button');}
 function setMessageButton(n,state,celebrate=false){setButtonState(messageButton(n),state,celebrate);}
 function setButtonState(b,state,celebrate=false,detail=''){
  if(!b)return;
- const states={ready:['✦','Add to StageForce','Preview this message in StageForce'],saved:['✓','Already in StageForce · Check','Saved in StageForce — open contacts and email'],disconnected:['○','Connect StageForce','Open extension connection settings'],offline:['○','StageForce · Offline','CRM unavailable — open to retry or check connection'],attention:['!','StageForce · Check','Open to check this message'],checking:['·','StageForce · Checking','Checking whether this message is saved']};
+ const states={ready:['✦','Add to StageForce','Preview this message in StageForce'],saved:['⚡','Already in StageForce · Check','Saved in StageForce — open contacts and email'],disconnected:['○','Connect StageForce','Open extension connection settings'],offline:['○','StageForce · Offline','CRM unavailable — open to retry or check connection'],attention:['!','StageForce · Check','Open to check this message'],checking:['·','StageForce · Checking','Checking whether this message is saved']};
  const [icon,label,title]=states[state];b.dataset.state=state;b.sfRevision=(b.sfRevision||0)+1;b.classList.toggle('celebrate',celebrate);b.querySelector('.symbol').textContent=icon;b.querySelector('.label').textContent=label;b.title=detail||title;
 }
 function buttonIssue(b,error){const message=error?.message||'Check the StageForce connection.';const state=error?.code==='connection_required'?'disconnected':/Connect Stage Force first|Connect your extension|Connect Stage Force using/.test(message)?'disconnected':/unavailable|Failed to fetch|timeout|timed out|aborted/i.test(message)?'offline':'attention';setButtonState(b,state,false,message);}

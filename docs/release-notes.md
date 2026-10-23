@@ -1,3 +1,7 @@
+## Extension 0.4.8
+
+- Give saved-email buttons a bright green outline, neutral background and lightning emoji in light and dark mode.
+
 ## 0.3.7-local · extension 0.4.7
 
 - Inset the message-direction arrow in the Gmail popup.
