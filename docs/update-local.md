@@ -1,4 +1,4 @@
-# Local update: CRM 0.3.7 / extension 0.4.10
+# Local update: CRM 0.3.8 / extension 0.4.11
 
 ## Install over your existing local project
 
@@ -24,6 +24,12 @@ Keep the same StageForce directory and Compose project so Docker reuses your dat
 
 ## What changed
 
+- Rebuild Docker and reload the extension together for contact editing and selection extraction.
+- Use the contact pencil to correct a name or add/change phone numbers. Save contact writes immediately to the selected organisation; saving the email remains a separate action. Existing secondary email addresses and roles are preserved in extension edits.
+- Highlight a single person’s contact details in the email body, then choose Extract contact (extension) or Kontakt extrahieren (CRM). Review before saving; choose an existing contact to add details to it. Selection parsing is local and may need correction, especially when several people appear in the selection.
+- CRM contact forms expand inside their cards. Email and phone inputs take one line; use semicolons for additional values.
+- The white quick-call control beside Notiz hinzufügen chooses the first usable number of the most recently contacted person with a number. Other numbers remain on the contact cards.
+
 - The extension popup uses a compact 70/30 desktop split. Click outside to close; pending call notes still ask before discarding, and saving cannot be interrupted.
 - Dark popups use the CRM signal background with a pause control. Animation respects reduced motion, pauses in hidden tabs and stops when the popup closes.
 
@@ -40,7 +46,7 @@ Keep the same StageForce directory and Compose project so Docker reuses your dat
 
 - Compact navigation leaves more room for organisation details. Search and refresh are available in the top toolbar.
 - Create an organisation from the search results. The in-app form starts with your search text, suggests existing organisations, and opens the saved record.
-- Contacts without detected or stored phone numbers show no phone section in the extension. Add missing numbers in the CRM after Save & Open. Existing number editors start collapsed.
+- Contacts without detected or stored phone numbers show no phone section in the extension. Use the pencil to add a missing number or correct an existing one.
 
 - Choose Hell, Dunkel or System in CRM settings. The extension reads this account preference each time its popup opens; System follows the browser’s OS theme live. Static gradients, borders and shadows replace backdrop blur.
 - “Notiz hinzufügen” adds a timeline note without recording a call or changing the last-contact date. Use the contact’s phone button to start and record calls.
@@ -48,9 +54,9 @@ Keep the same StageForce directory and Compose project so Docker reuses your dat
 - A compact 70/30 desktop popup, stacked on narrow screens.
 - Email text is extracted once per preview; large bodies initially render only 6,000 characters. Full text is retained and saved, including loaded conversation history. Use “Show / edit full email” to edit longer messages.
 - Keyboard events inside the popup are isolated from Gmail's document shortcuts.
-- Saved badges are checked against SQLite, scoped to mailbox plus Gmail message identifier. Opening a saved message shows its stored CRM content, selected contacts and current phone numbers, read-only, with calling and Open in CRM available.
+- Saved badges are checked against SQLite, scoped to mailbox plus Gmail message identifier. Opening a saved message shows its stored CRM content, selected contacts and current phone numbers. Message content stays read-only; contacts can be edited with the pencil, and calling and Open in CRM remain available.
 - Older imports use a SHA-256 fingerprint of original sender, date text, subject and body. Only that digest is sent during background fallback checks. A match attaches the Gmail identifier. A changed original rendering/date text may prevent recognition of older records; do not assume a missing badge proves an old import is absent. New records retain their Gmail identity.
-- Phone suggestions use the current sender's non-quoted signature and telephone links. Fax, generic numeric text and recognized quoted reply sections are excluded. You can correct suggested numbers before importing. Existing numbers are appended to, not overwritten; uncertain ownership still requires review. Unknown country codes are not guessed.
+- Phone suggestions use the current sender's non-quoted signature and telephone links. Fax, generic numeric text and recognized quoted reply sections are excluded. You can correct suggested numbers before importing. Automatic import suggestions append numbers. An explicit pencil edit replaces the phone list with the reviewed values; uncertain ownership still requires review. Unknown country codes are not guessed.
 - Attachment cards supply filename, displayed size and type when available. No file bytes are fetched or stored. Signature images and prose mentions are not treated as attachment evidence. Detection depends on Gmail's loaded DOM; collapsed/unloaded or unfamiliar attachment layouts may be missed.
 
 ## Calling

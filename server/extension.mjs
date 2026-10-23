@@ -1,10 +1,10 @@
 import {contactName} from '../src/domain.ts';
 import {appearance} from './appearance.mjs';
-import {prepareCall,saveCall,cancelCall,mergePhones} from './calls.mjs';
+import {prepareCall,saveCall,cancelCall,mergePhones,dialNumber} from './calls.mjs';
 import {randomBytes,createHash} from 'node:crypto';
 import {hashToken,limited,email} from './auth.mjs';
 import {transaction,now} from './db.mjs';
-import {Problem,matchEmail,stageImport,confirmImport,getOrg,contacts,createOrg,linkSave} from './crm.mjs';
+import {Problem,matchEmail,stageImport,confirmImport,getOrg,contacts,createOrg,linkSave,contactSave,assertVersion} from './crm.mjs';
 const brief=o=>({id:o.id,name:o.name,version:String(o.version)});
 const field=(v,max=1000)=>{if(typeof v!=='string'||v.length>max||v.includes('\0'))throw new Problem('Invalid field.');return v.trim();};
 export function extensionStatus(db,user){const k=db.prepare('SELECT created_at,expires_at,last_used_at FROM extension_keys WHERE user_id=?').get(user.id);return{email:user.email,connected:!!k&&k.expires_at>Date.now(),...k};}
@@ -37,10 +37,34 @@ export function extensionAction(db,user,b,origin){
   const organisation=brief(getOrg(db,m.organisation_id));if(!b.detail)return{saved:true,organisation};
   return{saved:true,organisation,message:{id:m.id,subject:m.subject,body:m.body,timestamp:m.sent_at,direction:m.direction,attachments:JSON.parse(m.attachments_json)},participants:db.prepare('SELECT c.id FROM activity_contacts ac JOIN contacts c ON c.id=ac.contact_id JOIN activities a ON a.id=ac.activity_id WHERE a.message_id=?').all(m.id).map(r=>contacts(db,m.organisation_id).find(c=>c.id===r.id)).filter(Boolean).map(c=>({contactId:c.id,email:c.e_mails[0]||'',name:contactName(c.name,c.e_mails[0]),phones:c.telefone,known:true}))};
  }
+ if(b.action==='contactSave'){
+  identity(b,user);if(b.confirmed!==true)throw new Problem('Explicit contact confirmation required.');
+  const name=field(b.name||'',300),address=field(b.email||'',254).toLowerCase();
+  if(address&&!email(address))throw new Problem('Check the email address.');
+  if(!Array.isArray(b.phones)||b.phones.length>10)throw new Problem('Check phone numbers.');
+  const phones=[...new Set(b.phones.map(p=>{dialNumber(p);return field(p,100);}))];
+  if(!address&&!phones.length)throw new Problem('Enter an email address or phone number.');
+  return transaction(db,()=>{
+   let id=b.organisationId;
+   if(id)assertVersion(getOrg(db,id),b.version);
+   else{const organisationName=field(b.newOrganisation||'',500);if(!organisationName)throw new Problem('Select or create an organisation first.');const existing=db.prepare('SELECT id FROM organisations WHERE name=? COLLATE NOCASE').get(organisationName);if(existing)throw new Problem('This organisation already exists. Select it from the search results.');id=createOrg(db,user,organisationName).id;}
+   if(b.messageId){const message=existingMessage(db,user,b);if(!message||message.id!==b.messageId||message.organisation_id!==id)throw new Problem('Email not found.',404);}
+   const all=contacts(db,id);let current=b.contactId?all.find(c=>c.id===b.contactId):null;
+   if(b.contactId&&!current)throw new Problem('Contact does not belong to this organisation.',404);
+   if(!current&&address){const matches=all.filter(c=>c.e_mails.some(e=>e.toLowerCase()===address));if(matches.length>1)throw new Problem('Several contacts share this address. Choose the contact in the CRM.');current=matches[0];}
+   if(!current&&!address){const matches=all.filter(c=>c.name.toLowerCase()===name.toLowerCase()&&c.telefone.some(p=>{try{return phones.some(n=>dialNumber(n)===dialNumber(p));}catch{return false;}}));if(matches.length>1)throw new Problem('Several contacts match this phone number. Choose the contact in the CRM.');current=matches[0];}
+   const addresses=[...new Set([...(current?.e_mails||[]),...(address?[address]:[])])];
+   const numbers=b.contactId?phones:[...new Set([...(current?.telefone||[]),...phones])];
+   const result=contactSave(db,user,{id,version:getOrg(db,id).version,contactId:current?.id,name:name||current?.name||'',role:current?.rolle||'',emails:addresses.join(';'),phones:numbers.join(';'),messageId:b.messageId});
+   const c=contacts(db,id).find(c=>c.id===result.contactId);
+   return{saved:true,organisation:brief(getOrg(db,id)),contact:{contactId:c.id,name:contactName(c.name,c.e_mails[0]),email:address||c.e_mails[0]||'',phones:c.telefone,known:true}};
+  });
+ }
  if(b.action==='callPrepare'){
   const e=envelope(b,user),person=[...e.sender,...e.recipients].find(p=>p.email===b.contactEmail&&p.email!==e.mailbox);
   // Saved message contacts may have changed in the CRM after import.
   if(b.messageId){identity(b,user);const m=existingMessage(db,user,b);if(!m||m.id!==b.messageId||m.organisation_id!==b.organisationId)throw new Problem('Email not found.',404);return prepareCall(db,user,b);}
+  if(b.confirmedContact===true&&b.contactId)return prepareCall(db,user,b);
   if(!person)throw new Problem('Select a contact from the email headers.');return prepareCall(db,user,b,{participant:person});
  }
  if(b.action==='callCancel')return cancelCall(db,user,b);
@@ -81,6 +105,14 @@ export function extensionAction(db,user,b,origin){
   const result=confirmImport(db,user,{importId:staged.id,id:b.organisationId,version:b.version,newOrganisation:b.newOrganisation?{name:field(b.newOrganisation,500),status:'Lead'}:undefined,body:field(b.body,500000),date,direction,contactEmails:b.contactEmails,sourceUrl});
   const id=result.entity.id;
   const mid=db.prepare('SELECT id FROM messages WHERE dedupe_key=?').get(dedupeKey).id;attachReference(db,user,b,mid);
+  if(b.extraContactIds!==undefined){
+   if(!Array.isArray(b.extraContactIds)||b.extraContactIds.length>100)throw new Problem('Invalid selected contacts.');
+   for(const cid of new Set(b.extraContactIds)){
+    if(typeof cid!=='string'||!db.prepare('SELECT 1 FROM organisation_contacts WHERE organisation_id=? AND contact_id=?').get(id,cid))throw new Problem('Contact does not belong to this organisation.',404);
+    for(const a of db.prepare('SELECT id FROM activities WHERE message_id=? AND organisation_id=?').all(mid,id))db.prepare('INSERT OR IGNORE INTO activity_contacts VALUES(?,?)').run(a.id,cid);
+   }
+  }
+
   if(b.contactPhones!==undefined){if(!Array.isArray(b.contactPhones)||b.contactPhones.length>100)throw new Problem('Invalid contacts.');for(const item of b.contactPhones){if(!b.contactEmails.includes(item.email))continue;const matches=contacts(db,id).filter(c=>c.e_mails.some(e=>e.toLowerCase()===item.email));if(matches.length===1)mergePhones(db,user,id,matches[0],item.phones);}}
 
   if(b.linked&&!result.duplicate){
