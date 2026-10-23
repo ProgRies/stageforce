@@ -1,4 +1,4 @@
-# Local update: CRM 0.3.7 / extension 0.4.8
+# Local update: CRM 0.3.7 / extension 0.4.9
 
 ## Install over your existing local project
 

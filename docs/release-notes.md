@@ -1,3 +1,8 @@
+## Extension 0.4.9
+
+- Keep Gmail header buttons visually identical in light and dark mode.
+- Use a white-to-mint gradient, dark text and a green checkmark for saved emails.
+
 ## Extension 0.4.8
 
 - Give saved-email buttons a bright green outline, neutral background and lightning emoji in light and dark mode.
