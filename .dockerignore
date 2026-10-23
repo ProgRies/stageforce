@@ -11,3 +11,6 @@
 
 !public/
 !public/**
+!integrations/
+!integrations/chrome/
+!integrations/chrome/extract.js
