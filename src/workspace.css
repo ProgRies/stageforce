@@ -8,7 +8,13 @@
 .communication-event{position:relative;border:1px solid var(--line);border-radius:20px;padding:18px 20px;margin:0 0 28px;background:linear-gradient(125deg,#ffffff8c,#eaf0ff40);box-shadow:0 5px 20px #344f7e05}
 .communication-event>summary{align-items:flex-start;gap:12px;min-height:60px}
 .communication-icon{position:absolute;left:-58px;top:16px;width:43px;height:43px;border-radius:50%;color:#627ad8;background:#e5ecfa;border:1px solid #aebde65c;box-shadow:0 0 0 5px #eff1f6}
-.communication-event.call .communication-icon{color:#9469cc;background:#eee6fa;border-color:#bca3db66}
+.communication-event.email{--event-accent:#315cad;background:linear-gradient(125deg,#f1f6ff,#e3edfc);border-color:#a8c0e8}
+.communication-event.call{--event-accent:#7443a3;background:linear-gradient(125deg,#f8f2ff,#eee2fb);border-color:#c7abe4}
+.communication-event.note{--event-accent:#805518;background:linear-gradient(125deg,#fff9ea,#f9edcf);border-color:#ddc28d}
+.communication-event.call .communication-icon{color:#7443a3;background:#eee2fb;border-color:#c7abe4}
+.communication-event.note .communication-icon{color:#805518;background:#f9edcf;border-color:#ddc28d}
+.communication-event.email .communication-icon{color:#315cad;background:#e3edfc;border-color:#a8c0e8}
+.communication-event .event-meta>span{color:var(--event-accent,var(--action))}
 .communication-event.contact .communication-icon{color:var(--muted);background:#e9edf2}
 .communication-title{gap:10px}
 .communication-title .event-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;white-space:normal;overflow:visible;font-size:11px;color:var(--muted)}
@@ -45,7 +51,12 @@
 .overview-action>span,.overview-issues>summary>span{flex:none}.overview-action,.overview-issues>summary{gap:8px}.overview-action[aria-expanded=true]>svg:last-child,.overview-issues[open]>summary>svg:last-child{transform:rotate(180deg)}
 [data-theme="dark"] .communication-event{background:linear-gradient(130deg,#a6b8ff0b,#7472ba06);border-color:#afbded22;box-shadow:0 6px 24px #040a1710}
 [data-theme="dark"] .communication-icon{color:#a8beff;background:#253252;border-color:#8bafff52;box-shadow:0 0 0 5px #18213a}
-[data-theme="dark"] .communication-event.call .communication-icon{color:#d1aeff;background:#35294b;border-color:#bf94ff52}
+[data-theme="dark"] .communication-event.email{--event-accent:#b6d2ff;background:linear-gradient(130deg,#243654,#1d2b46);border-color:#456391}
+[data-theme="dark"] .communication-event.call{--event-accent:#dfc1ff;background:linear-gradient(130deg,#3b2c52,#2c2342);border-color:#745594}
+[data-theme="dark"] .communication-event.note{--event-accent:#f4d394;background:linear-gradient(130deg,#423727,#302b25);border-color:#806844}
+[data-theme="dark"] .communication-event.call .communication-icon{color:#dfc1ff;background:#3b2c52;border-color:#745594}
+[data-theme="dark"] .communication-event.note .communication-icon{color:#f4d394;background:#423727;border-color:#806844}
+[data-theme="dark"] .communication-event.email .communication-icon{color:#b6d2ff;background:#243654;border-color:#456391}
 [data-theme="dark"] .communication-event.contact .communication-icon{color:#c4cce0;background:#263047;border-color:#8493b752}
 [data-theme="dark"] .contact-card{background:#ffffff03}
 [data-theme="dark"] .inline-organisation input,[data-theme="dark"] .inline-organisation select,[data-theme="dark"] .inline-organisation textarea,[data-theme="dark"] .inline-contact-editor input:not([type=checkbox]),[data-theme="dark"] .inline-contact-editor textarea,[data-theme="dark"] .inline-contact-editor select{background:#0d152b66;border-color:#bbcaff25;color:#e3e9fa}
@@ -164,9 +175,11 @@
 .timeline-heading{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}
 .timeline-heading h3{padding-top:12px;margin-right:auto}
 .timeline-actions{display:flex;align-items:flex-start;justify-content:flex-end;gap:10px;flex-wrap:wrap;flex:1}
-.timeline-actions>.button{white-space:nowrap}
-.quick-call{width:220px;max-width:100%;min-width:0}
-.quick-call .sf-phone{margin:0}.quick-call .sf-phone-number{min-height:40px;background:#fff;color:#29334b;border-color:#c9c9e0;color-scheme:light}
+.timeline-actions>.button{white-space:nowrap;min-height:40px}
+.quick-call{width:220px;max-width:100%;min-width:0;flex-shrink:0}
+.quick-call .sf-phone{margin:0}.quick-call .sf-phone-number{min-height:40px;padding:7px 10px;font-size:13px;line-height:20px;white-space:nowrap;background:#fff;color:#29334b;border-color:#c9c9e0;color-scheme:light}
+.quick-call .sf-phone-number span{min-width:0;overflow:hidden;text-overflow:ellipsis;overflow-wrap:normal}
+.quick-call .sf-phone-number>svg,.quick-call .sf-phone-number>img{flex-shrink:0}
 .quick-call .sf-phone-number:hover:not(:disabled){background:#f7f5ff;border-color:#8d77bd}
 .quick-call .sf-call-note{margin-top:8px;background:var(--surface-panel)}
 .extract-contact-action{position:fixed;z-index:10000;display:flex;align-items:center;gap:8px;padding:10px 14px;border:1px solid #aa97df;border-radius:10px;background:#fff;color:#43306d;box-shadow:0 4px 16px #18122f26;cursor:pointer;font:600 13px system-ui;max-width:calc(100vw - 24px)}
