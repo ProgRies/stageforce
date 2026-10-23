@@ -1,3 +1,9 @@
+## 0.3.7-local · extension 0.4.7
+
+- Inset the message-direction arrow in the Gmail popup.
+- Standardize CRM dropdown spacing across forms, appearance settings, call queues and imports, preserving the organisation status control.
+- Match arrow colors to light/dark themes and retain native arrows in forced-colors mode.
+
 ## Extension 0.4.6 · CRM 0.3.6-local
 
 - Failed authentication or connection checks disable email saving and show a retry action while preserving the draft.

@@ -1,0 +1,15 @@
+/* Keep native selection and keyboard behavior with a consistent inset chevron. */
+:root{--select-chevron:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23667e8f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")}
+[data-theme="dark"]{--select-chevron:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a8b4ce' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")}
+:root select:not([multiple]):not([size]):not(.organisation-status){
+ appearance:none;
+ padding-right:36px;
+ background-image:var(--select-chevron);
+ background-position:right 12px center;
+ background-size:16px 16px;
+ background-repeat:no-repeat;
+}
+.theme-picker select{max-width:110px}
+@media(forced-colors:active){
+ :root select:not([multiple]):not([size]):not(.organisation-status){appearance:auto;background-image:none;padding-right:11px}
+}

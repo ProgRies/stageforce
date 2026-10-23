@@ -1,4 +1,4 @@
-# Local update: CRM 0.3.4 / extension 0.4.6
+# Local update: CRM 0.3.7 / extension 0.4.7
 
 ## Install over your existing local project
 
@@ -23,6 +23,8 @@ Keep the same StageForce directory and Compose project so Docker reuses your dat
 5. In `chrome://extensions`, reload Stage Force. If Chrome was loading a different directory, use Load unpacked and select the updated `StageForce/integrations/chrome` folder. Refresh Gmail. Packing a CRX is unnecessary.
 
 ## What changed
+
+- Dropdown arrows use consistent inset spacing in the extension and CRM, including light, dark and high-contrast modes.
 
 - Use the sidebar toggle above logout to collapse or expand navigation on desktop. The logo and navigation icons stay visible.
 - The narrower organisation list displays a known location or organisation type; the Unklar placeholder is hidden.
