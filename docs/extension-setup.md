@@ -49,7 +49,7 @@ Credentials are random 256-bit, account-specific bearer tokens, stored only as h
 
 The extension stores its key in the local browser profile using `chrome.storage.local`, restricted to trusted extension contexts. It does not use Chrome Sync and does not expose the key to Gmail's content script. This is access isolation, not encrypted secret storage: someone controlling the device/profile can steal the key. Use OS disk encryption and locked, individual browser profiles.
 
-The extension key cannot access generic CRM routes, account administration or FastBill. It can read matching information and the stored message identified by an opened Gmail message, create confirmed imports/contacts/organisation links, and prepare/save/cancel its user’s calls. Web-session mutations still require session cookies, exact Origin and CSRF checks. Website-origin requests to the extension endpoint are rejected; bearer authorization is required even if an Origin header is absent. No wildcard CORS is enabled.
+The extension key cannot access generic CRM routes, account administration or FastBill. It can read matching information and the stored message identified by an opened Gmail message, create confirmed imports/contacts/organisation links, explicitly edit contacts under the selected organisation, and prepare/save/cancel its user’s calls. Web-session mutations still require session cookies, exact Origin and CSRF checks. Website-origin requests to the extension endpoint are rejected; bearer authorization is required even if an Origin header is absent. No wildcard CORS is enabled.
 
 ## Local and later hosted use
 
@@ -61,7 +61,7 @@ For shared hosted use, run the same CRM service behind HTTPS with a valid certif
 
 A unique exact external contact-address match is preselected. Shared-address ambiguity and domain-only suggestions require your choice. A single existing linked organisation is prefilled; new relationships are never guessed from an email domain.
 
-Contacts are drawn from loaded headers, not arbitrary addresses in the body. Gmail DOM selectors are undocumented. Collapsed headers may omit recipients and To/Cc roles are not reliably distinguished; expand the header and reopen when needed. Quoted text already loaded in the message is included, but unloaded messages and attachment contents are not.
+Automatic contact suggestions are drawn from loaded headers. To add a contact from the body, highlight one person’s details and choose Extract contact, then review and save. Selection parsing is local; contact saving sends only the reviewed name, email, phone numbers and organisation context. The contact pencil also edits names and phone numbers on saved messages. Gmail DOM selectors are undocumented. Collapsed headers may omit recipients and To/Cc roles are not reliably distinguished; expand the header and reopen when needed. Quoted text already loaded in the message is included, but unloaded messages and attachment contents are not.
 
 ISO timestamps and explicit numeric German timestamps are parsed. Numeric Gmail times use the browser's timezone; unsupported/relative formats require manual confirmation. The time field exposes the browser timezone and original timestamp in its tooltip. Check timezone and daylight-saving ambiguity when importing historical email.
 
@@ -69,6 +69,6 @@ Retries use a request ID; repeated extension imports use mailbox-scoped Gmail id
 
 ## Validation
 
-57 automated tests pass, including key hashing, expiry, rotation/revocation, account and request isolation, CSRF boundaries, conservative matching, rollback, duplicate saves, migration and dates. A Chromium Gmail-like fixture also passed prefill, header-only lookup, HTTP save into SQLite, date preservation, duplicate save and Save & Open; desktop/mobile layouts were inspected. The fixture mocks Chrome messaging; it does not validate the installed extension’s host-permission prompts. A real Gmail test and Docker start on your computer remain necessary; fixtures cannot guarantee Google's live markup or your browser/network policies.
+72 automated tests pass, including key hashing, expiry, rotation/revocation, account and request isolation, CSRF boundaries, conservative matching, rollback, duplicate saves, migration and dates. A Chromium Gmail-like fixture also passed prefill, header-only lookup, HTTP save into SQLite, date preservation, duplicate save and Save & Open; desktop/mobile layouts were inspected. The fixture mocks Chrome messaging; it does not validate the installed extension’s host-permission prompts. A real Gmail test and Docker start on your computer remain necessary; fixtures cannot guarantee Google's live markup or your browser/network policies.
 
 For the current saved-message, phone, attachment-reference and call workflow, see [the local update guide](update-local.md).

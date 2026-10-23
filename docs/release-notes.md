@@ -1,3 +1,13 @@
+## 0.3.8-local · extension 0.4.11
+
+- Edit contact names and phone numbers with the pencil in Gmail, including on already imported emails. Saving a contact writes it to the selected organisation independently of importing the email.
+- Highlight contact details in an email and choose Extract contact / Kontakt extrahieren. Parsing happens locally; review the suggestion and save a new contact or enrich an existing one. Extracted contacts can be linked without changing the original sender or recipients.
+- Expand CRM contact editors directly inside their cards, with single-line email and phone inputs. Separate multiple values with semicolons.
+- Place a white StageForce quick-call control beside Notiz hinzufügen. It uses the first valid number of the most recently contacted person with a number, falling back to contact order. Calling and call notes use the existing flow.
+- Keep expanded timeline entries open when refreshing contacts. Validate contact and email organisation associations before saving.
+
+Rebuild the CRM and reload the extension for this update. No database migration is required.
+
 ## Extension 0.4.10
 
 - Use a compact 1200px popup with a 70/30 desktop split and a stacked layout on small screens.

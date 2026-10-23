@@ -156,3 +156,21 @@
 .contacts-toggle svg{transition:transform .2s ease}
 .contacts-toggle[aria-expanded="true"] svg{transform:rotate(180deg)}
 @media(prefers-reduced-motion:reduce){.contacts-toggle svg{transition:none}}
+
+.contact-card.is-editing{border-color:var(--action)}
+.contact-card>.inline-contact-editor{border:0;border-top:1px solid var(--line);border-radius:0;background:transparent;padding:16px 0 0;margin:16px 0 0;animation:contact-expand .18s ease-out}
+[data-theme="dark"] .contact-card>.inline-contact-editor{background:transparent}
+.extraction-target{margin-bottom:14px}.extraction-review{font-size:12px;line-height:1.5}
+.timeline-heading{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.timeline-heading h3{padding-top:12px;margin-right:auto}
+.timeline-actions{display:flex;align-items:flex-start;justify-content:flex-end;gap:10px;flex-wrap:wrap;flex:1}
+.timeline-actions>.button{white-space:nowrap}
+.quick-call{width:220px;max-width:100%;min-width:0}
+.quick-call .sf-phone{margin:0}.quick-call .sf-phone-number{min-height:40px;background:#fff;color:#29334b;border-color:#c9c9e0;color-scheme:light}
+.quick-call .sf-phone-number:hover:not(:disabled){background:#f7f5ff;border-color:#8d77bd}
+.quick-call .sf-call-note{margin-top:8px;background:var(--surface-panel)}
+.extract-contact-action{position:fixed;z-index:10000;display:flex;align-items:center;gap:8px;padding:10px 14px;border:1px solid #aa97df;border-radius:10px;background:#fff;color:#43306d;box-shadow:0 4px 16px #18122f26;cursor:pointer;font:600 13px system-ui;max-width:calc(100vw - 24px)}
+.extract-contact-action:focus-visible{outline:3px solid var(--action);outline-offset:2px}
+.extract-contact-action:disabled{cursor:default;color:#677086}
+@keyframes contact-expand{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.contact-card>.inline-contact-editor{animation:none}}
