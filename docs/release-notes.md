@@ -1,3 +1,9 @@
+## Extension 0.4.10
+
+- Use a compact 1200px popup with a 70/30 desktop split and a stacked layout on small screens.
+- Close by clicking outside the popup; pending call notes retain their discard confirmation, and saves in progress stay open.
+- Bring the CRM’s blue/purple signal background into dark-mode popups using a bounded 20fps canvas, with pause, reduced-motion and hidden-tab handling. Dispose the renderer when the popup closes.
+
 ## Extension 0.4.9
 
 - Keep Gmail header buttons visually identical in light and dark mode.

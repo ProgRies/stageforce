@@ -44,7 +44,7 @@ APP_URL=http://localhost:3000 node server/http.mjs
 
 After source edits, rebuild Docker with `docker compose up -d --build`. For extension edits, click Reload in `chrome://extensions` and refresh Gmail.
 
-Schema 8 adds per-user theme preferences alongside durable email identities and call preparation/logging. Existing CRM data and credentials are preserved. Back up the database before upgrading; older versions cannot open schema 8. The extension starts at v0.4.9; CRM version is 0.3.7-local.
+Schema 8 adds per-user theme preferences alongside durable email identities and call preparation/logging. Existing CRM data and credentials are preserved. Back up the database before upgrading; older versions cannot open schema 8. The extension starts at v0.4.10; CRM version is 0.3.7-local.
 
 [Future hosting and backups](docs/deployment.md) · [Schema](docs/schema.md) · [Release notes](docs/release-notes.md)
 

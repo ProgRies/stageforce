@@ -1,4 +1,4 @@
-# Local update: CRM 0.3.7 / extension 0.4.9
+# Local update: CRM 0.3.7 / extension 0.4.10
 
 ## Install over your existing local project
 
@@ -24,6 +24,9 @@ Keep the same StageForce directory and Compose project so Docker reuses your dat
 
 ## What changed
 
+- The extension popup uses a compact 70/30 desktop split. Click outside to close; pending call notes still ask before discarding, and saving cannot be interrupted.
+- Dark popups use the CRM signal background with a pause control. Animation respects reduced motion, pauses in hidden tabs and stops when the popup closes.
+
 - Dropdown arrows use consistent inset spacing in the extension and CRM, including light, dark and high-contrast modes.
 
 - Use the sidebar toggle above logout to collapse or expand navigation on desktop. The logo and navigation icons stay visible.
@@ -42,7 +45,7 @@ Keep the same StageForce directory and Compose project so Docker reuses your dat
 - Choose Hell, Dunkel or System in CRM settings. The extension reads this account preference each time its popup opens; System follows the browser’s OS theme live. Static gradients, borders and shadows replace backdrop blur.
 - “Notiz hinzufügen” adds a timeline note without recording a call or changing the last-contact date. Use the contact’s phone button to start and record calls.
 
-- A 75/25 desktop popup, stacked on narrow screens.
+- A compact 70/30 desktop popup, stacked on narrow screens.
 - Email text is extracted once per preview; large bodies initially render only 6,000 characters. Full text is retained and saved, including loaded conversation history. Use “Show / edit full email” to edit longer messages.
 - Keyboard events inside the popup are isolated from Gmail's document shortcuts.
 - Saved badges are checked against SQLite, scoped to mailbox plus Gmail message identifier. Opening a saved message shows its stored CRM content, selected contacts and current phone numbers, read-only, with calling and Open in CRM available.
