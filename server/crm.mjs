@@ -6,7 +6,14 @@ const cols={1:'name',2:'type',3:'fastbill_url',4:'city',5:'state',6:'website',7:
 export const getOrg=(db,id)=>{const o=db.prepare('SELECT * FROM organisations WHERE id=?').get(id);if(!o)throw new Problem('Organisation nicht gefunden.',404,'not_found');return o;};
 export function assertVersion(o,v){if(String(o.version)!==String(v))throw new Problem('Dieser Eintrag wurde inzwischen geändert. Bitte prüfen und erneut speichern.',409,'conflict');}
 export function audit(db,id,user,action,changes){db.prepare('INSERT INTO audit_log VALUES(?,?,?,?,?,?)').run(uid(),id,user?.id||null,now(),action,JSON.stringify(changes));}
-export function contacts(db,id){return db.prepare('SELECT c.*,oc.is_primary FROM contacts c JOIN organisation_contacts oc ON oc.contact_id=c.id WHERE oc.organisation_id=? ORDER BY oc.is_primary DESC,c.name,c.id').all(id).map(c=>{const addresses=db.prepare('SELECT kind,value FROM contact_addresses WHERE contact_id=? ORDER BY position,id').all(c.id);return{id:c.id,name:c.name,rolle:c.role,primary:!!c.is_primary,e_mails:addresses.filter(a=>a.kind==='email').map(a=>a.value),telefone:addresses.filter(a=>a.kind==='phone').map(a=>a.value)};});}
+export function contacts(db,id){return db.prepare(`SELECT c.*,oc.is_primary FROM contacts c
+ JOIN organisation_contacts oc ON oc.contact_id=c.id
+ LEFT JOIN (SELECT ac.contact_id,MAX(COALESCE(ca.started_at,m.sent_at,a.occurred_on||'T00:00:00.000Z',a.created_at)) AS latest
+ FROM activity_contacts ac JOIN activities a ON a.id=ac.activity_id
+ LEFT JOIN messages m ON m.id=a.message_id LEFT JOIN call_attempts ca ON ca.activity_id=a.id
+ WHERE a.organisation_id=? AND (a.message_id IS NOT NULL OR ca.activity_id IS NOT NULL)
+ GROUP BY ac.contact_id) recent ON recent.contact_id=c.id
+ WHERE oc.organisation_id=? ORDER BY recent.latest DESC,c.name COLLATE NOCASE,c.id`).all(id,id).map(c=>{const addresses=db.prepare('SELECT kind,value FROM contact_addresses WHERE contact_id=? ORDER BY position,id').all(c.id);return{id:c.id,name:c.name,rolle:c.role,primary:!!c.is_primary,e_mails:addresses.filter(a=>a.kind==='email').map(a=>a.value),telefone:addresses.filter(a=>a.kind==='phone').map(a=>a.value)};});}
 export function entity(db,id,full=false){const o=getOrg(db,id);const cs=contacts(db,id),primary=cs.find(c=>c.primary);const f=db.prepare('SELECT * FROM followups WHERE organisation_id=? AND completed_at IS NULL').get(id);const review=db.prepare('SELECT text FROM review_issues WHERE organisation_id=? AND resolved_at IS NULL').all(id).map(r=>r.text).join('\n');
  const values=[o.id,o.name,o.type,o.fastbill_url,o.city,o.state,o.website,o.size??'',o.size_unit,o.status,o.phase,o.owner,primary?.name||'',primary?.e_mails[0]||'',primary?.telefone[0]||cs.flatMap(c=>c.telefone)[0]||'',o.last_contact||'',f?.text||'',f?.due_date||'',o.summary,review,full?JSON.stringify(cs):'[]','[]','[]','[]'];
  if(full){values[23]=JSON.stringify(db.prepare('SELECT payload_json FROM source_references WHERE organisation_id=? AND activity_id IS NULL AND contact_id IS NULL').all(id).map(s=>JSON.parse(s.payload_json)));}

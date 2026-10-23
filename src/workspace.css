@@ -148,3 +148,11 @@
 }
 @media(max-width:1100px){.sidebar .nav-label,.sidebar .nav-collapse{display:none}.sidebar .sheet-link{display:flex;justify-content:center}.sidebar .sheet-link .nav-label{display:none}}
 @media(prefers-reduced-motion:reduce){.sidebar,.sidebar .brand-name,.sidebar .nav-label,.sidebar .user>div:last-child,.sidebar .nav-item small{transition:none}}
+
+.contact-cards>.contact-card[hidden]{display:none}
+.contacts-toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;padding:10px 12px;margin:10px 0 16px;border:1px solid var(--line);border-radius:10px;background:var(--surface-accent);color:var(--action);font-size:12px;text-align:left}
+.contacts-toggle:hover:not(:disabled){background:var(--surface-input)}
+.contacts-toggle:disabled{opacity:.6;cursor:default}
+.contacts-toggle svg{transition:transform .2s ease}
+.contacts-toggle[aria-expanded="true"] svg{transform:rotate(180deg)}
+@media(prefers-reduced-motion:reduce){.contacts-toggle svg{transition:none}}

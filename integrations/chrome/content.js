@@ -135,20 +135,50 @@ async function open(n){
   const date=new Date($('#date').value);if(!Number.isFinite(+date)){ $('#error').textContent='Check the email date and time.';return; }
   busy=true;controls();$('#error').textContent='';sh.querySelectorAll('input,textarea,select').forEach(e=>e.disabled=true);
   try{const r=await api({action:'save',confirmed:true,requestId,...envelope(),gmailMessageId:d.gmailMessageId,attachments:d.attachments,contactPhones:participants.map(p=>({email:p.email,phones:phoneChoices.get(p.email)||[]})),organisationId:selected.id,version:selected.version,newOrganisation:selected.id?undefined:selected.name,linked:linked?{id:linked.id,name:linked.name}:undefined,subject:$('#subject').value,originalSubject:d.subject,body:expanded?$('#body').value:fullBody,originalBody:d.bodyText,timestamp:date.toISOString(),timestampRaw:d.timestampRaw,direction:$('#direction').value,sourceUrl:location.href,contactEmails:participants.filter(p=>choices.get(p.email)).map(p=>p.email)});
+   setMessageButton(n,'saved',true);
    if(openCRM){try{await send({type:'open',organisationId:r.organisation.id});}catch{if(active)$('#error').textContent='Saved. Open Stage Force to view the organization.';busy=false;sh.querySelectorAll('input,textarea,select').forEach(e=>e.disabled=false);controls();return;}}
-   const button=n.querySelector('[data-stageforce-button]')?.shadowRoot?.querySelector('button');if(button)button.textContent='✓ Already in StageForce · Check';close();
+   close();
   }catch(e){if(active){$('#error').textContent=e.message;busy=false;sh.querySelectorAll('input,textarea,select').forEach(e=>e.disabled=false);if(/inzwischen geändert/.test(e.message))await lookup();controls();}}
  }
  async function loadSaved(){if(!$('#mailbox').value)return;const r=await api({action:'messageStatus',mailbox:$('#mailbox').value,gmailMessageId:d.gmailMessageId,detail:true,legacyFingerprint:await messageFingerprint(d)});if(!active||!r.saved)return;
   savedMessage=r.message;selected=r.organisation;$('#title').textContent='Already in StageForce';$('#org').value=selected.name;$('#org').readOnly=true;$('#subject').value=savedMessage.subject;$('#subject').readOnly=true;setBody(savedMessage.body);$('#date').value=savedMessage.timestamp?localInput(new Date(savedMessage.timestamp)):'';$('#date').readOnly=true;$('#mailbox').readOnly=true;$('#direction').value=savedMessage.direction;$('#direction').disabled=true;$('.optional').classList.add('hidden');showAttachments(savedMessage.attachments);renderContacts(r.participants);$('#save').classList.add('hidden');$('#save-open').textContent='Open in CRM ↗';$('#save-open').onclick=()=>send({type:'open',organisationId:selected.id}).catch(e=>$('#error').textContent=e.message);$('#error').textContent='';
-  const b=n.querySelector('[data-stageforce-button]')?.shadowRoot?.querySelector('button');if(b)b.textContent='✓ Already in StageForce · Check';
+  setMessageButton(n,'saved');
  }
  $('#save').onclick=()=>save(false);$('#save-open').onclick=()=>save(true);
  async function close(){if(!active||[...callStates.values()].some(c=>c.busy))return;if([...callStates.values()].some(c=>c.open)){if(!window.confirm('Discard the unsaved call note? Organisation and contact remain saved.'))return;try{for(const c of callStates.values())if(c.open&&c.result){c.busy=true;await api({action:'callCancel',callId:c.result.callId});c.open=false;c.busy=false;}}catch(e){for(const c of callStates.values())c.busy=false;$('#error').textContent=e.message;return;}}active=false;media.removeEventListener('change',applyTheme);modalHost.remove();if(host===modalHost)host=null;for(const type of ['keydown','keyup','keypress'])window.removeEventListener(type,keys,true);lastFocus?.focus();}
  function keys(e){if(!e.composedPath().includes(modalHost))return;e.stopImmediatePropagation();if(e.type!=='keydown')return;if(e.key==='Enter'&&['org','linked'].includes(sh.activeElement?.id)){e.preventDefault();$('#'+sh.activeElement.id+'-options button')?.click();return;}if(e.key==='Escape'){e.preventDefault();e.stopPropagation();if(!busy)close();return;}if(e.key==='Tab'){const f=[...sh.querySelectorAll('button:not(:disabled),input:not(:disabled),textarea:not(:disabled),summary,select:not(:disabled)')].filter(visible);const first=f[0],last=f[f.length-1];if(e.shiftKey&&sh.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&sh.activeElement===last){e.preventDefault();first.focus();}}}
  $('.close').onclick=()=>{if(!busy)close();};for(const type of ['keydown','keyup','keypress'])window.addEventListener(type,keys,true);$('#org').focus();
- try{const c=await send({type:'status'});if(!active)return;connected=true;themeMode=['light','dark'].includes(c.appearance)?c.appearance:'system';applyTheme();$('#connection').textContent=new URL(c.origin).host+' · '+c.email;await loadSaved();if(!savedMessage)await lookup(true);}catch(e){if(active){$('#connection').textContent='Not connected';$('#error').textContent=e.message;}}controls();
+ try{const c=await send({type:'status'});if(!active)return;connected=true;if(messageButton(n)?.dataset.state!=='saved')setMessageButton(n,'ready');themeMode=['light','dark'].includes(c.appearance)?c.appearance:'system';applyTheme();$('#connection').textContent=new URL(c.origin).host+' · '+c.email;await loadSaved();if(!savedMessage)await lookup(true);}catch(e){if(active){buttonIssue(messageButton(n),e);$('#connection').textContent='Check connection';$('#error').textContent=e.message;}}controls();
 }
+const buttonCSS=`
+:host{display:inline-flex;vertical-align:middle;margin:0 12px 0 0;white-space:nowrap}
+button{position:relative;isolation:isolate;overflow:hidden;display:inline-flex;align-items:center;gap:7px;cursor:pointer;border:1px solid #887ab6;border-radius:20px;padding:7px 13px;font:600 12px/1.4 system-ui;color:#fff;background:linear-gradient(115deg,#6546b3,#3f58a8);box-shadow:0 2px 5px #25184918;transition:transform .16s ease,box-shadow .16s ease}
+button:focus-visible{outline:3px solid #aa8bed;outline-offset:3px}
+button:hover{box-shadow:0 3px 9px #25184930;transform:translateY(-1px)}
+button:active{transform:scale(.97)}
+.symbol{display:inline-block;width:14px;text-align:center;flex:none}
+.label{position:relative}
+button[data-state="ready"]::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(110deg,transparent 30%,#ffffff30 48%,transparent 65%);transform:translateX(-120%);animation:sf-shimmer 3.5s ease-in-out 2}
+button[data-state="ready"]:hover .symbol{animation:sf-spark .55s ease both}
+button[data-state="saved"]{color:#145438;background:#e2f4e9;border-color:#76b88e;box-shadow:0 2px 5px #134e2e12}
+button[data-state="saved"]:hover{background:#d2efdd}
+button[data-state="disconnected"],button[data-state="offline"],button[data-state="attention"]{color:#755018;background:#fff3d7;border-color:#c6a96c;box-shadow:none}
+button[data-state="checking"]{color:#526078;background:#edf0f7;border-color:#bbc3d3;box-shadow:none}
+button.celebrate .symbol{animation:sf-success .45s ease both}
+@keyframes sf-shimmer{0%,55%{transform:translateX(-120%)}90%,100%{transform:translateX(120%)}}
+@keyframes sf-spark{50%{transform:rotate(60deg) scale(1.2)}100%{transform:rotate(0) scale(1)}}
+@keyframes sf-success{0%{transform:scale(.6)}60%{transform:scale(1.25)}100%{transform:scale(1)}}
+@media(prefers-color-scheme:dark){button[data-state="saved"]{color:#c5f3d5;background:#173e2c;border-color:#4f9a70}button[data-state="saved"]:hover{background:#1d4a35}button[data-state="disconnected"],button[data-state="offline"],button[data-state="attention"]{color:#f4d598;background:#40341f;border-color:#927645}button[data-state="checking"]{color:#ccd5e8;background:#273047;border-color:#65718b}}
+@media(prefers-reduced-motion:reduce){button{transition:none}button:hover,button:active{transform:none}button::after,button .symbol{animation:none!important}}
+`;
+function messageButton(n){return n.querySelector('[data-stageforce-button]')?.shadowRoot?.querySelector('button');}
+function setMessageButton(n,state,celebrate=false){setButtonState(messageButton(n),state,celebrate);}
+function setButtonState(b,state,celebrate=false,detail=''){
+ if(!b)return;
+ const states={ready:['✦','Add to StageForce','Preview this message in StageForce'],saved:['✓','Already in StageForce · Check','Saved in StageForce — open contacts and email'],disconnected:['○','Connect StageForce','Open extension connection settings'],offline:['○','StageForce · Offline','CRM unavailable — open to retry or check connection'],attention:['!','StageForce · Check','Open to check this message'],checking:['·','StageForce · Checking','Checking whether this message is saved']};
+ const [icon,label,title]=states[state];b.dataset.state=state;b.sfRevision=(b.sfRevision||0)+1;b.classList.toggle('celebrate',celebrate);b.querySelector('.symbol').textContent=icon;b.querySelector('.label').textContent=label;b.title=detail||title;
+}
+function buttonIssue(b,error){const message=error?.message||'Check the StageForce connection.';const state=/Connect Stage Force first|Connect your extension|Connect Stage Force using/.test(message)?'disconnected':/unavailable|Failed to fetch|timeout|timed out|aborted/i.test(message)?'offline':'attention';setButtonState(b,state,false,message);}
 function inject(){
  for(const n of nodes()){
  if(n.querySelector('[data-stageforce-button]'))continue;
@@ -156,13 +186,28 @@ function inject(){
  if(!timestamp) continue;
  const wrap=document.createElement('span');wrap.dataset.stageforceButton='true';
  const sh=wrap.attachShadow({mode:'open'});
- sh.innerHTML='<style>:host{display:inline-flex;vertical-align:middle;margin:0 12px 0 0;white-space:nowrap}button{display:flex;align-items:center;gap:7px;cursor:pointer;border:1px solid #b49ae760;border-radius:20px;padding:7px 13px;font:600 12px system-ui;color:#f5edff;background:linear-gradient(120deg,#40205d,#272347);box-shadow:0 2px 12px #37214a22}button:hover{background:linear-gradient(120deg,#673385,#3d3670)}button:focus-visible{outline:2px solid #a78bfa}</style><button type="button" title="Preview this message in StageForce">✦ Add to StageForce</button>';
- sh.querySelector('button').onclick=e=>{e.stopPropagation();open(n);};timestamp.before(wrap);checkButton(n,sh.querySelector('button'));
+ sh.innerHTML='<style>'+buttonCSS+'</style><button type="button"><span class="symbol" aria-hidden="true"></span><span class="label"></span></button>';
+ const b=sh.querySelector('button');setButtonState(b,'checking');
+ b.onclick=e=>{e.stopPropagation();if(b.dataset.state==='disconnected')send({type:'options'}).catch(error=>buttonIssue(b,error));else open(n);};timestamp.before(wrap);checkButton(n,b);
  }
 }
 const checkQueue=[];let checkingButtons=false;
-function checkButton(n,b){checkQueue.push({n,b});drainChecks();}
-async function drainChecks(){if(checkingButtons)return;checkingButtons=true;while(checkQueue.length){const {n,b}=checkQueue.shift();if(!n.isConnected)continue;const id=messageId(n),mailbox=account();if(!mailbox){b.title='Open to check saved status';continue;}try{let r=await api({action:'messageStatus',mailbox,gmailMessageId:id});if(!r.saved){const legacyFingerprint=await messageFingerprint(extract(n));r=await api({action:'messageStatus',mailbox,gmailMessageId:id,legacyFingerprint});}b.textContent=r.saved?'✓ Already in StageForce · Check':'✦ Add to StageForce';}catch{b.textContent='StageForce · Check connection';}}checkingButtons=false;}
+function checkButton(n,b){if(b.sfQueued)return;b.sfQueued=true;checkQueue.push({n,b});drainChecks();}
+async function drainChecks(){
+ if(checkingButtons)return;checkingButtons=true;
+ try{while(checkQueue.length){const {n,b}=checkQueue.shift();try{
+  if(!n.isConnected)continue;const revision=b.sfRevision,id=messageId(n),mailbox=account();
+  try{
+   if(!mailbox){await send({type:'status'});if(b.sfRevision===revision)setButtonState(b,'attention',false,'Open to confirm your Gmail mailbox.');continue;}
+   let r=await api({action:'messageStatus',mailbox,gmailMessageId:id});
+   if(!r.saved){const legacyFingerprint=await messageFingerprint(extract(n));r=await api({action:'messageStatus',mailbox,gmailMessageId:id,legacyFingerprint});}
+   if(b.sfRevision===revision)setButtonState(b,r.saved?'saved':'ready');
+  }catch(error){if(b.sfRevision===revision)buttonIssue(b,error);}
+ }finally{b.sfQueued=false;}}}finally{checkingButtons=false;}
+}
+let lastRetry=0;
+function retryButtons(){if(document.hidden||Date.now()-lastRetry<15000)return;lastRetry=Date.now();for(const n of nodes()){const b=messageButton(n);if(b&&['disconnected','offline','attention'].includes(b.dataset.state))checkButton(n,b);}}
+window.addEventListener('focus',retryButtons);window.addEventListener('online',retryButtons);
 let pending=false;
 new MutationObserver(records=>{if(records.every(r=>r.target===host||host?.contains(r.target)))return;if(!pending){pending=true;setTimeout(()=>{pending=false;inject();},250);}}).observe(document.body,{childList:true,subtree:true});
 inject();

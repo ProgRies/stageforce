@@ -1,3 +1,9 @@
+## 0.3.6-local · extension 0.4.5
+
+- Gmail buttons distinguish saved mail (green), connection issues (amber), and messages ready to import (a brief StageForce shimmer). Click and save animations respect reduced-motion preferences.
+- Disconnected buttons open connection settings; connection warnings retry when returning to Gmail or coming online.
+- CRM shows the two contacts with the latest recorded email/call in this organization, with alphabetical fallback. Expand the remaining contacts when needed. An active call or contact edit prevents collapsing its controls.
+
 ## 0.3.5-local · extension 0.4.4
 
 - Chrome toolbar and extension management use the StageForce client logo in native icon sizes.
