@@ -5,9 +5,9 @@ import {ArrowLeft,ArrowRight,X} from 'lucide-react';
 const steps=[
  {target:'organisations',title:'Dein gemeinsames CRM',body:'Hier findest du Kunden und Leads. Jeder im Team sieht denselben gespeicherten Stand.'},
  {target:'list',title:'Organisation finden',body:'Suche nach Name, Ort oder Kontakt. Fehlt eine Organisation, erstelle sie direkt aus den Suchergebnissen. Unter Prüfen ist diese Spalte nach offenen Themen sortiert.'},
- {target:'timeline',title:'Der letzte Kontakt steht oben',body:'Die verbundenen Karten zeigen E-Mails und Anrufe. Öffne eine Karte für den vollständigen Eintrag. Über „Notiz hinzufügen“ hältst du Informationen fest. Anrufe startest du über die Telefonnummer eines Kontakts.'},
+ {target:'timeline',title:'Der letzte Kontakt steht oben',body:'Die verbundenen Karten zeigen E-Mails, Anrufe und Notizen. Öffne eine Karte für den vollständigen Eintrag. „Notiz hinzufügen“ erstellt einen datierten Eintrag im Verlauf. Anrufe startest du über die Telefonnummer eines Kontakts.'},
  {target:'contacts',title:'Menschen und Beziehungen',body:'Kontakte sind hier sichtbar. Mit dem Stift bearbeitest du sie direkt. Verknüpfte Organisationen zeigen zum Beispiel eine betreuende Agentur.'},
- {target:'fields',title:'Direkt bearbeiten',body:'Status, Phase und Wiedervorlage kannst du hier ändern. Speichern übernimmt deine Eingaben. Kunde bedeutet bestätigte Zahlungspflicht. FastBill öffnet die hinterlegte Kundenseite.'},
+ {target:'fields',title:'Direkt bearbeiten',body:'Hier hältst du Organisationsnotizen fest. Speichern übernimmt sie ins gemeinsame CRM; ungespeicherte Entwürfe bleiben in diesem Tab. Status und FastBill findest du neben dem Organisationsnamen.'},
  {target:'gmail',title:'Im eigenen Postfach nachsehen',body:'Öffnet Gmail mit einer Suche nach dieser Organisation und ihren Kontaktadressen. Das CRM liest dadurch keine E-Mails. Relevante Nachrichten kannst du danach gezielt importieren.'},
  {target:'calls',title:'Deine Anrufliste',body:'Erstelle eine Tagesliste aus Wiedervorlagen, Kunden mit längerer Kontaktpause und neuen Leads. Trage nach jedem Anruf das Ergebnis ein.'},
  {target:'review',title:'Offene Fragen abarbeiten',body:'Wähle ein Thema, zum Beispiel fehlende Telefonnummern. Prüfe die betroffenen Organisationen anhand deiner E-Mails oder FastBill und ergänze die Angaben.'},

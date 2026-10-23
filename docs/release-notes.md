@@ -1,3 +1,11 @@
+# StageForce 0.3.3-local
+
+- Organisation header contains the immediately saved Lead / Kunde / Partner / Agentur selector and editable FastBill link.
+- Right column contains Gmail search, contacts, links and one general notes field with Save.
+- Note drafts are retained in the current browser tab across organisation changes and reloads; save explicitly to share with colleagues. Concurrent note edits require review before overwriting.
+- Add Note creates a dated timeline event alongside calls and emails; existing Notiz events also appear there. General notes edits stay in the change log.
+- Existing next-step and review text remains available under Changes & Sources below the timeline.
+
 # StageForce 0.3.2-local / extension 0.4.2
 
 - Narrower navigation with compact spacing and visible labels.

@@ -1,4 +1,4 @@
-# Local update: CRM 0.3.2 / extension 0.4.2
+# Local update: CRM 0.3.3 / extension 0.4.2
 
 ## Install over your existing local project
 
@@ -7,8 +7,8 @@ Keep the same StageForce directory and Compose project so Docker reuses your dat
 1. With the existing container running, back up SQLite and copy the backup to your Mac:
 
    ```sh
-   docker compose exec crm node server/cli.mjs backup /app/data/before-0.3.2.sqlite
-   docker compose cp crm:/app/data/before-0.3.2.sqlite ./before-0.3.2.sqlite
+   docker compose exec crm node server/cli.mjs backup /app/data/before-0.3.3.sqlite
+   docker compose cp crm:/app/data/before-0.3.3.sqlite ./before-0.3.3.sqlite
    ```
 
 2. In your existing repository on `local-development`, run `git pull --ff-only`. Preserve your `.env`, local backups and data. Do not delete the Docker volume or use `docker compose down -v`.
@@ -24,12 +24,16 @@ Keep the same StageForce directory and Compose project so Docker reuses your dat
 
 ## What changed
 
+- Status beside the organisation name saves immediately. The FastBill button and its edit pencil sit above Gmail search.
+- General notes use a single growing text field and Save. Unsaved drafts remain in this browser tab across navigation/reload, scoped to your account and organisation. Closing the tab can lose an unsaved draft; Save writes to the shared CRM.
+- Add Note creates a dated timeline event alongside calls and emails, independently of general organisation notes.
+
 - Compact navigation leaves more room for organisation details. Search and refresh are available in the top toolbar.
 - Create an organisation from the search results. The in-app form starts with your search text, suggests existing organisations, and opens the saved record.
 - Contacts without detected or stored phone numbers show no phone section in the extension. Add missing numbers in the CRM after Save & Open. Existing number editors start collapsed.
 
 - Choose Hell, Dunkel or System in CRM settings. The extension reads this account preference each time its popup opens; System follows the browser’s OS theme live. Static gradients, borders and shadows replace backdrop blur.
-- “Notiz hinzufügen” adds an internal note without recording a call or changing the last-contact date. Use the contact’s phone button to start and record calls.
+- “Notiz hinzufügen” adds a timeline note without recording a call or changing the last-contact date. Use the contact’s phone button to start and record calls.
 
 - A 75/25 desktop popup, stacked on narrow screens.
 - Email text is extracted once per preview; large bodies initially render only 6,000 characters. Full text is retained and saved, including loaded conversation history. Use “Show / edit full email” to edit longer messages.

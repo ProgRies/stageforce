@@ -19,8 +19,8 @@ export function listData(db){
  const entities=db.prepare('SELECT * FROM organisations ORDER BY name COLLATE NOCASE').all().map(o=>{const c=primary.get(o.id),f=followups.get(o.id);return{id:o.id,row:0,version:String(o.version),values:[o.id,o.name,o.type,o.fastbill_url,o.city,o.state,o.website,o.size??'',o.size_unit,o.status,o.phase,o.owner,c?.name||'',c?.email||'',(c?.phone?.replace(/\D/g,'').length>=6?c.phone:fallback.get(o.id)||c?.phone||''),o.last_contact||'',f?.text||'',f?.due_date||'',o.summary,reviews.get(o.id)||'','[]','[]','[]','[]']};});
  return{entities,links:db.prepare('SELECT * FROM organisation_links').all(),loadedAt:now()};
 }
-const communicationSQL="(a.message_id IS NOT NULL OR a.kind='Kontakt' OR lower(a.kind) LIKE '%mail%' OR lower(a.kind) LIKE '%telefon%' OR lower(a.kind) LIKE '%anruf%' OR lower(a.kind) LIKE '%phone%' OR lower(a.kind) LIKE '%call%')";
-const historyOrder="a.occurred_on DESC, COALESCE(m.sent_at, ca.started_at, '') DESC, a.created_at DESC, a.rowid DESC";
+const communicationSQL="(a.message_id IS NOT NULL OR a.kind='Kontakt' OR a.kind='Notiz' OR lower(a.kind) LIKE '%mail%' OR lower(a.kind) LIKE '%telefon%' OR lower(a.kind) LIKE '%anruf%' OR lower(a.kind) LIKE '%phone%' OR lower(a.kind) LIKE '%call%')";
+const historyOrder="a.occurred_on DESC, COALESCE(m.sent_at, ca.started_at, CASE WHEN a.kind='Notiz' THEN a.created_at ELSE '' END) DESC, a.created_at DESC, a.rowid DESC";
 const historyItem=a=>({ereignis_id:a.id,datum:a.occurred_on,art:a.kind,text:a.body,autor_name:a.user_name||a.author_label||'',message_id:a.message_id,subject:a.subject,direction:a.direction,sent_at:a.sent_at||a.call_started_at,call_phone:a.call_phone,call_contact:a.call_contact,call_contact_id:a.call_contact_id,call_source:a.call_source,attachments:a.attachments_json?JSON.parse(a.attachments_json):[],is_contact:!!a.is_contact});
 export function history(db,id,offset=0,kind='all'){
  getOrg(db,id);if(!['all','communication','internal'].includes(kind))throw new Problem('Ungültiger Verlauf.');const safe=Math.max(0,Math.floor(Number(offset)||0));

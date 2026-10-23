@@ -2,7 +2,7 @@ export type CellValue = string | number;
 export type Entity = { id: string; row: number; values: CellValue[]; version: string };
 export type EntityLink = { id: string; a: string; b: string; note: string };
 export const HEADERS = ["Entität-ID","Name","Entitätstyp","FastBill-Link (manuell)","Ort","Bundesland","Website","Größe","Größenmaß","Beziehungsstatus","Vertriebsphase","Zuständig intern","Hauptkontakt","E-Mail","Telefon","Letzter belegter Kontakt","Nächster Schritt","Wiedervorlage","Kurzüberblick","Prüfbedarf","Kontakte JSON","Historie JSON","Verknüpfte Entitäten JSON","Quellen JSON"];
-export const STATUSES = ["Kunde","Lead","Unklar","Ehemaliger Kunde"];
+export const STATUSES = ["Kunde","Lead","Partner / Agentur","Unklar","Ehemaliger Kunde"];
 export const PHASES = ["Unbearbeitet","Kontaktaufnahme","Im Gespräch","Termin vereinbart","Angebot","Testphase","Gewonnen","Aktuell kein Bedarf","Verloren","Unklar"];
 export const TYPES = ["Stadt/Gemeinde","Landkreis","Landesregierung","Bundesministerium","Landesministerium","Landeseinrichtung","Bundeseinrichtung","Sonstige öffentliche Einrichtung","Schule","Hochschule/Universität","NGO/Verband","Unternehmen","Agentur","Sonstiges","Unklar"];
 export function text(e: Entity, col: number) { return String(e.values[col] ?? ""); }
@@ -62,7 +62,7 @@ export function reviewFindings(e:Entity):ReviewFinding[]{
   }
   if(needsFastbill(e)&&!fastbillURL(e.values[3]))out.push({source:'field',categories:['fastbill'],text:text(e,3)?'FastBill-Link ist nicht gültig.':'FastBill-Link fehlt.'});
   if(!phone(e))out.push({source:'field',categories:['phone'],text:'Telefonnummer fehlt.'});
-  if(!['Kunde','Lead'].includes(text(e,9)))out.push({source:'field',categories:['status'],text:'Zahlenden Kundenstatus prüfen; bisher: '+(text(e,9)||'unbekannt')+'.'});
+  if(!['Kunde','Lead','Partner / Agentur'].includes(text(e,9)))out.push({source:'field',categories:['status'],text:'Zahlenden Kundenstatus prüfen; bisher: '+(text(e,9)||'unbekannt')+'.'});
   if(text(e,9)==='Lead'&&text(e,10)==='Gewonnen')out.push({source:'field',categories:['status'],text:'Als Lead mit Phase Gewonnen geführt: Zahlungspflicht prüfen.'});
   return out;
 }
@@ -84,7 +84,7 @@ export function contactAge(e: Entity, today=todayBerlin()): number | null { cons
 export function contactLabel(e: Entity) { const days=contactAge(e);return days===null?"Kontakt unbekannt":days===0?"Heute kontaktiert":days===1?"Gestern kontaktiert":`Vor ${days} Tagen`; }
 export type QueueItem = {id:string; reason:string; kind:"followup"|"customer"|"warm"|"cold"};
 export function buildQueue(entities:Entity[], count=30, staleDays=90, customerShare=.6, today=todayBerlin()):QueueItem[] {
-  const max=Math.max(1,Math.min(100,Math.floor(count)));const eligible=entities.filter(e=>phone(e)&&text(e,9)!=="Ehemaliger Kunde"&&!["Verloren","Aktuell kein Bedarf"].includes(text(e,10)));
+  const max=Math.max(1,Math.min(100,Math.floor(count)));const eligible=entities.filter(e=>phone(e)&&!["Ehemaliger Kunde","Partner / Agentur"].includes(text(e,9))&&!["Verloren","Aktuell kein Bedarf"].includes(text(e,10)));
   const customer=(e:Entity)=>text(e,9)==="Kunde";
   const cold=(e:Entity)=>!customer(e)&&["Unbearbeitet","Kontaktaufnahme","Unklar",""].includes(text(e,10));
   const overdue=(e:Entity)=>{const d=dateISO(e.values[17]);return d&&d<=today;};

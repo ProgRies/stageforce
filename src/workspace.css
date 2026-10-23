@@ -97,3 +97,24 @@
 .organisation-matches button{display:flex;justify-content:space-between;gap:10px;padding:10px;border-radius:8px;text-align:left;color:var(--ink)}
 .organisation-matches button:hover{background:var(--surface-accent)}
 .organisation-matches span{overflow-wrap:anywhere;min-width:0}
+
+.organisation-header{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(290px,1fr);gap:20px 32px;align-items:start;margin-bottom:28px}
+.organisation-title{display:flex;align-items:center;flex-wrap:wrap;gap:14px}
+.organisation-title h2{font-size:27px;line-height:1.3;overflow-wrap:anywhere}
+.organisation-status{max-width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 12px;background:var(--surface-accent);color:var(--ink);font:inherit;font-size:13px;cursor:pointer}
+.organisation-fastbill{padding-left:26px;display:flex;align-items:center;justify-content:flex-end;gap:5px}
+.organisation-fastbill>.button{flex:1}
+.organisation-fastbill .empty-fastbill{opacity:.45;cursor:default}
+.organisation-fastbill form{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:5px;width:100%}
+.organisation-fastbill input{width:100%;min-width:0;border:1px solid var(--line);border-radius:9px;padding:10px;background:var(--surface-input);color:var(--ink)}
+.organisation-header>.save-error{grid-column:1/-1;margin:0}
+.organisation-notes{margin-top:24px}
+.organisation-notes textarea{width:100%;min-height:100px;resize:vertical;overflow:hidden;background:var(--surface-input);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:12px;line-height:1.6}
+.organisation-notes .field>span{display:flex;justify-content:space-between;gap:8px}
+.notes-unsaved{color:var(--action);font-size:11px}
+.notes-save{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px}
+.notes-save small{font-size:11px;color:var(--muted)}
+.communication-column .overview-details{margin-top:15px}
+.filter-row{flex-wrap:wrap}
+@container(max-width:700px){.organisation-header{grid-template-columns:minmax(0,1fr) minmax(250px,.95fr);gap:20px}}
+@container(max-width:560px){.organisation-header{grid-template-columns:1fr}.organisation-fastbill{justify-content:flex-start;padding-left:0}.organisation-title h2{font-size:24px}}
