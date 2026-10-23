@@ -148,7 +148,8 @@
 .sidebar .sheet-link{gap:7px}
 @media(min-width:1101px){
  .sidebar.is-collapsed{width:66px;padding-left:7px;padding-right:7px}
- .sidebar.is-collapsed .brand{gap:0;padding-left:8px;padding-right:0}
+ .sidebar.is-collapsed .brand{gap:0;justify-content:center;padding-left:0;padding-right:0}
+ .sidebar.is-collapsed .stage-mark{justify-content:center}
  .sidebar.is-collapsed .brand-name,.sidebar.is-collapsed .nav-label,.sidebar.is-collapsed .user>div:last-child{max-width:0;opacity:0}
  .sidebar.is-collapsed .nav-item{gap:0;position:relative;padding-left:17px;padding-right:17px}
  .sidebar.is-collapsed .nav-item small{position:absolute;right:1px;top:2px;font-size:9px}
@@ -197,3 +198,8 @@
 .confirm-dialog header{display:flex;align-items:center;justify-content:space-between;gap:16px}
 .confirm-dialog h2{font-size:18px}.confirm-dialog p{font-size:14px;line-height:1.7;margin:16px 0 24px}
 .confirm-dialog footer{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+
+.entity-list .item-meta{flex-wrap:wrap;justify-content:flex-start;gap:5px 8px}
+.entity-list .item-meta .mini-status{margin-left:0;font-size:13px;font-weight:650}
+.entity-list .item-meta .organisation-subtitle{flex-basis:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.entity-list .organisation-subtitle:empty{display:none}

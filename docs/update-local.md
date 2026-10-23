@@ -1,4 +1,4 @@
-# Local update: CRM 0.3.9 / extension 0.4.11
+# Local update: CRM 0.3.10 / extension 0.4.12
 
 ## Install over your existing local project
 
@@ -20,7 +20,7 @@ Keep the same StageForce directory and Compose project so Docker reuses your dat
    ```
 
 4. Open http://localhost:3000 and refresh. Existing users, API keys and data remain. Schema 8 migrates automatically.
-5. This CRM update leaves extension 0.4.11 unchanged. If upgrading from an older extension, in `chrome://extensions`, reload Stage Force. If Chrome was loading a different directory, use Load unpacked and select the updated `StageForce/integrations/chrome` folder. Refresh Gmail. Packing a CRX is unnecessary.
+5. For extension 0.4.12, in `chrome://extensions`, reload Stage Force. If Chrome was loading a different directory, use Load unpacked and select the updated `StageForce/integrations/chrome` folder. Refresh Gmail. Packing a CRX is unnecessary.
 
 ## What changed
 
