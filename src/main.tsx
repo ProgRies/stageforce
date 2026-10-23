@@ -1,3 +1,4 @@
+import {ConfirmProvider} from './ConfirmDialog';
 import {useEffect,useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {LockKeyhole} from 'lucide-react';
@@ -16,4 +17,4 @@ function App(){const[user,setUser]=useState<any>(null),[loading,setLoading]=useS
  if(user)return <Desk user={user}/>;
  return <main className="login-page"><div className="login-appearance"><SystemSettings/></div><form className="login-card glass" onSubmit={login}><div className="brand"><div className="stage-mark"><i/><i/><i/></div><span className="brand-name">Stage <span>Force</span></span></div><h1>Guten Tag.</h1><p>Dein gemeinsamer Blick auf Kunden und Kontakte.</p><label className="field"><span>E-Mail</span><input type="email" autoComplete="username" required value={email} onChange={e=>setEmail(e.target.value)}/></label><label className="field"><span>Passwort</span><input type="password" autoComplete="current-password" required value={password} onChange={e=>setPassword(e.target.value)}/></label>{notice&&!error&&<p role="status" className="login-notice"><LockKeyhole size={14} aria-hidden="true"/>{notice}</p>}{error&&<p role="alert" className="save-error login-error">{error}</p>}<button className="button primary wide" disabled={busy}>{busy?'Anmelden …':'Anmelden'}</button><small>Accounts und Passwörter verwaltet euer Administrator.</small></form></main>;
 }
-createRoot(document.getElementById('root')!).render(<AppearanceProvider><App/></AppearanceProvider>);
+createRoot(document.getElementById('root')!).render(<AppearanceProvider><ConfirmProvider><App/></ConfirmProvider></AppearanceProvider>);

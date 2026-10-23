@@ -1,3 +1,13 @@
+## 0.3.9-local
+
+- Edit call notes and notes directly in their timeline cards. Preserve event dates, authors and contact links; audit edits and reject conflicting changes.
+- Toggle a contact pencil to an X. Closing discards its draft; saving updates the card and collapses its editor without clearing the timeline or loaded older activities.
+- Use StageForce confirmation dialogs inside the CRM, and the organisation creation form in FastBill imports. Browser tab-close protection still applies to unsaved work.
+- Keep StageForce call buttons white in the header, contacts and expanded call cards. Timeline colors remain blue for emails, purple for calls and amber for notes in both themes.
+- Include the shared contact parser in the Docker build stage and context.
+
+Rebuild the CRM and refresh its browser tab. Extension 0.4.11 is unchanged. No database migration is required.
+
 ## 0.3.8-local · extension 0.4.11
 
 - Edit contact names and phone numbers with the pencil in Gmail, including on already imported emails. Saving a contact writes it to the selected organisation independently of importing the email.

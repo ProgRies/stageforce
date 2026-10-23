@@ -76,7 +76,7 @@
 /* A fresh login is quiet; only an interrupted session needs a small notice. */
 .login-card .login-notice{display:flex;align-items:center;gap:8px;margin:16px 0 0;padding:0;font-size:13px;line-height:1.5;color:var(--muted)}
 .login-card .login-error{margin:16px 0 0;padding:10px 12px;font-size:13px;line-height:1.5;border-radius:10px}
-.sf-phone{width:100%;margin:7px 0}.sf-phone-number{display:flex;align-items:center;gap:8px;width:100%;border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--surface-accent);color:inherit;text-align:left;cursor:pointer}.sf-phone-number span{flex:1;overflow-wrap:anywhere}.sf-phone-number:disabled{cursor:default;opacity:.65}.sf-call-note{padding:10px;border:1px solid var(--line);border-radius:10px}.sf-call-note>div{display:flex;align-items:center;justify-content:space-between}.sf-call-note textarea{width:100%;margin:8px 0;min-height:85px}.sf-call-note>div button{background:transparent;border:0;color:inherit;cursor:pointer}.sf-call-note>a{display:block;font-size:12px;margin-bottom:10px}
+.sf-phone{width:100%;margin:7px 0}.sf-phone-number{display:flex;align-items:center;gap:8px;width:100%;min-height:40px;border:1px solid #c9c9e0;border-radius:10px;padding:7px 10px;background:#fff;color:#29334b;color-scheme:light;font-size:13px;line-height:20px;text-align:left;cursor:pointer}.sf-phone-number:hover:not(:disabled){background:#f7f5ff;border-color:#8d77bd}.sf-phone-number>img{flex-shrink:0}.sf-phone-number span{flex:1;overflow-wrap:anywhere}.sf-phone-number:disabled{cursor:default;opacity:.65}.sf-call-note{padding:10px;border:1px solid var(--line);border-radius:10px}.sf-call-note>div{display:flex;align-items:center;justify-content:space-between}.sf-call-note textarea{width:100%;margin:8px 0;min-height:85px}.sf-call-note>div button{background:transparent;border:0;color:inherit;cursor:pointer}.sf-call-note>a{display:block;font-size:12px;margin-bottom:10px}
 .sf-call-note textarea{font:inherit;font-size:14px;line-height:1.5;border:1px solid var(--line);border-radius:9px;padding:10px;color:inherit;background:var(--surface-input)}
 
 .inline-note{border:1px solid var(--line);border-radius:18px;padding:20px;margin-bottom:24px;background:var(--surface-panel)}
@@ -187,3 +187,13 @@
 .extract-contact-action:disabled{cursor:default;color:#677086}
 @keyframes contact-expand{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
 @media(prefers-reduced-motion:reduce){.contact-card>.inline-contact-editor{animation:none}}
+
+.activity-edit-toggle{flex-shrink:0;margin-top:-5px}
+.activity-editor{display:grid;gap:12px;margin-top:12px}
+.activity-editor textarea{width:100%;resize:vertical;min-height:96px;border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--surface-input);color:var(--ink);font:inherit;line-height:1.6}
+.activity-editor>div{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.confirm-dialog{position:fixed;inset:0;margin:auto;width:420px;max-width:calc(100vw - 32px);max-height:90dvh;overflow:auto;border:1px solid var(--line);border-radius:20px;padding:24px;background:var(--surface-panel);color:var(--ink);box-shadow:0 18px 70px #070c3540}
+.confirm-dialog::backdrop{background:#05091980}
+.confirm-dialog header{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.confirm-dialog h2{font-size:18px}.confirm-dialog p{font-size:14px;line-height:1.7;margin:16px 0 24px}
+.confirm-dialog footer{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}
