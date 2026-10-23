@@ -122,7 +122,7 @@
 .organisation-status-wrap{position:relative;display:inline-flex;align-items:center;max-width:100%}
 .organisation-status-wrap select{appearance:none;padding-right:34px}
 .organisation-status-wrap>svg{position:absolute;right:12px;pointer-events:none;color:var(--muted)}
-.entity-list .item-meta:has(>span:empty):not(:has(.mini-customer)){display:none}
+.entity-list .item-meta:has(>span:empty):not(:has(.mini-status)){display:none}
 .list-pane .searchbox{margin:16px 12px 12px}
 .list-pane .filter-row{padding:0 12px 12px;gap:2px}
 .list-pane .filter{padding:6px 7px;font-size:12px}

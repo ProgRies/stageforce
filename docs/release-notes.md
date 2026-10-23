@@ -1,3 +1,9 @@
+## 0.3.5-local · extension 0.4.4
+
+- Chrome toolbar and extension management use the StageForce client logo in native icon sizes.
+- Organization list previews show Lead, Kunde and Partner / Agentur, including any retained legacy status.
+- Added security boundary regression coverage for cookie flags, CSRF, authentication, request size, static-file isolation and SQL-like inputs.
+
 # StageForce 0.3.4-local / extension 0.4.3
 
 - Collapsible desktop navigation keeps the logo, icons and hover labels. Width and label transitions respect reduced motion; the chosen state is remembered.

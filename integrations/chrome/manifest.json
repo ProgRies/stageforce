@@ -1,9 +1,46 @@
 {
- "manifest_version":3,"name":"Stage Force · Gmail","version":"0.4.3","minimum_chrome_version":"120",
- "description":"Review one Gmail message and save it to your own Stage Force CRM.",
- "permissions":["storage"],
- "optional_host_permissions":["http://localhost/*","http://127.0.0.1/*","https://*/*"],
- "background":{"service_worker":"worker.js","type":"module"},
- "options_page":"options.html","action":{"default_title":"Connect Stage Force"},
- "content_scripts":[{"matches":["https://mail.google.com/*"],"js":["date.js","extract.js","content.js"],"run_at":"document_idle"}]
+  "manifest_version": 3,
+  "name": "Stage Force \u00b7 Gmail",
+  "version": "0.4.4",
+  "minimum_chrome_version": "120",
+  "description": "Review one Gmail message and save it to your own Stage Force CRM.",
+  "permissions": [
+    "storage"
+  ],
+  "optional_host_permissions": [
+    "http://localhost/*",
+    "http://127.0.0.1/*",
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "worker.js",
+    "type": "module"
+  },
+  "options_page": "options.html",
+  "action": {
+    "default_title": "Connect Stage Force",
+    "default_icon": {
+      "16": "icons/stageforce-16.png",
+      "32": "icons/stageforce-32.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://mail.google.com/*"
+      ],
+      "js": [
+        "date.js",
+        "extract.js",
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/stageforce-16.png",
+    "32": "icons/stageforce-32.png",
+    "48": "icons/stageforce-48.png",
+    "128": "icons/stageforce-128.png"
+  }
 }

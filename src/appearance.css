@@ -61,7 +61,7 @@
 [data-theme="dark"] .linked-symbol,[data-theme="dark"] .timeline-dot,[data-theme="dark"] .modal-icon,[data-theme="dark"] .empty-art{background:linear-gradient(140deg,#7198ea19,#be8de91c);color:#b9b6ed;border-color:#c0c9ef1a;box-shadow:none}
 [data-theme="dark"] .history-entry:before,[data-theme="dark"] .queue-progress{background:#c4d2ff17}
 [data-theme="dark"] .status.customer{background:#66d6a619;color:#a2dfc5}
-[data-theme="dark"] .mini-customer,[data-theme="dark"] .connection{color:#9bcdbb}
+[data-theme="dark"] .mini-status[data-status="Kunde"],[data-theme="dark"] .connection{color:#9bcdbb}
 [data-theme="dark"] .status.lead{background:#899efa20;color:#c0cfff}
 [data-theme="dark"] .status.neutral{background:#adb9d41a;color:#bdc9df}
 [data-theme="dark"] .quality-notice,[data-theme="dark"] .import-warning,[data-theme="dark"] .save-error,[data-theme="dark"] .error-banner,[data-theme="dark"] .button.missing-link{background:#46342657;border-color:#edc37e28;color:#e5bf85}
