@@ -5,6 +5,7 @@ RUN npm ci --ignore-scripts
 COPY index.html tsconfig.json ./
 COPY src ./src
 COPY public ./public
+COPY integrations/chrome/extract.js ./integrations/chrome/extract.js
 RUN npm run typecheck && npm run build
 
 FROM node:24-bookworm-slim AS runtime
