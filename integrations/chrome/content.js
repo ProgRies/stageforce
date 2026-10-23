@@ -84,7 +84,7 @@ async function open(n){
    const numbers=document.createElement('div');numbers.style.width='100%';
    const draw=()=>{numbers.replaceChildren();for(const number of phoneChoices.get(person.email))numbers.append(phoneControl(person,number));};
    edit.onchange=()=>{phoneChoices.set(person.email,edit.value.split(';').map(v=>v.trim()).filter(Boolean));draw();};
-   card.append(numbers);if(!savedMessage){const editor=document.createElement('details');editor.className='phone-editor';editor.open=!phoneChoices.get(person.email).length;const summary=document.createElement('summary');summary.textContent='Edit phone numbers';editor.append(summary,edit);card.append(editor);}draw();$('#contacts').append(card);
+   if(phoneChoices.get(person.email).length)card.append(numbers);if(!savedMessage&&phoneChoices.get(person.email).length){const editor=document.createElement('details');editor.className='phone-editor';editor.open=false;const summary=document.createElement('summary');summary.textContent='Edit phone numbers';editor.append(summary,edit);card.append(editor);}draw();$('#contacts').append(card);
   }
   if(!items.length)$('#contacts').textContent='No external contacts found in the loaded headers.';
  }

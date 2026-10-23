@@ -1,3 +1,10 @@
+# StageForce 0.3.2-local / extension 0.4.2
+
+- Narrower navigation with compact spacing and visible labels.
+- Create organisations from search results through a themed form with existing-name matching.
+- Search and refresh shortcuts in the toolbar.
+- Phone sections appear in the extension only when a number is detected or stored in the CRM.
+
 # StageForce 0.3.1-local / extension 0.4.1
 
 - Light, dark and system themes cover phone controls, note fields and settings.
