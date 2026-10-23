@@ -1,4 +1,4 @@
-# Local update: CRM 0.3.3 / extension 0.4.2
+# Local update: CRM 0.3.4 / extension 0.4.3
 
 ## Install over your existing local project
 
@@ -7,8 +7,8 @@ Keep the same StageForce directory and Compose project so Docker reuses your dat
 1. With the existing container running, back up SQLite and copy the backup to your Mac:
 
    ```sh
-   docker compose exec crm node server/cli.mjs backup /app/data/before-0.3.3.sqlite
-   docker compose cp crm:/app/data/before-0.3.3.sqlite ./before-0.3.3.sqlite
+   docker compose exec crm node server/cli.mjs backup /app/data/before-0.3.4.sqlite
+   docker compose cp crm:/app/data/before-0.3.4.sqlite ./before-0.3.4.sqlite
    ```
 
 2. In your existing repository on `local-development`, run `git pull --ff-only`. Preserve your `.env`, local backups and data. Do not delete the Docker volume or use `docker compose down -v`.
@@ -23,6 +23,11 @@ Keep the same StageForce directory and Compose project so Docker reuses your dat
 5. In `chrome://extensions`, reload Stage Force. If Chrome was loading a different directory, use Load unpacked and select the updated `StageForce/integrations/chrome` folder. Refresh Gmail. Packing a CRX is unnecessary.
 
 ## What changed
+
+- Use the sidebar toggle above logout to collapse or expand navigation on desktop. The logo and navigation icons stay visible.
+- The narrower organisation list displays a known location or organisation type; the Unklar placeholder is hidden.
+- Email-based contact names are suggested when a name is missing (paul.schubert → Paul Schubert, socialmedia → Socialmedia). No primary-contact selection is required.
+- Organisation suggestions overlay the extension form without shifting its contents.
 
 - Status beside the organisation name saves immediately. The FastBill button and its edit pencil sit above Gmail search.
 - General notes use a single growing text field and Save. Unsaved drafts remain in this browser tab across navigation/reload, scoped to your account and organisation. Closing the tab can lose an unsaved draft; Save writes to the shared CRM.

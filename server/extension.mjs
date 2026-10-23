@@ -1,3 +1,4 @@
+import {contactName} from '../src/domain.ts';
 import {appearance} from './appearance.mjs';
 import {prepareCall,saveCall,cancelCall,mergePhones} from './calls.mjs';
 import {randomBytes,createHash} from 'node:crypto';
@@ -34,7 +35,7 @@ export function extensionAction(db,user,b,origin){
  if(b.action==='messageStatus'){
   const m=existingMessage(db,user,b);if(!m)return{saved:false};
   const organisation=brief(getOrg(db,m.organisation_id));if(!b.detail)return{saved:true,organisation};
-  return{saved:true,organisation,message:{id:m.id,subject:m.subject,body:m.body,timestamp:m.sent_at,direction:m.direction,attachments:JSON.parse(m.attachments_json)},participants:db.prepare('SELECT c.id FROM activity_contacts ac JOIN contacts c ON c.id=ac.contact_id JOIN activities a ON a.id=ac.activity_id WHERE a.message_id=?').all(m.id).map(r=>contacts(db,m.organisation_id).find(c=>c.id===r.id)).filter(Boolean).map(c=>({contactId:c.id,email:c.e_mails[0]||'',name:c.name,phones:c.telefone,known:true}))};
+  return{saved:true,organisation,message:{id:m.id,subject:m.subject,body:m.body,timestamp:m.sent_at,direction:m.direction,attachments:JSON.parse(m.attachments_json)},participants:db.prepare('SELECT c.id FROM activity_contacts ac JOIN contacts c ON c.id=ac.contact_id JOIN activities a ON a.id=ac.activity_id WHERE a.message_id=?').all(m.id).map(r=>contacts(db,m.organisation_id).find(c=>c.id===r.id)).filter(Boolean).map(c=>({contactId:c.id,email:c.e_mails[0]||'',name:contactName(c.name,c.e_mails[0]),phones:c.telefone,known:true}))};
  }
  if(b.action==='callPrepare'){
   const e=envelope(b,user),person=[...e.sender,...e.recipients].find(p=>p.email===b.contactEmail&&p.email!==e.mailbox);
@@ -56,7 +57,7 @@ export function extensionAction(db,user,b,origin){
   const selected=b.organisationId?brief(getOrg(db,field(b.organisationId,100))):best;
   const known=selected?contacts(db,selected.id):[];
   const linked=selected?db.prepare('SELECT o.id,o.name,o.version FROM organisation_links l JOIN organisations o ON o.id=CASE WHEN l.a=? THEN l.b ELSE l.a END WHERE l.a=? OR l.b=?').all(selected.id,selected.id,selected.id).map(brief):[];
-  return{organisation:selected,candidates,participants:p.participants.filter(a=>!a.internal&&a.role!=='quoted').map(a=>{const c=known.find(c=>c.e_mails.some(e=>e.toLowerCase()===a.email));return{...a,known:!!c,contactId:c?.id,phones:c?.telefone||[]};}),linked:linked.length===1?linked[0]:null};
+  return{organisation:selected,candidates,participants:p.participants.filter(a=>!a.internal&&a.role!=='quoted').map(a=>{const c=known.find(c=>c.e_mails.some(e=>e.toLowerCase()===a.email));return{...a,name:contactName(c?.name&&!c.name.includes('@')?c.name:a.name,a.email),known:!!c,contactId:c?.id,phones:c?.telefone||[]};}),linked:linked.length===1?linked[0]:null};
  }
  if(b.action!=='save'||b.confirmed!==true)throw new Problem('Explicit confirmation required.');
  if(typeof b.requestId!=='string'||!/^[a-f0-9-]{36}$/.test(b.requestId))throw new Problem('Invalid request ID.');

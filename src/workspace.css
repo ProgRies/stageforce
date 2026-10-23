@@ -118,3 +118,33 @@
 .filter-row{flex-wrap:wrap}
 @container(max-width:700px){.organisation-header{grid-template-columns:minmax(0,1fr) minmax(250px,.95fr);gap:20px}}
 @container(max-width:560px){.organisation-header{grid-template-columns:1fr}.organisation-fastbill{justify-content:flex-start;padding-left:0}.organisation-title h2{font-size:24px}}
+
+.organisation-status-wrap{position:relative;display:inline-flex;align-items:center;max-width:100%}
+.organisation-status-wrap select{appearance:none;padding-right:34px}
+.organisation-status-wrap>svg{position:absolute;right:12px;pointer-events:none;color:var(--muted)}
+.entity-list .item-meta:has(>span:empty):not(:has(.mini-customer)){display:none}
+.list-pane .searchbox{margin:16px 12px 12px}
+.list-pane .filter-row{padding:0 12px 12px;gap:2px}
+.list-pane .filter{padding:6px 7px;font-size:12px}
+.list-pane .entity-item{padding:12px 9px}
+.list-pane .item-title strong{font-size:14px}
+.sidebar{transition:width .24s ease,padding .24s ease}
+.sidebar .stage-mark,.sidebar .nav-item>svg{flex-shrink:0}
+.sidebar .brand-name,.sidebar .nav-label,.sidebar .user>div:last-child{overflow:hidden;white-space:nowrap;transition:opacity .16s ease,max-width .24s ease;max-width:150px;opacity:1}
+.sidebar .nav-item small{transition:opacity .16s ease;flex-shrink:0}
+.sidebar .nav-item{overflow:hidden}
+.sidebar .nav-collapse{margin-bottom:6px}
+.sidebar .sheet-link{gap:7px}
+@media(min-width:1101px){
+ .sidebar.is-collapsed{width:66px;padding-left:7px;padding-right:7px}
+ .sidebar.is-collapsed .brand{gap:0;padding-left:8px;padding-right:0}
+ .sidebar.is-collapsed .brand-name,.sidebar.is-collapsed .nav-label,.sidebar.is-collapsed .user>div:last-child{max-width:0;opacity:0}
+ .sidebar.is-collapsed .nav-item{gap:0;position:relative;padding-left:17px;padding-right:17px}
+ .sidebar.is-collapsed .nav-item small{position:absolute;right:1px;top:2px;font-size:9px}
+ .sidebar.is-collapsed .sidebar-bottom{padding:0}
+ .sidebar.is-collapsed .user{gap:0;justify-content:center}
+ .sidebar.is-collapsed .sheet-link{width:100%;justify-content:center;gap:0}
+ .sidebar.is-collapsed .nav-collapse{display:flex;margin-left:auto;margin-right:auto}
+}
+@media(max-width:1100px){.sidebar .nav-label,.sidebar .nav-collapse{display:none}.sidebar .sheet-link{display:flex;justify-content:center}.sidebar .sheet-link .nav-label{display:none}}
+@media(prefers-reduced-motion:reduce){.sidebar,.sidebar .brand-name,.sidebar .nav-label,.sidebar .user>div:last-child,.sidebar .nav-item small{transition:none}}

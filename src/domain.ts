@@ -6,6 +6,13 @@ export const STATUSES = ["Kunde","Lead","Partner / Agentur","Unklar","Ehemaliger
 export const PHASES = ["Unbearbeitet","Kontaktaufnahme","Im Gespräch","Termin vereinbart","Angebot","Testphase","Gewonnen","Aktuell kein Bedarf","Verloren","Unklar"];
 export const TYPES = ["Stadt/Gemeinde","Landkreis","Landesregierung","Bundesministerium","Landesministerium","Landeseinrichtung","Bundeseinrichtung","Sonstige öffentliche Einrichtung","Schule","Hochschule/Universität","NGO/Verband","Unternehmen","Agentur","Sonstiges","Unklar"];
 export function text(e: Entity, col: number) { return String(e.values[col] ?? ""); }
+export function contactName(name:unknown,address:unknown):string {
+ const supplied=String(name||'').trim();if(supplied&&!supplied.includes('@'))return supplied;
+ const local=String(address||'').trim().split('@')[0].split('+')[0];
+ if(!/\p{L}/u.test(local))return '';
+ return local.split(/[._-]+/).filter(Boolean).map(part=>part.charAt(0).toLocaleUpperCase()+part.slice(1).toLocaleLowerCase()).join(' ').slice(0,300);
+}
+export function organisationSubtitle(e:Entity){const city=text(e,4).trim(),type=text(e,2).trim();return city&&city!=='Unklar'?city:type&&type!=='Unklar'?type:'';}
 export function jsonList(value: unknown): any[] { try { const x = JSON.parse(String(value || "[]")); return Array.isArray(x) ? x : []; } catch { return []; } }
 export function todayBerlin() { return new Intl.DateTimeFormat("sv-SE",{timeZone:"Europe/Berlin",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date()); }
 export function dateISO(value: unknown): string {

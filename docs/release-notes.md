@@ -1,3 +1,11 @@
+# StageForce 0.3.4-local / extension 0.4.3
+
+- Collapsible desktop navigation keeps the logo, icons and hover labels. Width and label transitions respect reduced motion; the chosen state is remembered.
+- Tighter organisation list hides the unknown-type placeholder. Status dropdown arrow is inset.
+- Extension search results overlay the form so suggestions do not move the email preview.
+- Contact names fall back to readable email usernames, including shared addresses. Existing entered names remain preferred; suggested names can be edited.
+- Contact editing no longer asks for a primary contact. Existing legacy selections remain stored.
+
 # StageForce 0.3.3-local
 
 - Organisation header contains the immediately saved Lead / Kunde / Partner / Agentur selector and editable FastBill link.
