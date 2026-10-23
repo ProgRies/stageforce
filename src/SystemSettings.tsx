@@ -1,3 +1,4 @@
+import {useConfirm} from './ConfirmDialog';
 import {useEffect,useRef,useState} from 'react';
 import {Settings,RefreshCw,Copy,Check,X} from 'lucide-react';
 import {AppearanceControls} from './Appearance';
@@ -5,27 +6,28 @@ import {api} from './api';
 
 type Props={signedIn?:boolean;loadedAt?:string;stale?:boolean;loading?:boolean;disabled?:boolean;onRefresh?:()=>void};
 export default function SystemSettings(props:Props){
+ const ask=useConfirm();
  const[open,setOpen]=useState(false),[extension,setExtension]=useState<any>(null),[key,setKey]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[copied,setCopied]=useState(false);
  const ref=useRef<HTMLDivElement>(null),trigger=useRef<HTMLButtonElement>(null),visibility=useRef(0);
  const close=()=>{visibility.current++;setOpen(false);setKey('');setCopied(false);};
  useEffect(()=>{
   if(!open)return;
-  const outside=(e:PointerEvent)=>{if(!ref.current?.contains(e.target as Node))close();};
-  const escape=(e:KeyboardEvent)=>{if(e.key==='Escape'){close();trigger.current?.focus();}};
+  const outside=(e:PointerEvent)=>{if((e.target as Element)?.closest?.('.confirm-dialog'))return;if(!ref.current?.contains(e.target as Node))close();};
+  const escape=(e:KeyboardEvent)=>{if(e.key==='Escape'&&!document.querySelector('.confirm-dialog[open]')){close();trigger.current?.focus();}};
   document.addEventListener('pointerdown',outside);document.addEventListener('keydown',escape);
   let active=true;if(props.signedIn)api({action:'extensionStatus'}).then(v=>{if(active)setExtension(v);}).catch(e=>{if(active)setError(e.message);});
   return()=>{active=false;document.removeEventListener('pointerdown',outside);document.removeEventListener('keydown',escape);};
  },[open,props.signedIn]);
  async function connection(action:string){
-  if(action==='extensionCreate'&&extension?.connected&&!window.confirm('Den bisherigen Erweiterungs-Schlüssel ersetzen? Danach die Browser-Erweiterung neu verbinden.'))return;
-  if(action==='extensionRevoke'&&!window.confirm('Browser-Verbindung widerrufen?'))return;
+  if(action==='extensionCreate'&&extension?.connected&&!await ask('Den bisherigen Erweiterungs-Schlüssel ersetzen? Danach die Browser-Erweiterung neu verbinden.','Schlüssel ersetzen'))return;
+  if(action==='extensionRevoke'&&!await ask('Browser-Verbindung widerrufen?','Widerrufen'))return;
   const opened=visibility.current;setBusy(true);setError('');setKey('');setCopied(false);
   try{const v=await api({action,});if(opened===visibility.current){setExtension(v);setKey(v.token||'');}}catch(e:any){if(opened===visibility.current)setError(e.message);}finally{setBusy(false);}
  }
  return <div className="system-settings" data-tour="settings" ref={ref}>
-  <button ref={trigger} type="button" className="icon-button" title="Einstellungen" aria-label="Einstellungen" aria-expanded={open} aria-controls="system-settings-panel" onClick={()=>{if(open)close();else{setError('');setOpen(true);}}}><Settings size={19}/></button>
+  <button ref={trigger} type="button" className="icon-button" title="Einstellungen" aria-label="Einstellungen" aria-expanded={open} aria-controls="system-settings-panel" onClick={async()=>{if(open)close();else{setError('');setOpen(true);}}}><Settings size={19}/></button>
   {open&&<section id="system-settings-panel" className="settings-popover glass" aria-label="Einstellungen">
-   <header><strong>Einstellungen</strong><button type="button" className="icon-button" aria-label="Einstellungen schließen" onClick={()=>{close();trigger.current?.focus();}}><X size={16}/></button></header>
+   <header><strong>Einstellungen</strong><button type="button" className="icon-button" aria-label="Einstellungen schließen" onClick={async()=>{close();trigger.current?.focus();}}><X size={16}/></button></header>
    <div className="settings-row"><span>Darstellung</span><AppearanceControls/></div>
    {props.onRefresh&&<div className="settings-row"><span className={`connection ${props.stale?'stale':''}`} title={props.loadedAt?`Geladen ${new Date(props.loadedAt).toLocaleTimeString('de-DE')}`:undefined}><i/>{props.stale?'Veraltet':props.loadedAt?'Live':'Laden …'}</span><button type="button" className="text-button" disabled={props.disabled||props.loading} onClick={props.onRefresh}><RefreshCw size={15} className={props.loading?'spin':''}/>Aktualisieren</button></div>}
    {props.signedIn&&<details className="settings-extension"><summary>Browser-Erweiterung verbinden</summary><p>Schlüssel erstellen und zusammen mit dieser CRM-Adresse in den Einstellungen der Chrome-Erweiterung einfügen.</p><p><strong>{window.location.origin}</strong></p>

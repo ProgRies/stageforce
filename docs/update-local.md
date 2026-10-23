@@ -1,4 +1,4 @@
-# Local update: CRM 0.3.8 / extension 0.4.11
+# Local update: CRM 0.3.9 / extension 0.4.11
 
 ## Install over your existing local project
 
@@ -7,8 +7,8 @@ Keep the same StageForce directory and Compose project so Docker reuses your dat
 1. With the existing container running, back up SQLite and copy the backup to your Mac:
 
    ```sh
-   docker compose exec crm node server/cli.mjs backup /app/data/before-0.3.4.sqlite
-   docker compose cp crm:/app/data/before-0.3.4.sqlite ./before-0.3.4.sqlite
+   docker compose exec crm node server/cli.mjs backup /app/data/before-0.3.9.sqlite
+   docker compose cp crm:/app/data/before-0.3.9.sqlite ./before-0.3.9.sqlite
    ```
 
 2. In your existing repository on `local-development`, run `git pull --ff-only`. Preserve your `.env`, local backups and data. Do not delete the Docker volume or use `docker compose down -v`.
@@ -20,9 +20,16 @@ Keep the same StageForce directory and Compose project so Docker reuses your dat
    ```
 
 4. Open http://localhost:3000 and refresh. Existing users, API keys and data remain. Schema 8 migrates automatically.
-5. In `chrome://extensions`, reload Stage Force. If Chrome was loading a different directory, use Load unpacked and select the updated `StageForce/integrations/chrome` folder. Refresh Gmail. Packing a CRX is unnecessary.
+5. This CRM update leaves extension 0.4.11 unchanged. If upgrading from an older extension, in `chrome://extensions`, reload Stage Force. If Chrome was loading a different directory, use Load unpacked and select the updated `StageForce/integrations/chrome` folder. Refresh Gmail. Packing a CRX is unnecessary.
 
 ## What changed
+
+- Calls and notes have a pencil for editing their text in place. The original date, author and linked contact stay intact; edits are audited.
+- The contact pencil becomes an X that closes the editor. Saving updates and collapses it without clearing the timeline.
+- CRM confirmation prompts use the app styling. All CRM call buttons use the white StageForce style.
+- Timeline cards distinguish blue emails, purple calls and amber notes.
+
+### Earlier contact-extraction update
 
 - Rebuild Docker and reload the extension together for contact editing and selection extraction.
 - Use the contact pencil to correct a name or add/change phone numbers. Save contact writes immediately to the selected organisation; saving the email remains a separate action. Existing secondary email addresses and roles are preserved in extension edits.
