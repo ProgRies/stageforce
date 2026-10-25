@@ -45,7 +45,6 @@ export function gmailSearch(e:Entity,mailbox:string) {
  return {query,url:base+encodeURIComponent(query)};
 }
 export function websiteURL(value: unknown) { const s=String(value||"").trim(); if(!s)return "";try{const u=new URL(/^https?:\/\//i.test(s)?s:"https://"+s);return ["http:","https:"].includes(u.protocol)&&!u.username&&!u.password?u.href:"";}catch{return "";} }
-export function needsFastbill(e: Entity) { return ["Kunde","Ehemaliger Kunde"].includes(text(e,9)) || text(e,10)==="Angebot"; }
 export function phone(e: Entity) { const primary=text(e,14).trim();if(primary.replace(/\D/g,"").length>=6)return primary; for(const c of jsonList(e.values[20]))for(const p of c.telefone||[])if(String(p).replace(/\D/g,"").length>=6)return String(p);return ""; }
 // One tap after a call decides when the organisation comes back. Nobody drops out for good unless
 // the phase is set to "Verloren" by hand.
