@@ -21,7 +21,6 @@ export function dateISO(value: unknown): string {
   const m = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/); return m ? `${m[3]}-${m[2]}-${m[1]}` : "";
 }
 export function validDate(s: string) { if(!/^\d{4}-\d{2}-\d{2}$/.test(s))return false;const d=new Date(s+"T12:00:00Z");return !isNaN(+d)&&d.toISOString().slice(0,10)===s; }
-export function serialDate(s: string) { if(!validDate(s)) throw new Error("Ungültiges Datum."); return Date.parse(s+"T00:00:00Z")/86400000+25569; }
 export function formatDate(value: unknown) { const s=dateISO(value); return s ? new Intl.DateTimeFormat("de-DE",{day:"2-digit",month:"2-digit",year:"numeric",timeZone:"UTC"}).format(new Date(s+"T12:00:00Z")) : "—"; }
 export function fastbillURL(value: unknown): string { try { const u=new URL(String(value)); return u.protocol==="https:" && !u.username && !u.password && (u.hostname==="fastbill.com"||u.hostname.endsWith(".fastbill.com")) ? u.href : ""; } catch { return ""; } }
 // A normal browser shortcut, with no mailbox API or extra permission.
