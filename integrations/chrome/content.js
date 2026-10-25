@@ -299,6 +299,7 @@ async function open(n){
    renderContacts([...p.participants,...extraContacts.filter(extra=>!p.participants.some(p=>p.contactId===extra.contactId||(p.email&&p.email===extra.email))),...(p.participants.length?[]:(p.suggested||[]).filter(s=>!extraContacts.some(e=>e.contactId===s.contactId)).map(s=>({...s,manual:true,confirmedContact:true,suggested:true})))].concat(quotedCards(p.quoted,found,p.participants)));
    if(auto&&!selected&&p.candidates.length){showResults('org',p.candidates);$('#org-status').textContent='Choose the matching organization';}
    if(p.linked&&!linked){linked=p.linked;$('#linked').value=linked.name;$('#linked-status').textContent='Existing CRM link';}
+   if(selected?.id&&!$('#meeting').classList.contains('hidden'))detectMeeting();
   }catch(e){if(active&&generation===lookupGeneration)$('#error').textContent=e.message;}finally{checking--;if(active)controls();}
  }
  function showResults(id,items,query=''){
@@ -370,13 +371,17 @@ async function open(n){
  function keys(e){if(!e.composedPath().includes(modalHost))return;e.stopImmediatePropagation();if(e.type!=='keydown')return;if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();const form=sh.querySelector('.contact-editor');if(contactEdit&&form)form.requestSubmit();else if(!savedMessage&&!$('#save').disabled)save(false);return;}if(e.key==='Enter'&&['org','linked'].includes(sh.activeElement?.id)){e.preventDefault();$('#'+sh.activeElement.id+'-options button')?.click();return;}if(e.key==='Escape'){e.preventDefault();e.stopPropagation();if(!busy)close();return;}if(e.key==='Tab'){const f=[...sh.querySelectorAll('button:not(:disabled),input:not(:disabled),textarea:not(:disabled),summary,select:not(:disabled)')].filter(visible);const first=f[0],last=f[f.length-1];if(e.shiftKey&&sh.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&sh.activeElement===last){e.preventDefault();first.focus();}}}
  const veil=$('.veil');let backdropPress=false;veil.onpointerdown=e=>{backdropPress=e.target===veil;};veil.onclick=e=>{if(e.target===veil&&backdropPress&&!busy)close();backdropPress=false;};
  $('.close').onclick=()=>{if(!busy)close();};for(const type of ['keydown','keyup','keypress'])window.addEventListener(type,keys,true);$('#org').focus();
- // Video-call invitations can be logged as a Meeting in the same save; loose mentions start unticked.
+ // Any email can also be logged as a Meeting in the same save. Invitations and confirmations start ticked with their date; other emails unticked.
  async function detectMeeting(){
-  let m=null;try{m=(await popupApi({action:'meeting',originalSubject:d.subject,originalBody:d.bodyText,links:d.links,timestamp:d.timestampISO||''}))?.meeting;}catch{}
-  if(!active||!m)return;const emailDay=$('#date').value.slice(0,10);
-  $('#meeting-label').textContent=(m.cancelled?'Mark cancelled ':'Also log ')+m.provider+' meeting';$('#meeting-log').checked=m.likely;
-  $('#meeting-date').value=m.date||emailDay;$('#meeting-time').value=m.time||'';$('#meeting-date').hidden=$('#meeting-time').hidden=m.cancelled;$('#meeting').classList.remove('hidden');
+  let m=null;try{m=(await popupApi({action:'meeting',originalSubject:d.subject,originalBody:d.bodyText,links:d.links,attachments:d.attachments,timestamp:d.timestampISO||'',organisationId:selected?.id||undefined}))?.meeting;}catch{}
+  if(!active||meetingTouched)return;const emailDay=$('#date').value.slice(0,10);m||={provider:'',date:'',time:'',likely:false,cancelled:false};
+  // A meeting already in the timeline is only updated when this email moves or cancels it.
+  const logged=m.logged,day=s=>s.split('-').reverse().join('.');
+  $('#meeting-label').textContent=logged?(logged.update?(m.cancelled?'Mark logged meeting cancelled':'Update logged meeting'):'Meeting on '+day(logged.date)+' already logged · tick to add this email'):(m.cancelled?'Mark cancelled ':'Also log ')+(m.provider?m.provider+' meeting':'as meeting');
+  $('#meeting-log').checked=logged?logged.update:m.likely;
+  $('#meeting-date').value=m.date||emailDay;$('#meeting-time').value=m.time||'';$('#meeting-date').hidden=$('#meeting-time').hidden=m.cancelled||!!logged&&!logged.update;$('#meeting').title=logged?logged.text:'';$('#meeting').classList.remove('hidden');
  }
+ let meetingTouched=false;$('#meeting').addEventListener('input',()=>meetingTouched=true);
  const meetingChoice=()=>$('#meeting').classList.contains('hidden')||!$('#meeting-log').checked?undefined:{log:true,date:$('#meeting-date').value,time:$('#meeting-time').value};
  async function reconnect(){
   if(busy||checking)return;checking++;connected=false;$('#retry').disabled=true;controls();
