@@ -1,5 +1,17 @@
 ## 0.3.9-local
 
+## Unreleased · extension 0.4.13
+
+Better contact and phone extraction in the Gmail popup. Reload the extension and refresh Gmail; rebuild the CRM for the role field. No database migration is required.
+
+- Read German signature labels (T, M, Tel., Mob., Handy, Büro, Zentrale, Durchwahl) and split "Tel. … | Fax … | Mobil …" lines, dropping only the fax entry. Dates are no longer taken as phone numbers.
+- Suggest sender phones from the signature block only, not from numbers mentioned in the text.
+- Mark suggested numbers as "new" with an × to drop them before saving the email.
+- Keep table cells apart in email text, so contact-form emails stay readable and their addresses parse correctly.
+- Extract contact recognises titles, combines first and last name fields, skips company lines, and suggests role and company. The role is saved for new contacts; the company prefills the organisation search when none is selected.
+- Send recipients' display names, so new contacts from To/Cc get real names.
+- Ctrl/Cmd+Enter saves and continues, or saves the open contact editor.
+
 ## 0.3.10-local · extension 0.4.12
 
 Centered the collapsed sidebar logo and placed organisation status below the name. Contact editing uses inset icons and accessible field names. The popup shows connection settings only while disconnected and no longer offers a manual animation pause control; system reduced-motion settings remain respected.

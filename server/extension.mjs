@@ -39,7 +39,7 @@ export function extensionAction(db,user,b,origin){
  }
  if(b.action==='contactSave'){
   identity(b,user);if(b.confirmed!==true)throw new Problem('Explicit contact confirmation required.');
-  const name=field(b.name||'',300),address=field(b.email||'',254).toLowerCase();
+  const name=field(b.name||'',300),role=field(b.role||'',500),address=field(b.email||'',254).toLowerCase();
   if(address&&!email(address))throw new Problem('Check the email address.');
   if(!Array.isArray(b.phones)||b.phones.length>10)throw new Problem('Check phone numbers.');
   const phones=[...new Set(b.phones.map(p=>{dialNumber(p);return field(p,100);}))];
@@ -55,7 +55,7 @@ export function extensionAction(db,user,b,origin){
    if(!current&&!address){const matches=all.filter(c=>c.name.toLowerCase()===name.toLowerCase()&&c.telefone.some(p=>{try{return phones.some(n=>dialNumber(n)===dialNumber(p));}catch{return false;}}));if(matches.length>1)throw new Problem('Several contacts match this phone number. Choose the contact in the CRM.');current=matches[0];}
    const addresses=[...new Set([...(current?.e_mails||[]),...(address?[address]:[])])];
    const numbers=b.contactId?phones:[...new Set([...(current?.telefone||[]),...phones])];
-   const result=contactSave(db,user,{id,version:getOrg(db,id).version,contactId:current?.id,name:name||current?.name||'',role:current?.rolle||'',emails:addresses.join(';'),phones:numbers.join(';'),messageId:b.messageId});
+   const result=contactSave(db,user,{id,version:getOrg(db,id).version,contactId:current?.id,name:name||current?.name||'',role:role||current?.rolle||'',emails:addresses.join(';'),phones:numbers.join(';'),messageId:b.messageId});
    const c=contacts(db,id).find(c=>c.id===result.contactId);
    return{saved:true,organisation:brief(getOrg(db,id)),contact:{contactId:c.id,name:contactName(c.name,c.e_mails[0]),email:address||c.e_mails[0]||'',phones:c.telefone,known:true}};
   });

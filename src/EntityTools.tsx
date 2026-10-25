@@ -20,7 +20,7 @@ export default function EntityTools({extracted,entity,entities,links,disabled,on
  function close(){if(busy)return;setMode('');setError('');setSuggestion(null);setSourceMessage(undefined);}
  async function save(){if(busy||conflict)return;setBusy(true);setError('');try{const result=await api(mode==='contact'?{action:'contact',id:entity.id,version,contactId:cid||null,name,role,emails,phones,messageId:sourceMessage}:{action:'link',id:entity.id,version,other,note});setMode('');onSaved(result.entity);}catch(e:any){setError(e.message);if(e.status==='conflict')onSaved();}finally{setBusy(false);}}
  function applySuggestion(draft:ContactSuggestion,id:string){
-  const c=contacts.find(c=>c.id===id);setCid(id);setName(c?.name||draft.name);setRole(c?.rolle||'');
+  const c=contacts.find(c=>c.id===id);setCid(id);setName(c?.name||draft.name);setRole(c?.rolle||draft.role||'');
   setEmails([...new Set([...(c?.e_mails||[]),...draft.emails])].join('; '));
   const seen=new Set<string>();setPhones([...(c?.telefone||[]),...draft.phones].filter(p=>{const key=p.replace(/\(0\)/g,'').replace(/[^+\d]/g,'');if(seen.has(key))return false;seen.add(key);return true;}).join('; '));
   setSourceMessage(draft.messageId);setSuggestion(draft);setVersion(entity.version);setError('');setMode('contact');setExpanded(true);
