@@ -1,4 +1,13 @@
-## 0.3.9-local
+## Unreleased · CRM
+
+Rebuild the CRM. The database moves to schema 9 on start (personal call lists); no data is changed.
+
+- After a call, one tap records the result (Nicht erreicht, Später anrufen, Termin, E-Mail nötig, Kein Interesse) and sets when the organisation comes back. Termin opens the booking calendar.
+- "Notiz hinzufügen" can record a Meeting, which counts as the last contact.
+- **Prüfen** lists organisations that need an email after a call, with the latest timeline entry. Saving an outgoing email clears the point; **Erledigt** clears it by hand. The old automatic field checks are gone.
+- Each user gets their own call list: only organisations they own ("Zuständig") or nobody owns, and none a colleague already holds today. The first saved call to an unowned organisation makes the caller its owner.
+- The in-app tour covers status and ownership, meetings, call results and Prüfen. Started from Anrufe or Prüfen, it switches to Organisationen and opens an organisation first.
+- Cleanup: removed the unused full-page organisation editor, the old note types (E-Mail, Telefonat, Anrufversuch) from the note API, an unused helper and about 200 unused CSS selectors. Removed the demo-data command; see the README for resetting the local database.
 
 ## Unreleased · extension 0.4.15
 

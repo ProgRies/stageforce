@@ -42,7 +42,7 @@ A clear existing contact match is prefilled. Ambiguous matches and new organisat
 
 ## CRM features retained
 
-Organisation/contact editing, search, communication history, follow-ups, call queues, review categories, FastBill imports and the optional .eml file importer. The browser extension uses the same database; it does not need the file importer. No real CRM snapshot, mailbox contents, passwords or connection keys are included.
+Organisation/contact editing, search, communication history with notes and meetings, follow-ups, personal call lists with one-tap call results, the Prüfen handoff list, FastBill imports and the optional .eml file importer. The browser extension uses the same database; it does not need the file importer. No real CRM snapshot, mailbox contents, passwords or connection keys are included.
 
 ## Development
 
@@ -58,7 +58,7 @@ APP_URL=http://localhost:3000 node server/http.mjs
 
 After source edits, rebuild Docker with `docker compose up -d --build`. For extension edits, click Reload in `chrome://extensions` and refresh Gmail.
 
-Schema 8 adds per-user theme preferences alongside durable email identities and call preparation/logging. Existing CRM data and credentials are preserved. Back up the database before upgrading; older versions cannot open schema 8. The extension starts at v0.4.12; CRM version is 0.3.10-local.
+The database is at schema 9 (personal call lists; see [Schema](docs/schema.md)). Existing CRM data and credentials are preserved on upgrade. Back up the database before upgrading; older versions cannot open schema 9. The extension is v0.4.15; CRM version is 0.3.10-local.
 
 [Future hosting and backups](docs/deployment.md) · [Schema](docs/schema.md) · [Release notes](docs/release-notes.md)
 

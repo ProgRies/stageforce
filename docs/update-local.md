@@ -1,4 +1,4 @@
-# Local update: CRM 0.3.10 / extension 0.4.12
+# Local update: CRM 0.3.10 / extension 0.4.15
 
 ## Install over your existing local project
 
@@ -7,8 +7,8 @@ Keep the same StageForce directory and Compose project so Docker reuses your dat
 1. With the existing container running, back up SQLite and copy the backup to your Mac:
 
    ```sh
-   docker compose exec crm node server/cli.mjs backup /app/data/before-0.3.9.sqlite
-   docker compose cp crm:/app/data/before-0.3.9.sqlite ./before-0.3.9.sqlite
+   docker compose exec crm node server/cli.mjs backup /app/data/before-update.sqlite
+   docker compose cp crm:/app/data/before-update.sqlite ./before-update.sqlite
    ```
 
 2. In your existing repository on `local-development`, run `git pull --ff-only`. Preserve your `.env`, local backups and data. Do not delete the Docker volume or use `docker compose down -v`.
@@ -19,8 +19,8 @@ Keep the same StageForce directory and Compose project so Docker reuses your dat
    docker compose logs --tail=30 crm
    ```
 
-4. Open http://localhost:3000 and refresh. Existing users, API keys and data remain. Schema 8 migrates automatically.
-5. For extension 0.4.12, in `chrome://extensions`, reload Stage Force. If Chrome was loading a different directory, use Load unpacked and select the updated `StageForce/integrations/chrome` folder. Refresh Gmail. Packing a CRX is unnecessary.
+4. Open http://localhost:3000 and refresh. Existing users, API keys and data remain. Schema 9 migrates automatically.
+5. For extension 0.4.15, in `chrome://extensions`, reload Stage Force. If Chrome was loading a different directory, use Load unpacked and select the updated `StageForce/integrations/chrome` folder. Refresh Gmail. Packing a CRX is unnecessary.
 
 ## What changed
 
@@ -72,7 +72,7 @@ Every contact phone control has a phone icon, number and StageForce mark. Clicki
 
 In the extension, a missing organisation causes the button to shake and points to the organisation field. Choose an existing organisation, choose Create, or type a new organisation name before calling. A typed exact existing name is reused. The organisation, contact and number remain saved even if no call event is recorded. Starting a call does not import the email.
 
-Save records the original click timestamp, the user, contact, number, organisation and notes. Empty notes produce “Anruf gestartet · keine Notiz”. This records an attempt to open the dialler, not proof of a connected call, and does not advance the organisation's last successful contact date. Save retries do not duplicate the event.
+In the CRM, one tap after the call records the result and sets the next follow-up: **Nicht erreicht** (again in 2 days), **Später anrufen** (a date you pick), **Termin** (opens the booking calendar, phase Termin vereinbart, follow up in 14 days), **E-Mail nötig** (adds the organisation to Prüfen, follow up in 7 days) and **Kein Interesse** (phase Aktuell kein Bedarf, back in a year). Every result except Nicht erreicht counts as the last contact. The extension saves calls without a result as “Anruf gestartet”, which does not change the last-contact date. Save records the click timestamp, user, contact, number, organisation and notes; retries do not duplicate the event.
 
 × cancels the pending call note and deletes its preparation record; the saved organisation and contact remain. Closing an extension popup with a pending note asks before discarding. Abruptly closing the browser may leave a pending preparation entry, which is not shown in the timeline. Call notes are not automatically recoverable after closing the page. Notes saying “no answer” can be saved normally. Calls from already saved emails also retain a reference to that CRM email.
 

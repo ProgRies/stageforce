@@ -78,7 +78,7 @@ test('duplicate email cannot create another organisation or rewrite previous con
 
 test('new customers require explicit paying status; draft/contact-date overrides are refused in email imports',async()=>{const{db,user}=setup();try{
  const p=stageImport(db,user,await mail());const b={importId:p.id,newOrganisation:{name:'Paying customer',status:'Kunde'},date:'2026-10-13'};assert.throws(()=>confirmImport(db,user,{...b,fields:{15:'2026-10-14'}}),/Nur Status/);const r=confirmImport(db,user,b);assert.equal(r.entity.values[9],'Kunde');assert.equal(r.entity.values[15],'2026-10-13');
- const failed=save(db,user,{id:r.entity.id,version:r.entity.version,requestId:'missed',fields:{},note:{type:'Anrufversuch',text:'Telefonisch nicht erreicht.',date:'2026-10-14',contacted:true}});assert.equal(failed.entity.values[15],'2026-10-13');assert.equal(history(db,r.entity.id,0,'communication').items[0].art,'Anrufversuch');
+ const failed=save(db,user,{id:r.entity.id,version:r.entity.version,requestId:'missed',fields:{},note:{type:'Notiz',text:'Telefonisch nicht erreicht.',date:'2026-10-14',contacted:true}});assert.equal(failed.entity.values[15],'2026-10-13');assert.equal(history(db,r.entity.id,0,'communication').items[0].art,'Notiz');
  }finally{db.close();}});
 
 test('wizard HTTP endpoint returns position and persists selected contacts via authenticated routes',async()=>{const{db,user}=setup();const org=createOrg(db,user,'Customer'),p=stageImport(db,user,await mail()),session=createSession(db,user),server=makeServer(db,{origin:'http://localhost:3000'});await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port;try{
