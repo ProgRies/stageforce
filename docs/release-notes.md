@@ -1,5 +1,15 @@
 ## 0.3.9-local
 
+## Unreleased · FastBill click to add
+
+Rebuild the CRM and refresh its browser tab. No database change.
+
+- FastBill rows are now added to the CRM one at a time. **Als neue Organisation hinzufügen** creates the organisation from that row in one click; **Zuordnen** links it to an existing one; **Nicht relevant** skips it. The next open row opens after each decision.
+- Better duplicate protection: suggestions now also use phone numbers, company domains, contact names and similar names without legal forms. Adding a new organisation while possible matches exist needs one extra confirmation.
+- Re-importing the same export only asks about rows that are still undecided, including ones marked Nicht relevant before.
+- A new organisation from FastBill without an email address shows up in Prüfen.
+- Removed the one-time spreadsheet migration (`npm run cli migrate`). It could add every organisation at once, bypassing the review queue, and it was only usable on an empty CRM.
+
 ## Unreleased · extension 0.4.15
 
 Meetings from video-call invitations. Rebuild the CRM, reload the extension and refresh Gmail. The CRM adds one table on start (meeting references); no data is changed.

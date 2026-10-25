@@ -1,8 +1,8 @@
 import {createHash} from 'node:crypto';
 import {uid,now,transaction,reindex} from './db.mjs';
-import {Problem,entity,getOrg,assertVersion,fieldsValidated,applyFields,contacts,addContact,addActivity,audit} from './crm.mjs';
+import {Problem,entity,getOrg,assertVersion,fieldsValidated,applyFields,contacts,addContact,addActivity,audit,publicDomains} from './crm.mjs';
 import {email} from './auth.mjs';
-import {normalize,todayBerlin} from '../src/domain.ts';
+import {normalize,todayBerlin,websiteURL,fastbillURL,formatPhone} from '../src/domain.ts';
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const norm=value=>normalize(String(value||'')).replace(/[^a-z0-9]/g,'');
 const clean=(value,max=2000)=>{const s=String(value??'').trim();if(s.length>max)throw new Problem('Ein Importfeld ist zu lang. Bitte die Spaltenzuordnung prüfen.');return s;};
@@ -57,30 +57,72 @@ export function stageFastbill(db,user,{scope='main',label='FastBill',records,bat
  for(const r of records){const fingerprint=hash(r);if(seen.has(fingerprint)){duplicates++;continue;}seen.add(fingerprint);added++;if(seen.size>10000)throw new Problem('Maximal 10.000 Einträge pro Importlauf.');
  const decision=db.prepare('SELECT decision,organisation_id FROM fastbill_decisions WHERE scope=? AND fingerprint=?').get(scope,fingerprint);
  db.prepare('INSERT INTO fastbill_rows VALUES(?,?,?,?,?,?,?,?)').run(uid(),id,keyOf(r),fingerprint,JSON.stringify(r),decision?.decision||'pending',decision?.organisation_id||null,decision?'Aus früherem Import übernommen':'');}
- return{id,duplicates,count:seen.size,added};});
+ const pending=db.prepare("SELECT count(*) n FROM fastbill_rows WHERE batch_id=? AND status='pending'").get(id).n;
+ return{id,duplicates,count:seen.size,added,pending,known:seen.size-pending};});
 }
 export function fastbillBatches(db,user){return db.prepare("SELECT b.*,count(r.id) total,sum(CASE WHEN r.status='pending' THEN 1 ELSE 0 END) pending FROM fastbill_batches b LEFT JOIN fastbill_rows r ON r.batch_id=b.id WHERE b.user_id=? GROUP BY b.id ORDER BY b.created_at DESC,b.rowid DESC").all(user.id);}
-export function fastbillRows(db,user,{batchId,status='pending',query='',offset=0}){batchFor(db,user,batchId);if(!['pending','applied','ignored','all'].includes(status))throw new Problem('Ungültiger Filter.');offset=Math.max(0,Math.floor(Number(offset)||0));const where="batch_id=? AND (?='all' OR status=?) AND payload_json LIKE ?";const args=[batchId,status,status,'%'+clean(query,200)+'%'];return{items:db.prepare(`SELECT * FROM fastbill_rows WHERE ${where} ORDER BY rowid LIMIT 100 OFFSET ?`).all(...args,offset).map(r=>({...r,payload:JSON.parse(r.payload_json),payload_json:undefined})),total:db.prepare(`SELECT count(*) n FROM fastbill_rows WHERE ${where}`).get(...args).n};}
+export function fastbillRows(db,user,{batchId,status='pending',query='',offset=0}){if(!['pending','applied','ignored','all'].includes(status))throw new Problem('Ungültiger Filter.');offset=Math.max(0,Math.floor(Number(offset)||0));const where="r.batch_id=? AND (?='all' OR r.status=?) AND r.payload_json LIKE ?";const args=[batchId,status,status,'%'+clean(query,200)+'%'];const b=batchFor(db,user,batchId),match=matcher(db,b.scope);
+ return{items:db.prepare(`SELECT r.*,o.name organisation_name FROM fastbill_rows r LEFT JOIN organisations o ON o.id=r.organisation_id WHERE ${where} ORDER BY r.rowid LIMIT 100 OFFSET ?`).all(...args,offset).map(r=>{const payload=JSON.parse(r.payload_json);return{...r,payload,payload_json:undefined,match:r.status==='pending'?match(payload)[0]||null:null};}),total:db.prepare(`SELECT count(*) n FROM fastbill_rows r WHERE ${where}`).get(...args).n};}
 function rowFor(db,user,id){const r=db.prepare('SELECT r.*,b.scope FROM fastbill_rows r JOIN fastbill_batches b ON b.id=r.batch_id WHERE r.id=? AND b.user_id=?').get(id,user.id);if(!r)throw new Problem('Importzeile nicht gefunden.',404);return{...r,payload:JSON.parse(r.payload_json)};}
 export function fastbillPreview(db,user,id){const row=rowFor(db,user,id),p=row.payload,candidates=new Map();
  const previous=db.prepare('SELECT decision,organisation_id,note FROM fastbill_decisions WHERE scope=? AND fingerprint=?').get(row.scope,row.fingerprint);if(row.status==='pending'&&previous){row.status=previous.decision;row.organisation_id=previous.organisation_id;row.note=previous.note;}
- for(const key of keysOf(p))for(const c of db.prepare('SELECT o.id,o.name FROM fastbill_mappings m JOIN organisations o ON o.id=m.organisation_id WHERE m.scope=? AND m.source_key=?').all(row.scope,key))candidates.set(c.id,{...c,reason:'Bestätigte Zuordnung',score:3});
- if(p.email)for(const c of db.prepare("SELECT DISTINCT o.id,o.name FROM organisations o JOIN organisation_contacts oc ON oc.organisation_id=o.id JOIN contact_addresses a ON a.contact_id=oc.contact_id WHERE a.kind='email' AND a.value=? COLLATE NOCASE").all(p.email))if(!candidates.has(c.id))candidates.set(c.id,{...c,reason:'Gleiche E-Mail-Adresse',score:2});
- for(const c of db.prepare('SELECT id,name FROM organisations').all())if(norm(c.name)===norm(p.name)&&!candidates.has(c.id))candidates.set(c.id,{...c,reason:'Gleicher Name',score:1});
- return{...row,payload_json:undefined,candidates:[...candidates.values()].sort((a,b)=>b.score-a.score)};
+ return{...row,payload_json:undefined,candidates:matcher(db,row.scope)(p)};
 }
+// Words that say nothing about which organisation is meant.
+const NOISE=new Set(['gmbh','mbh','ug','haftungsbeschrankt','ag','kg','ohg','gbr','ev','e','v','co','und','and','the','der','die','das','ltd','inc','llc','se','kgaa','partg','eg','gmbhcokg']);
+const words=value=>normalize(String(value||'')).replace(/&/g,' ').split(/[^a-z0-9]+/).filter(w=>w&&!NOISE.has(w));
+const host=value=>{const u=websiteURL(value);try{return u?new URL(u).hostname.replace(/^www\./,''):'';}catch{return '';}};
+const mailDomain=value=>{const d=String(value||'').toLowerCase().split('@')[1]||'';return publicDomains.has(d)?'':d;};
+const digits=value=>String(value||'').replace(/\D/g,'').replace(/^(00)?49/,'0').slice(-9);
+function similar(a,b){if(!a.length||!b.length)return false;const x=a.join(''),y=b.join('');if(x===y)return true;if(Math.min(x.length,y.length)>=8&&(x.includes(y)||y.includes(x)))return true;
+ const shared=a.filter(w=>w.length>=4&&b.includes(w)).length;return shared>0&&shared/new Set([...a,...b]).size>0.5;}
+// Suggests which existing organisations a FastBill row probably means; strongest evidence first.
+export function matcher(db,scope){
+ const orgs=db.prepare('SELECT id,name,website FROM organisations').all().map(o=>({...o,words:words(o.name),host:host(o.website),emails:new Set(),domains:new Set(),phones:new Set(),people:new Set()}));const byId=new Map(orgs.map(o=>[o.id,o]));
+ for(const a of db.prepare('SELECT oc.organisation_id id,c.name,a.kind,a.value FROM organisation_contacts oc JOIN contacts c ON c.id=oc.contact_id LEFT JOIN contact_addresses a ON a.contact_id=c.id').all()){const o=byId.get(a.id);if(!o)continue;if(norm(a.name))o.people.add(norm(a.name));
+  if(a.kind==='email'){o.emails.add(String(a.value).toLowerCase());const d=mailDomain(a.value);if(d)o.domains.add(d);}else if(a.kind==='phone'&&digits(a.value).length>=6)o.phones.add(digits(a.value));}
+ const mapped=db.prepare('SELECT organisation_id FROM fastbill_mappings WHERE scope=? AND source_key=?');
+ return p=>{const found=new Map(),add=(id,score,reason)=>{const o=byId.get(id);if(!o)return;const c=found.get(id)||{id,name:o.name,best:0,reasons:[]};if(!c.reasons.includes(reason)){c.reasons.push(reason);c.best=Math.max(c.best,score);c.score=c.best+c.reasons.length/100;}found.set(id,c);};
+  for(const key of keysOf(p))for(const m of mapped.all(scope,key))add(m.organisation_id,3,'Bestätigte Zuordnung');
+  const name=words(p.name),domain=mailDomain(p.email),site=host(p.website),phones=(p.phones||[]).map(digits).filter(x=>x.length>=6),person=norm(p.contactName);
+  for(const o of orgs){
+   if(p.email&&o.emails.has(p.email))add(o.id,2,'Gleiche E-Mail-Adresse');
+   if(phones.some(x=>o.phones.has(x)))add(o.id,1.8,'Gleiche Telefonnummer');
+   if((domain&&(o.domains.has(domain)||o.host===domain))||(site&&(o.host===site||o.domains.has(site))))add(o.id,1.5,'Gleiche Domain');
+   if(norm(o.name)===norm(p.name))add(o.id,1,'Gleicher Name');else if(similar(name,o.words))add(o.id,0.6,'Ähnlicher Name');
+   if(person&&o.people.has(person))add(o.id,0.8,'Gleicher Ansprechpartner');
+  }
+  return[...found.values()].sort((a,b)=>b.score-a.score).slice(0,5).map(({best,...c})=>({...c,reason:c.reasons.join(' · ')}));};
+}
+// Click to add: a new organisation from one FastBill customer row, with only what the row says.
+function createFromRow(db,user,r){
+ const p=r.payload;if(p.kind!=='customers')throw new Problem('Neue Organisationen nur aus Kundendaten anlegen.');
+ const name=clean(p.name,500);if(!name)throw new Problem('Name erforderlich.');
+ const id='STG-'+uid();db.prepare("INSERT INTO organisations(id,name,status,fastbill_url,city,website,created_at,updated_at) VALUES(?,?,'Kunde',?,?,?,?,?)").run(id,name,fastbillURL(p.url),clean(p.city,500),websiteURL(p.website)?p.website:'',now(),now());
+ const em=email(p.email)?p.email:'',phones=[...new Set(p.phones.map(formatPhone).filter(x=>x.replace(/\D/g,'').length>=6))];
+ if(p.contactName||em||phones.length)addContact(db,id,{name:p.contactName,rolle:p.role,e_mails:em?[em]:[],telefone:phones},true);
+ // Same handoff as a call that needs an email: it shows up in Prüfen until someone resolves it.
+ if(!em)db.prepare('INSERT INTO review_issues VALUES(?,?,?,NULL)').run(uid(),id,NO_EMAIL);
+ audit(db,id,user,'create',{name,via:'fastbill_import',scope:r.scope});return getOrg(db,id);
+}
+export const NO_EMAIL='E-Mail-Adresse fehlt (FastBill-Import)';
 export function decideFastbill(db,user,b){return transaction(db,()=>{
- const r=rowFor(db,user,b.rowId);if(b.decision==='pending'){
+ const r=rowFor(db,user,b.rowId),same="fingerprint=? AND batch_id IN (SELECT id FROM fastbill_batches WHERE scope=?)";if(b.decision==='pending'){
   const old=db.prepare('SELECT organisation_id FROM fastbill_decisions WHERE scope=? AND fingerprint=?').get(r.scope,r.fingerprint);
   if(old?.organisation_id){for(const key of keysOf(r.payload))db.prepare('DELETE FROM fastbill_mappings WHERE scope=? AND source_key=? AND organisation_id=?').run(r.scope,key,old.organisation_id);audit(db,old.organisation_id,user,'fastbill_reopen',{scope:r.scope,keys:keysOf(r.payload)});}
   db.prepare('DELETE FROM fastbill_decisions WHERE scope=? AND fingerprint=?').run(r.scope,r.fingerprint);
-  db.prepare("UPDATE fastbill_rows SET status='pending',organisation_id=NULL,note='' WHERE id=?").run(r.id);return{};
+  db.prepare(`UPDATE fastbill_rows SET status='pending',organisation_id=NULL,note='' WHERE id=? OR (${same})`).run(r.id,r.fingerprint,r.scope);return{};
  }
- if(!['applied','ignored'].includes(b.decision))throw new Problem('Ungültige Entscheidung.');
+ if(!['applied','ignored','create'].includes(b.decision))throw new Problem('Ungültige Entscheidung.');
  if(r.status!=='pending'){if(r.status===b.decision&&(b.decision==='ignored'||r.organisation_id===b.id))return{alreadySaved:true};throw new Problem('Zeile wurde bereits bearbeitet. Bitte erneut öffnen.',409,'conflict');}
  // Another user/batch may have handled the same evidence since this queue was loaded.
  if(db.prepare('SELECT 1 FROM fastbill_decisions WHERE scope=? AND fingerprint=?').get(r.scope,r.fingerprint))throw new Problem('Dieser Datensatz wurde in einem anderen Import geprüft. Import neu laden oder Zeile erneut öffnen.',409,'conflict');
  const note=clean(b.note||'',4000);let orgId=null;
+ if(b.decision==='create'){
+  const candidates=matcher(db,r.scope)(r.payload);
+  if(candidates.length&&!b.confirmDuplicate)throw new Problem('Mögliche Treffer: '+candidates.map(c=>c.name).join(', ')+'. Bitte zuordnen oder Neuanlage bestätigen.',409,'duplicate');
+  const o=createFromRow(db,user,r);b={...b,decision:'applied',id:o.id,version:o.version,fields:{},addContact:false};
+ }
  if(b.decision==='applied'){
   const o=getOrg(db,b.id);assertVersion(o,b.version);orgId=o.id;const fields=fieldsValidated(b.fields||{});
   if(Object.keys(fields).some(k=>!['3','4','6'].includes(k)))throw new Problem('FastBill-Import darf nur Link, Ort und Website ändern.');
@@ -108,7 +150,7 @@ export function decideFastbill(db,user,b){return transaction(db,()=>{
   db.prepare('UPDATE organisations SET version=version+1,updated_at=? WHERE id=?').run(now(),o.id);reindex(db,o.id);
  }
  db.prepare('INSERT INTO fastbill_decisions VALUES(?,?,?,?,?,?,?)').run(r.scope,r.fingerprint,b.decision,orgId,user.id,now(),note);
- db.prepare('UPDATE fastbill_rows SET status=?,organisation_id=?,note=? WHERE id=?').run(b.decision,orgId,note,r.id);
+ db.prepare(`UPDATE fastbill_rows SET status=?,organisation_id=?,note=? WHERE id=? OR (status='pending' AND ${same})`).run(b.decision,orgId,note,r.id,r.fingerprint,r.scope);
  return{entity:orgId?entity(db,orgId,true):null};
 });}
 export function deleteFastbillBatch(db,user,id){batchFor(db,user,id);db.prepare('DELETE FROM fastbill_batches WHERE id=?').run(id);return{};}
