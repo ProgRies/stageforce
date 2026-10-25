@@ -53,3 +53,8 @@ CREATE TABLE IF NOT EXISTS extension_thread_refs(mailbox TEXT NOT NULL,thread_id
 CREATE TABLE IF NOT EXISTS call_attempts(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),organisation_id TEXT NOT NULL REFERENCES organisations(id),contact_id TEXT NOT NULL REFERENCES contacts(id),phone TEXT NOT NULL,started_at TEXT NOT NULL,source_message_id TEXT REFERENCES messages(id),activity_id TEXT UNIQUE REFERENCES activities(id));
 CREATE TABLE IF NOT EXISTS user_appearance(user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,mode TEXT NOT NULL CHECK(mode IN ('light','dark','system')));
 CREATE TABLE IF NOT EXISTS call_reservations(organisation_id TEXT NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,day TEXT NOT NULL,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,PRIMARY KEY(organisation_id,day));
+
+-- Version 10: second factor. A session row only exists after a correct authenticator or recovery code.
+CREATE TABLE IF NOT EXISTS user_mfa(user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,secret TEXT NOT NULL,last_step INTEGER NOT NULL DEFAULT 0,enabled_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS mfa_recovery_codes(user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,code_hash TEXT NOT NULL,used_at INTEGER,PRIMARY KEY(user_id,code_hash));
+CREATE TABLE IF NOT EXISTS login_challenges(token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,setup_secret TEXT,attempts INTEGER NOT NULL DEFAULT 0,expires_at INTEGER NOT NULL);

@@ -41,6 +41,10 @@ Rollback after a schema upgrade requires the matching pre-upgrade database backu
 docker compose exec crm node server/cli.mjs user:add colleague@example.com "Colleague"
 docker compose exec crm node server/cli.mjs user:password colleague@example.com
 docker compose exec crm node server/cli.mjs user:disable colleague@example.com
+docker compose exec crm node server/cli.mjs user:mfa-reset colleague@example.com
+docker compose exec crm node server/cli.mjs user:list
 ```
 
 Passwords are entered at a hidden prompt and hashed with scrypt. Password reset and account disabling revoke sessions and extension keys. Session expiry is seven days; extension key expiry is 90 days. The current design uses one active extension key per CRM user.
+
+Every sign-in needs a TOTP code from an authenticator app (or a single-use recovery code). New users set the app up on their first sign-in; they cannot reach the CRM before that. If a phone is lost and the recovery codes are gone, `user:mfa-reset` removes the old authenticator, ends the user's sessions and revokes their extension key; the next sign-in sets up a new app. Check identity out of band before resetting, because the reset leaves the password as the only factor until the user enrols again. `user:list` shows who has set up the app and how many recovery codes are left.
