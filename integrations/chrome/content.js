@@ -217,15 +217,16 @@ async function open(n){
    const check=document.createElement('input');check.type='checkbox';check.checked=choices.get(key);check.disabled=!!savedMessage;check.onchange=()=>choices.set(key,check.checked);check.setAttribute('aria-label','Include '+(person.email||person.name));
    const info=document.createElement('span'),name=document.createElement('strong'),mail=document.createElement('small');info.className='contact-info';name.textContent=person.name||person.email||'Contact';mail.textContent=person.email;info.append(name,mail);
    const inOrg=person.known&&selected?.id,elsewhere=person.crm?.organisations?.filter(o=>o.id!==selected?.id)||[];
-   if(person.suggested&&selected?.name){const status=document.createElement('small');status.className='contact-crm';status.textContent='Suggested · contact of '+selected.name;status.title='No client address in this email. Tick to add the email to this contact’s history.';info.append(status);}
+   if(person.fromQuoted){const status=document.createElement('small');status.className='contact-crm'+(inOrg?' known':'');status.textContent='From quoted history'+(inOrg?' · contact of '+selected.name:elsewhere.length?' · in CRM · '+elsewhere.map(o=>o.name).join(', '):'');status.title=inOrg?'Tick to add this email to their history':'Not in the email header. Add them as a contact to keep their details.';info.append(status);if(person.quotedPhones.length){const found=document.createElement('small');found.className='contact-crm';found.textContent='Found: '+person.quotedPhones.join(' · ');info.append(found);}if(!person.contactId){check.disabled=true;check.title='Add the contact first';}}
+   else if(person.suggested&&selected?.name){const status=document.createElement('small');status.className='contact-crm';status.textContent='Suggested · contact of '+selected.name;status.title='No client address in this email. Tick to add the email to this contact’s history.';info.append(status);}
    else if(inOrg||elsewhere.length){const status=document.createElement('small');status.className='contact-crm'+(inOrg?' known':'');status.textContent=inOrg?'✓ Already a contact of '+selected.name:'In CRM · '+elsewhere.map(o=>o.name).join(', ')+(person.crm.more?' +'+person.crm.more:'');status.title=inOrg?'Saved contact; this email is added to their history':'This address belongs to a contact of another organisation';info.append(status);}card.append(check,info);
-   if(!phoneChoices.has(key))phoneChoices.set(key,unique([...(person.phones||[]),...(!savedMessage&&person.email===d.from.email?d.signaturePhones:[])]));
-   const edit=document.createElement('button');edit.type='button';edit.className='contact-edit-button';edit.setAttribute('aria-label','Edit '+(person.name||person.email||'contact'));edit.title='Edit contact';edit.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m16 3 5 5-13 13H3v-5Z"/><path d="m14 5 5 5"/></svg>';edit.onclick=()=>beginContactEdit(person);card.append(edit);
+   if(!phoneChoices.has(key))phoneChoices.set(key,person.fromQuoted?unique(person.phones||[]):unique([...(person.phones||[]),...(!savedMessage&&person.email===d.from.email?d.signaturePhones:[]),...(quotedPending.get(key)||[])]));quotedPending.delete(key);
+   const edit=document.createElement('button');edit.type='button';edit.className='contact-edit-button';edit.setAttribute('aria-label','Edit '+(person.name||person.email||'contact'));edit.title='Edit contact';edit.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m16 3 5 5-13 13H3v-5Z"/><path d="m14 5 5 5"/></svg>';edit.onclick=()=>person.fromQuoted?beginContactEdit(person,{name:person.name,emails:[person.email],phones:unique([...(person.phones||[]),...person.quotedPhones]),role:'',organisation:''}):beginContactEdit(person);if(person.fromQuoted&&!person.contactId){edit.title='Add contact';edit.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="8" r="4"/><path d="M2 21v-1a7 7 0 0 1 11-5.7M19 14v6M16 17h6"/></svg>';edit.setAttribute('aria-label','Add '+(person.name||person.email)+' as a contact');}card.append(edit);
    for(const number of phoneChoices.get(key)){
     const box=phoneControl(person,number);card.append(box);
     // Numbers found in the signature are saved with the email unless removed here.
     if(savedMessage||(person.phones||[]).some(p=>globalThis.stageForceExtract.normalize(p)===globalThis.stageForceExtract.normalize(number)))continue;
-    box.classList.add('suggested');const badge=document.createElement('em');badge.className='phone-new';badge.textContent='new';badge.title='Found in the signature · saved with this email unless removed';box.querySelector('.phone-number span').after(badge);
+    box.classList.add('suggested');const badge=document.createElement('em');badge.className='phone-new';badge.textContent='new';badge.title=(quotedAdded.get(key)||[]).includes(number)?'Found in the quoted history · saved with this email unless removed':'Found in the signature · saved with this email unless removed';box.querySelector('.phone-number span').after(badge);
     const drop=document.createElement('button');drop.type='button';drop.className='ghost phone-drop';drop.textContent='×';drop.title='Not this contact’s number';drop.setAttribute('aria-label','Remove suggested number '+number);
     drop.onclick=()=>{if(editorBlocked()||contactEdit)return;phoneChoices.set(key,phoneChoices.get(key).filter(p=>p!==number));callStates.delete(key+':'+number);renderContacts(participants);[...sh.querySelectorAll('.contact')].find(c=>c.dataset.key===key)?.querySelector('.phone-drop,input')?.focus();};
     box.querySelector('.phone-number').after(drop);
@@ -247,7 +248,7 @@ async function open(n){
  $('#body').addEventListener('select',selectionAction);
  $('#quoted').checked=d.newBodyText===d.bodyText;$('#quoted-toggle').classList.toggle('hidden',d.newBodyText===d.bodyText);
  $('#body').addEventListener('input',()=>bodyEdited=true);
- $('#quoted').onchange=()=>{const q=$('#quoted');if(bodyEdited&&!window.confirm('Replace your edits to the email text?')){q.checked=!q.checked;return;}setBody(q.checked?d.bodyText:d.newBodyText);bodyEdited=false;};
+ $('#quoted').onchange=()=>{const q=$('#quoted');if(bodyEdited&&!window.confirm('Replace your edits to the email text?')){q.checked=!q.checked;return;}setBody(q.checked?d.bodyText:d.newBodyText);bodyEdited=false;quotedScan();};
  $('#direction').addEventListener('change',()=>directionTouched=true);$('#body').addEventListener('pointerup',selectionAction);$('#body').addEventListener('keyup',selectionAction);
  extractButton.onpointerdown=e=>e.preventDefault();extractButton.onclick=()=>{const suggestion=globalThis.stageForceExtract.contact(selectedContactText);extractButton.hidden=true;if(!selected&&!$('#org').value.trim()&&suggestion.organisation){$('#org').value=suggestion.organisation;$('#org').dispatchEvent(new Event('input'));}beginContactEdit(null,suggestion);};
  sh.addEventListener('pointerdown',e=>{if(e.target!==$('#body')&&e.target!==extractButton)extractButton.hidden=true;});$('.grid').addEventListener('scroll',()=>extractButton.hidden=true);
@@ -271,13 +272,31 @@ async function open(n){
    finally{state.busy=false;refresh();}
   };refresh();return box;
  }
+ // With the quoted history included, its authors and their signature numbers are offered too. Header contacts get the numbers as removable chips; other authors appear unticked.
+ const headerEmails=new Set([d.from.email,...d.visibleRecipients].map(e=>String(e||'').toLowerCase()).filter(Boolean)),quotedAdded=new Map();let quotedCache=null;
+ function quotedFound(){if(!$('#quoted').checked||savedMessage)return null;return quotedCache??=globalThis.stageForceExtract.quotedContacts(d.bodyText);}
+ function quotedCards(items,found,header){
+  if(!items||!found)return[];
+  // Numbers of header contacts are merged into their chips once; the toggle takes them out again.
+  for(const person of header){const hit=found.find(q=>q.email===person.email);if(!hit)continue;const key=personKey(person),have=phoneChoices.get(key)||[],norm=globalThis.stageForceExtract.normalize,extra=hit.phones.filter(n=>!have.some(h=>norm(h)===norm(n))&&!(person.phones||[]).some(h=>norm(h)===norm(n)));if(!extra.length)continue;if(phoneChoices.has(key))phoneChoices.set(key,[...have,...extra]);else quotedPending.set(key,extra);quotedAdded.set(key,[...(quotedAdded.get(key)||[]),...extra]);}
+  return items.filter(q=>!extraContacts.some(e=>e.email===q.email||(q.contactId&&e.contactId===q.contactId))).map(q=>{const hit=found.find(f=>f.email===q.email),norm=globalThis.stageForceExtract.normalize;return{...q,manual:true,confirmedContact:!!q.contactId,suggested:true,fromQuoted:true,quotedPhones:(hit?.phones||[]).filter(n=>!(q.phones||[]).some(h=>norm(h)===norm(n)))};});
+ }
+ const quotedPending=new Map();
+ function quotedScan(){
+  if(contactEdit?.person?.fromQuoted){contactEdit=null;}
+  for(const [key,added] of quotedAdded)if(phoneChoices.has(key))phoneChoices.set(key,phoneChoices.get(key).filter(n=>!added.includes(n)));
+  quotedAdded.clear();quotedPending.clear();
+  for(const person of participants)if(person.fromQuoted){choices.delete(personKey(person));phoneChoices.delete(personKey(person));}
+  renderContacts(participants.filter(p=>!p.fromQuoted));
+  if($('#quoted').checked)lookup();else ++lookupGeneration;
+ }
  async function lookup(auto=false){
   if(!connected||!$('#mailbox').value||savedMessage)return;
   const generation=++lookupGeneration;checking++;controls();
-  try{const p=await popupApi({action:'lookup',...envelope(),organisationId:!auto&&selected?.id||undefined});if(!active||generation!==lookupGeneration)return;
+  const found=quotedFound();try{const p=await popupApi({action:'lookup',...envelope(),organisationId:!auto&&selected?.id||undefined,quoted:found?found.filter(q=>!headerEmails.has(q.email)).map(q=>({email:q.email,name:q.name})):undefined});if(!active||generation!==lookupGeneration)return;
    if(p.direction&&!directionTouched)$('#direction').value=p.direction;if(auto&&p.organisation){selected=p.organisation;$('#org').value=selected.name;$('#org-status').textContent=p.conversation?'✓ Same conversation as an email already saved':'✓ Matched by email address';}
    else if(!auto&&selected?.id&&p.organisation)selected=p.organisation;
-   renderContacts([...p.participants,...extraContacts.filter(extra=>!p.participants.some(p=>p.contactId===extra.contactId||(p.email&&p.email===extra.email))),...(p.participants.length?[]:(p.suggested||[]).filter(s=>!extraContacts.some(e=>e.contactId===s.contactId)).map(s=>({...s,manual:true,confirmedContact:true,suggested:true})))]);
+   renderContacts([...p.participants,...extraContacts.filter(extra=>!p.participants.some(p=>p.contactId===extra.contactId||(p.email&&p.email===extra.email))),...(p.participants.length?[]:(p.suggested||[]).filter(s=>!extraContacts.some(e=>e.contactId===s.contactId)).map(s=>({...s,manual:true,confirmedContact:true,suggested:true})))].concat(quotedCards(p.quoted,found,p.participants)));
    if(auto&&!selected&&p.candidates.length){showResults('org',p.candidates);$('#org-status').textContent='Choose the matching organization';}
    if(p.linked&&!linked){linked=p.linked;$('#linked').value=linked.name;$('#linked-status').textContent='Existing CRM link';}
   }catch(e){if(active&&generation===lookupGeneration)$('#error').textContent=e.message;}finally{checking--;if(active)controls();}
@@ -335,7 +354,7 @@ async function open(n){
   busy=true;controls();const action=$(openCRM?'#save-open':'#save');action.classList.add('working');$('#error').textContent='';sh.querySelectorAll('input,textarea,select').forEach(e=>e.disabled=true);
   try{const r=await popupApi({action:'save',confirmed:true,requestId,...envelope(),gmailMessageId:d.gmailMessageId,attachments:d.attachments,contactPhones:participants.map(p=>({email:p.email,phones:phoneChoices.get(personKey(p))||[]})),organisationId:selected.id,version:selected.version,newOrganisation:selected.id?undefined:selected.name,linked:linked?{id:linked.id,name:linked.name}:undefined,subject:$('#subject').value,originalSubject:d.subject,body:expanded?$('#body').value:fullBody,originalBody:d.bodyText,links:d.links,meeting:meetingChoice(),timestamp:date.toISOString(),timestampRaw:d.timestampRaw,direction:$('#direction').value,sourceUrl:location.href,contactEmails:participants.filter(p=>!p.manual&&choices.get(personKey(p))).map(p=>p.email),extraContactIds:participants.filter(p=>p.confirmedContact&&p.contactId&&choices.get(personKey(p))).map(p=>p.contactId)});
    if(r?.saved!==true||!r.organisation?.id)throw Object.assign(new Error('The CRM did not confirm that this email was saved.'),{code:'invalid_response'});
-   setMessageButton(n,'saved',true);
+   setMessageButton(n,'saved',true);rowSavedNow(d);
    if(!await saveConversation(r.organisation)){action.classList.remove('working');busy=false;sh.querySelectorAll('input,textarea,select').forEach(e=>e.disabled=false);drawConversation();controls();return;}
    action.classList.replace('working','done');action.textContent='✓ Saved';if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches)await new Promise(r=>setTimeout(r,280));
    if(openCRM){try{await send({type:'open',organisationId:r.organisation.id});}catch{if(active)$('#error').textContent='Saved. Open Stage Force to view the organization.';action.classList.remove('done');action.textContent='Save & Open ↗';busy=false;sh.querySelectorAll('input,textarea,select').forEach(e=>e.disabled=false);controls();return;}}
@@ -453,7 +472,35 @@ function setButtonState(b,state,celebrate=false,detail=''){
  const [icon,label,title]=states[state];b.dataset.state=state;b.sfRevision=(b.sfRevision||0)+1;b.classList.toggle('celebrate',celebrate);b.querySelector('.symbol').textContent=icon;b.querySelector('.label').textContent=label;b.title=detail||title;
 }
 function buttonIssue(b,error){const message=error?.message||'Check the StageForce connection.';const state=error?.code==='connection_required'?'disconnected':/Connect Stage Force first|Connect your extension|Connect Stage Force using/.test(message)?'disconnected':/unavailable|Failed to fetch|timeout|timed out|aborted/i.test(message)?'offline':'attention';setButtonState(b,state,false,message);}
+// Inbox rows get a small mark when their conversation is in StageForce. Only Gmail ids are sent and only a yes/no comes back, so no client data is put into the page.
+const rowStatus=new Map();let rowsBusy=false,rowsPausedUntil=0;
+const rowKey=(mailbox,id)=>mailbox.toLowerCase()+'|'+id;
+function rowIds(r){const attr=(s,a)=>r.querySelector(s)?.getAttribute(a)||r.getAttribute(a)||'';return unique([attr('[data-thread-id]','data-thread-id').replace(/^#/,''),attr('[data-legacy-thread-id]','data-legacy-thread-id'),attr('[data-legacy-last-message-id]','data-legacy-last-message-id')]).filter(v=>v.length<=200&&/^[\w:.-]+$/.test(v));}
+function rowSaved(mailbox,ids){return ids.some(v=>rowStatus.get(rowKey(mailbox,v))?.saved);}
+function rowSavedNow(m){const mailbox=account();if(!mailbox)return;for(const v of [m.gmailThreadId,m.gmailMessageId])if(v)rowStatus.set(rowKey(mailbox,String(v).replace(/^#/,'')),{saved:true,at:Date.now()});markInbox();}
+function markRow(r){
+ if(r.querySelector('[data-stageforce-row]'))return;const cell=r.querySelector('.y6')||r.querySelector('.xT')||r.querySelector('.yX');if(!cell)return;
+ const wrap=document.createElement('span');wrap.dataset.stageforceRow='true';const root=wrap.attachShadow({mode:'closed'});
+ root.innerHTML='<style>span{display:inline-flex;align-items:center;margin-right:6px;padding:0 6px;height:18px;border-radius:9px;font:600 11px/18px "Google Sans",Roboto,Arial,sans-serif;color:#fff;background:linear-gradient(115deg,#6546b3,#3f58a8);white-space:nowrap;vertical-align:middle}</style><span title="In StageForce" aria-label="In StageForce">✓ CRM</span>';
+ cell.prepend(wrap);
+}
+async function markInbox(){
+ if(rowsBusy||document.hidden||Date.now()<rowsPausedUntil)return;
+ const rows=[...document.querySelectorAll('tr.zA')].filter(visible);if(!rows.length)return;
+ const mailbox=account();if(!mailbox)return;
+ const now=Date.now(),wanted=new Set();
+ for(const r of rows){const ids=rowIds(r);if(rowSaved(mailbox,ids)){markRow(r);continue;}for(const v of ids){const s=rowStatus.get(rowKey(mailbox,v));if(!s||now-s.at>60000)wanted.add(v);}}
+ if(!wanted.size)return;
+ const ids=[...wanted].slice(0,150);rowsBusy=true;
+ try{const r=await api({action:'threadStatus',mailbox,ids});const saved=new Set(Array.isArray(r?.saved)?r.saved:[]);for(const v of ids)rowStatus.set(rowKey(mailbox,v),{saved:saved.has(v),at:Date.now()});}
+ catch{rowsPausedUntil=Date.now()+60000;return;}
+ finally{rowsBusy=false;}
+ for(const r of rows)if(r.isConnected&&rowSaved(mailbox,rowIds(r)))markRow(r);
+ if(wanted.size>ids.length)setTimeout(markInbox,0);
+}
+window.addEventListener('hashchange',()=>setTimeout(markInbox,400));document.addEventListener('visibilitychange',()=>{if(!document.hidden)markInbox();});
 function inject(){
+ markInbox();
  for(const n of nodes()){
  if(n.querySelector('[data-stageforce-button]'))continue;
  const timestamp=n.querySelector('.g3') || n.querySelector('time');

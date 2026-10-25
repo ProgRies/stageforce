@@ -40,6 +40,13 @@ function meetingIn(b){const m=detectMeeting({subject:field(b.originalSubject||b.
 function attachmentRefs(value){if(value===undefined)return[];if(!Array.isArray(value)||value.length>100)throw new Problem('Too many attachment references.');return value.map(a=>({name:field(a.name,500),size:field(a.size||'',100),type:field(a.type||'',100),referenceOnly:true})).filter(a=>a.name);}
 export function extensionAction(db,user,b,origin){
  if(b.action==='check')return{email:user.email,appearance:appearance(db,user)||'system'};
+ // Inbox marks: which of the listed Gmail conversations/messages of this mailbox already have a saved email. Only ids go back, no content.
+ if(b.action==='threadStatus'){
+  const {mailbox}=identity(b,user);if(!Array.isArray(b.ids)||b.ids.length>150)throw new Problem('Invalid conversations.');
+  const ids=[...new Set(b.ids.map(v=>field(v,200).replace(/^#/,'')))];if(ids.some(v=>!/^[\w:.-]+$/.test(v)))throw new Problem('Invalid conversations.');
+  const thread=db.prepare('SELECT 1 FROM extension_thread_refs WHERE mailbox=? AND thread_id=? LIMIT 1'),message=db.prepare('SELECT 1 FROM extension_message_refs WHERE mailbox=? AND gmail_id=?');
+  return{saved:ids.filter(v=>thread.get(mailbox,v)||message.get(mailbox,v))};
+ }
  if(b.action==='messageStatus'){
   const m=existingMessage(db,user,b);if(!m)return{saved:false};
   const organisation=brief(getOrg(db,m.organisation_id));if(!b.detail)return{saved:true,organisation};
@@ -91,8 +98,10 @@ export function extensionAction(db,user,b,origin){
   const conversation=b.organisationId?null:conversationOrganisation(db,user,b),selected=b.organisationId?brief(getOrg(db,field(b.organisationId,100))):conversation?brief(getOrg(db,conversation)):best;
   const known=selected?contacts(db,selected.id):[];
   const linked=selected?db.prepare('SELECT o.id,o.name,o.version FROM organisation_links l JOIN organisations o ON o.id=CASE WHEN l.a=? THEN l.b ELSE l.a END WHERE l.a=? OR l.b=?').all(selected.id,selected.id,selected.id).map(brief):[];
+  // Authors found in the quoted history (only when the user includes it); colleagues are dropped here because only the server knows INTERNAL_DOMAINS.
+  let quoted;if(b.quoted!==undefined){if(!Array.isArray(b.quoted)||b.quoted.length>30)throw new Problem('Invalid participants.');const ours=ourAddresses(db,user,b.mailbox),header=new Set(p.participants.filter(a=>a.role!=='quoted').map(a=>a.email));quoted=[...new Map(b.quoted.map(a=>{const e=field(a?.email,254).toLowerCase();if(!email(e))throw new Problem('Check the quoted addresses.');return[e,field(a.name||'',300)];})).entries()].filter(([e])=>!ours.internal(e)&&!header.has(e)).map(([e,name])=>{const c=known.find(c=>c.e_mails.some(x=>x.toLowerCase()===e)),crm=crmContact(db,e);return{email:e,name:contactName(c?.name||crm?.name||name,e),known:!!c,contactId:c?.id,phones:c?.telefone||[],crm};});}
   // With no client address in the email, the organisation's two most recently active contacts are offered instead.
-  return{organisation:selected,conversation:!!conversation,direction:p.direction,candidates,suggested:known.slice(0,2).map(c=>({contactId:c.id,email:c.e_mails[0]||'',name:contactName(c.name,c.e_mails[0]),phones:c.telefone,known:true})),participants:p.participants.filter(a=>!a.internal&&a.role!=='quoted').map(a=>{const c=known.find(c=>c.e_mails.some(e=>e.toLowerCase()===a.email)),crm=crmContact(db,a.email);return{...a,name:contactName(c?.name&&!c.name.includes('@')?c.name:crm?.name||a.name,a.email),known:!!c,contactId:c?.id,phones:c?.telefone||[],crm};}),linked:linked.length===1?linked[0]:null};
+  return{quoted,organisation:selected,conversation:!!conversation,direction:p.direction,candidates,suggested:known.slice(0,2).map(c=>({contactId:c.id,email:c.e_mails[0]||'',name:contactName(c.name,c.e_mails[0]),phones:c.telefone,known:true})),participants:p.participants.filter(a=>!a.internal&&a.role!=='quoted').map(a=>{const c=known.find(c=>c.e_mails.some(e=>e.toLowerCase()===a.email)),crm=crmContact(db,a.email);return{...a,name:contactName(c?.name&&!c.name.includes('@')?c.name:crm?.name||a.name,a.email),known:!!c,contactId:c?.id,phones:c?.telefone||[],crm};}),linked:linked.length===1?linked[0]:null};
  }
  if(b.action!=='save'||b.confirmed!==true)throw new Problem('Explicit confirmation required.');
  if(typeof b.requestId!=='string'||!/^[a-f0-9-]{36}$/.test(b.requestId))throw new Problem('Invalid request ID.');
