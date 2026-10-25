@@ -2,7 +2,7 @@
 
 ## Unreleased · extension 0.4.15
 
-Meetings from video-call invitations. Rebuild the CRM, reload the extension and refresh Gmail. The CRM adds one table on start (meeting references); no data is changed. Builds on the Meeting timeline type.
+Meetings from video-call invitations. Rebuild the CRM, reload the extension and refresh Gmail. The CRM adds one table on start (meeting references); no data is changed.
 
 - When an email holds a Zoom, Microsoft Teams, Google Meet, Webex, GoTo Meeting, Whereby, Jitsi or Skype invitation, the popup shows "Also log … meeting" with the meeting date and time read from the invitation (Google Calendar subjects, "Wann:/When:/Time:/Datum:" lines). Save stores the email and a Meeting entry on that date in the organisation timeline, linked to the same contacts.
 - Invitations with a join link or a date are ticked by default; a loose mention ("per Google Meet?") is offered unticked. Accept/decline replies are ignored.

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {openDB} from '../server/db.mjs';
 import {addUser} from '../server/auth.mjs';
+import {history} from '../server/crm.mjs';
 import {extensionAction} from '../server/extension.mjs';
 import {detectMeeting,meetingDate} from '../server/meetings.mjs';
 const origin='http://localhost:3000';
@@ -45,6 +46,7 @@ test('saving an invitation logs one meeting that later invitations move or cance
   assert.equal(meeting().length,1);assert.equal(meeting()[0].occurred_on,'2026-10-29');assert.equal(meeting()[0].body,'Google Meet · 11:00 Uhr · Kickoff');
   save(db,user,{originalSubject:'Abgesagter Termin: Kickoff @ Do. 29. Okt. 2026 11:00 - 12:00 (MEZ)',originalBody:'',links:invite.links,organisationId:id,version:version(),timestamp:'2026-10-15T10:07:00Z',meeting:{log:true}});
   assert.equal(meeting().length,1);assert.match(meeting()[0].body,/^Abgesagt · /);
+  assert.ok(history(db,id,0,'communication').items.some(i=>i.art==='Meeting'));
   save(db,user,{originalSubject:'Angebot',originalBody:'Per Google Meet?',organisationId:id,version:version(),timestamp:'2026-10-16T10:07:00Z'});
   assert.equal(meeting().length,1);
   assert.throws(()=>save(db,user,{originalSubject:'Angebot 2',originalBody:'Anbei',organisationId:id,version:version(),timestamp:'2026-10-16T11:07:00Z',meeting:{log:true}}),/No meeting/);
