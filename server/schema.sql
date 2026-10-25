@@ -42,6 +42,7 @@ INSERT OR IGNORE INTO schema_versions VALUES(3,datetime('now'));
 CREATE TABLE IF NOT EXISTS activity_contacts(activity_id TEXT NOT NULL REFERENCES activities(id) ON DELETE CASCADE,contact_id TEXT NOT NULL REFERENCES contacts(id),PRIMARY KEY(activity_id,contact_id));
 CREATE TABLE IF NOT EXISTS meeting_refs(activity_id TEXT PRIMARY KEY REFERENCES activities(id) ON DELETE CASCADE,meeting_key TEXT NOT NULL,message_id TEXT REFERENCES messages(id) ON DELETE SET NULL,join_url TEXT NOT NULL DEFAULT '');
 CREATE INDEX IF NOT EXISTS meeting_refs_key ON meeting_refs(meeting_key);
+CREATE TABLE IF NOT EXISTS meeting_status(activity_id TEXT PRIMARY KEY REFERENCES activities(id) ON DELETE CASCADE,cancelled_at TEXT NOT NULL);
 INSERT OR IGNORE INTO schema_versions VALUES(4,datetime('now'));
 
 CREATE TABLE IF NOT EXISTS extension_keys(user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,token_hash TEXT NOT NULL UNIQUE,created_at INTEGER NOT NULL,expires_at INTEGER NOT NULL,last_used_at INTEGER);

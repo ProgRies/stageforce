@@ -57,7 +57,7 @@ test('saving an invitation logs one meeting that later invitations move or cance
   save(db,user,{originalSubject:'Aktualisierte Einladung: Kickoff @ Do. 29. Okt. 2026 11:00 - 12:00 (MEZ)',originalBody:'Mit Google Meet teilnehmen',links:invite.links,organisationId:id,version:version(),timestamp:'2026-10-14T10:07:00Z',meeting:{log:true,date:'2026-10-29',time:'11:00'}});
   assert.equal(meeting().length,1);assert.equal(meeting()[0].occurred_on,'2026-10-29');assert.equal(meeting()[0].body,'Google Meet · 11:00 Uhr · Kickoff');
   save(db,user,{originalSubject:'Abgesagter Termin: Kickoff @ Do. 29. Okt. 2026 11:00 - 12:00 (MEZ)',originalBody:'',links:invite.links,organisationId:id,version:version(),timestamp:'2026-10-15T10:07:00Z',meeting:{log:true}});
-  assert.equal(meeting().length,1);assert.match(meeting()[0].body,/^Abgesagt · /);
+  assert.equal(meeting().length,1);assert.equal(meeting()[0].body,'Google Meet · 11:00 Uhr · Kickoff');assert.equal(db.prepare('SELECT count(*) n FROM meeting_status').get().n,1);
   assert.ok(history(db,id,0,'communication').items.some(i=>i.art==='Meeting'));
   save(db,user,{originalSubject:'Angebot',originalBody:'Per Google Meet?',organisationId:id,version:version(),timestamp:'2026-10-16T10:07:00Z'});
   assert.equal(meeting().length,1);

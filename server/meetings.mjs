@@ -1,4 +1,4 @@
-import {addActivity} from './crm.mjs';
+import {addActivity,setMeetingCancelled,settleMeetings} from './crm.mjs';
 // Video-call invitations and calendar or booking confirmations in saved emails become Meeting entries in the organisation timeline.
 const PROVIDERS=[
  {name:'Zoom',link:/https?:\/\/(?:[\w-]+\.)?zoom(?:gov)?\.us\/(?:j|w|s|my)\/[\w.-]+(?:\?pwd=[\w.-]+)?/i,text:/\bjoin zoom meeting\b|\bzoom[- ]meeting\b|\bzoom-besprechung\b|\bzoom video communications\b/i,key:l=>/\/(?:j|w|s|my)\/([\w.-]+)/i.exec(l)?.[1]},
@@ -70,7 +70,7 @@ export function detectMeeting({subject='',body='',links=[],attachments=[],sentAt
  const title=cleanTitle(subject)||provider.name||'Meeting';
  return{provider:provider.name,title,link,likely:!!(link||when||confirmed||INVITE.test(subject)||CANCELLED.test(subject)),date:when?.date||'',time:when?.time||'',cancelled:CANCELLED.test(subject),key:((provider.name||'Termin')+':'+(id||title.toLowerCase())).slice(0,500)};
 }
-export const meetingText=(m,cancelled=false)=>[cancelled&&'Abgesagt',m.provider,m.time&&m.time+' Uhr',m.title&&m.title!==m.provider&&m.title!=='Meeting'&&m.title].filter(Boolean).join(' · ')||'Meeting';
+export const meetingText=m=>[m.provider,m.time&&m.time+' Uhr',m.title&&m.title!==m.provider&&m.title!=='Meeting'&&m.title].filter(Boolean).join(' · ')||'Meeting';
 // The user ticked "log as meeting" on an email nothing was detected in: one meeting for that email.
 export const manualMeeting=(subject,messageId)=>({provider:'',title:cleanTitle(String(subject||'').replace(/^(?:(?:re|aw|fwd?|wg)\s*:\s*)+/i,''))||'Meeting',link:'',date:'',time:'',cancelled:false,likely:false,key:'Manuell:'+messageId});
 const uhr=body=>/(\d{2}:\d{2}) Uhr/.exec(body||'')?.[1]||'';
@@ -89,7 +89,11 @@ export function findMeeting(db,organisationId,meeting,date,time){
 export function logMeeting(db,user,{organisationId,meeting,date,time,messageId,contactIds=[]}){
  const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Berlin'}).format(new Date());
  const m={...meeting,time:time??meeting.time},found=findMeeting(db,organisationId,meeting,date,m.time);let activityId=found?.id;
- if(found?.match==='key'||found&&meeting.cancelled){const held=!meeting.cancelled&&date<=today;db.prepare('UPDATE activities SET occurred_on=?,body=?,is_contact=? WHERE id=?').run(date,meetingText(m,meeting.cancelled),held?1:0,activityId);if(held)db.prepare('UPDATE organisations SET last_contact=CASE WHEN last_contact IS NULL OR last_contact<? THEN ? ELSE last_contact END WHERE id=?').run(date,date,organisationId);}
+ if(found){
+  // The same invitation moves the entry; any email about it can cancel it.
+  if(found.match==='key')db.prepare('UPDATE activities SET occurred_on=?,body=? WHERE id=?').run(date,meetingText(m),activityId);
+  if(found.match==='key'||meeting.cancelled){setMeetingCancelled(db,activityId,!!meeting.cancelled);db.prepare('UPDATE activities SET is_contact=0 WHERE id=?').run(activityId);settleMeetings(db);}
+ }
  else if(!found){
   if(meeting.cancelled)return null;
   activityId=addActivity(db,organisationId,user,{type:'Meeting',text:meetingText(m),date,contacted:date<=today});
