@@ -15,6 +15,20 @@ Use the Gmail address you will import from. Choose a password of at least 12 cha
 
 `compose.yaml` builds the local source and binds to localhost. Never run `down -v` unless you intend to delete your local database.
 
+## Reset your local database
+
+Rebuilding the image keeps your data: the database lives in the Docker volume, not in the image. To start over with an empty database:
+
+```sh
+docker compose exec crm node server/cli.mjs backup /app/data/backups/before-reset.sqlite   # optional
+docker compose cp crm:/app/data/backups/before-reset.sqlite ./before-reset.sqlite          # optional, keeps the backup outside the volume
+docker compose down -v
+docker compose up -d --build
+docker compose exec crm node server/cli.mjs user:add you@example.com "Your Name"
+```
+
+Then create a new key in StageForce settings and reconnect the browser extension. The old key no longer exists.
+
 ## Connect Gmail
 
 1. Open `chrome://extensions`, enable Developer mode, and **Load unpacked** → `integrations/chrome`.
