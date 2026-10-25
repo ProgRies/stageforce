@@ -1,5 +1,6 @@
 import {uid,now,transaction,reindex} from './db.mjs';
 import {formatPhone,CALL_OUTCOMES,addDays,validDate,todayBerlin} from '../src/domain.ts';
+import {claimOnCall} from './leads.mjs';
 import {Problem,getOrg,contacts,createOrg,addContact,audit,addActivity,assertVersion} from './crm.mjs';
 const field=(v,max=1000)=>{if(typeof v!=='string'||v.length>max||v.includes('\0'))throw new Problem('Invalid field.');return v.trim();};
 export const dialNumber=value=>{const s=formatPhone(field(value,100)).replace(/[^+\d]/g,'');if(!/^\+?\d{6,15}$/.test(s))throw new Problem('Check the phone number.');return s;};
@@ -37,6 +38,7 @@ export function saveCall(db,user,b){return transaction(db,()=>{
  if(outcome)applyOutcome(db,user,call.organisation_id,outcome,due);
  db.prepare('INSERT INTO activity_contacts VALUES(?,?)').run(aid,call.contact_id);db.prepare('UPDATE call_attempts SET activity_id=? WHERE id=?').run(aid,call.id);
  audit(db,call.organisation_id,user,'call',{activityId:aid,outcome:b.outcome??null,due,contactId:call.contact_id,phone:call.phone,startedAt:call.started_at,sourceMessageId:call.source_message_id});
+ claimOnCall(db,user,call.organisation_id);
  db.prepare('UPDATE organisations SET version=version+1,updated_at=? WHERE id=?').run(now(),call.organisation_id);reindex(db,call.organisation_id);return{saved:true,organisation:{id:call.organisation_id,version:String(getOrg(db,call.organisation_id).version)}};
  });}
 // The open follow-up always holds the next call; a phase change or a handoff to Prüfen comes with some results.

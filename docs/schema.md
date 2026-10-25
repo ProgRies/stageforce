@@ -1,6 +1,6 @@
 # Database and migration
 
-`server/schema.sql` is the executable schema. Tables use foreign keys and stable text IDs. `PRAGMA user_version` tracks the schema version; future application versions must introduce an explicit versioned migration before changing a deployed database. An older binary refuses a newer schema. Current version: 8. Version 3 added FastBill import tables; version 4 added `activity_contacts`; version 6 replaces legacy integration credentials. Startup applies these additive changes in a transaction and preserves existing CRM data. Back up before upgrading. Older binaries refuse newer databases; rollback requires restoring the pre-upgrade backup.
+`server/schema.sql` is the executable schema. Tables use foreign keys and stable text IDs. `PRAGMA user_version` tracks the schema version; future application versions must introduce an explicit versioned migration before changing a deployed database. An older binary refuses a newer schema. Current version: 9. Version 3 added FastBill import tables; version 4 added `activity_contacts`; version 6 replaces legacy integration credentials. Startup applies these additive changes in a transaction and preserves existing CRM data. Back up before upgrading. Older binaries refuse newer databases; rollback requires restoring the pre-upgrade backup.
 
 | Table | Purpose / relationship |
 | --- | --- |
@@ -52,3 +52,7 @@ Adds `extension_keys` (one hashed, revocable, expiring credential per user). Rem
 ## Schema 8: appearance
 
 `user_appearance` stores each user’s light, dark or system preference. CRM settings save the preference through the authenticated API; the extension reads it when opening its popup.
+
+## Schema 9: personal call lists
+
+`call_reservations` holds the organisations on a user's call list for one Berlin calendar day (one holder per organisation and day). `organisations.owner` ("Zuständig intern") now stores a user ID; older free-text values that match a user's name or email are treated as that user, anything else counts as unowned. A user's call list only draws from organisations they own or nobody owns and no colleague holds today, and the first saved call to an unowned organisation makes the caller its owner. Existing data is preserved.

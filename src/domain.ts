@@ -1,5 +1,6 @@
 export type CellValue = string | number;
-export type Entity = { id: string; row: number; values: CellValue[]; version: string };
+export type Entity = { id: string; row: number; values: CellValue[]; version: string; ownerId?: string; reservedBy?: string };
+export type TeamUser = { id: string; name: string; email: string };
 export type EntityLink = { id: string; a: string; b: string; note: string };
 export const HEADERS = ["Entität-ID","Name","Entitätstyp","FastBill-Link (manuell)","Ort","Bundesland","Website","Größe","Größenmaß","Beziehungsstatus","Vertriebsphase","Zuständig intern","Hauptkontakt","E-Mail","Telefon","Letzter belegter Kontakt","Nächster Schritt","Wiedervorlage","Kurzüberblick","Prüfbedarf","Kontakte JSON","Historie JSON","Verknüpfte Entitäten JSON","Quellen JSON"];
 export const STATUSES = ["Kunde","Lead","Partner / Agentur","Unklar","Ehemaliger Kunde"];
@@ -72,6 +73,9 @@ export function callable(e:Entity,today=todayBerlin()){
   const due=dateISO(e.values[17]);if(due)return due<=today;
   return text(e,10)!=="Aktuell kein Bedarf";
 }
+// A user's call list only draws from organisations they own or that nobody owns and no colleague holds today.
+export const callableBy=(e:Entity,userId:string)=>(!e.ownerId||e.ownerId===userId)&&(!e.reservedBy||e.reservedBy===userId);
+export const eligibleFor=(entities:Entity[],userId:string)=>entities.filter(e=>callableBy(e,userId));
 export type QueueItem = {id:string; reason:string; kind:"followup"|"customer"|"warm"|"cold"};
 export function buildQueue(entities:Entity[], count=30, staleDays=90, customerShare=.6, today=todayBerlin()):QueueItem[] {
   const max=Math.max(1,Math.min(100,Math.floor(count)));const eligible=entities.filter(e=>callable(e,today));
