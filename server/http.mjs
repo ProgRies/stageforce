@@ -10,6 +10,7 @@ import {getSession,verifyPassword,createSession,limited,publicUser} from './auth
 import {Problem,listData,entity,history,search,save,createOrg,activitySave,contactSave,linkSave,stageImport,importPreview,confirmImport,timelinePosition} from './crm.mjs';
 import {inspectCSV,csvRecords,stageFastbill,fastbillBatches,fastbillRows,fastbillPreview,decideFastbill,deleteFastbillBatch,fetchFastbillPage} from './fastbill.mjs';
 import {parseEmail} from './email.mjs';
+import {deleteOrganisation,mergeOrganisations} from './lifecycle.mjs';
 export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:3000',staticDir=resolve('dist')}={}){
  const url=new URL(origin);if(url.origin!==origin.replace(/\/$/,''))throw Error('APP_URL must be an origin without a path.');origin=url.origin;const secure=url.protocol==='https:';if(process.env.NODE_ENV==='production'&&!secure)throw Error('Production APP_URL must use HTTPS.');let parsing=0;
  const json=(res,status,data)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(JSON.stringify(data));};
@@ -76,6 +77,8 @@ export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:300
    case 'activitySave':data=activitySave(db,session,b);break;
    case 'contact':data=contactSave(db,session,b);break;
    case 'link':data=linkSave(db,session,b);break;
+   case 'organisationDelete':data=deleteOrganisation(db,session,b);break;
+   case 'organisationMerge':data=mergeOrganisations(db,session,b);break;
    case 'imports':data={items:db.prepare('SELECT id,payload_json FROM email_imports WHERE user_id=? AND expires_at>? ORDER BY rowid DESC').all(session.id,Date.now()).map(r=>{const p=JSON.parse(r.payload_json);return{id:r.id,subject:p.subject,sentAt:p.sentAt,direction:p.direction};})};break;
    case 'importPreview':data=importPreview(db,session,b.importId);break;
    case 'importPosition':data=timelinePosition(db,session,b);break;

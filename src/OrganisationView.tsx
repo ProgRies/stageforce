@@ -8,9 +8,10 @@ import {Mail,Phone,ChevronDown,ArrowUpRight,Plus,Check,X,Pencil,AlertCircle,Mess
 import {api} from './api';
 import OrganisationFields from './OrganisationFields';
 import EntityTools from './EntityTools';
+import OrganisationManage from './OrganisationManage';
 import {text,jsonList,formatDate,todayBerlin,gmailSearch,websiteURL,type Entity,type EntityLink} from './domain';
-type Props={entity:Entity;entities:Entity[];links:EntityLink[];history:any[];historyTotal:number;loading:boolean;issues:string[];onMore:()=>void;onEdit:(type?:string)=>void;onPick:(id:string)=>void;onSaved:(entity?:Entity)=>void;onActivitySaved:(result:{entity:Entity;activityId:string;text:string})=>void;onCallSaved:()=>void;callReason?:string;onSkip:()=>void;accountEmail:string;onPendingChange:(pending:boolean)=>void;onBusyChange:(busy:boolean)=>void};
-export default function OrganisationView({entity,entities,links,history,historyTotal,loading,issues,onMore,onEdit,onPick,onSaved,onActivitySaved,onCallSaved,callReason,onSkip,accountEmail,onPendingChange,onBusyChange}:Props){
+type Props={entity:Entity;entities:Entity[];links:EntityLink[];history:any[];historyTotal:number;loading:boolean;issues:string[];onMore:()=>void;onEdit:(type?:string)=>void;onPick:(id:string)=>void;onSaved:(entity?:Entity)=>void;onActivitySaved:(result:{entity:Entity;activityId:string;text:string})=>void;onCallSaved:()=>void;onRemoved:(removedId:string,nextId:string|null,message:string)=>void;callReason?:string;onSkip:()=>void;accountEmail:string;onPendingChange:(pending:boolean)=>void;onBusyChange:(busy:boolean)=>void};
+export default function OrganisationView({entity,entities,links,history,historyTotal,loading,issues,onMore,onEdit,onPick,onSaved,onActivitySaved,onCallSaved,onRemoved,callReason,onSkip,accountEmail,onPendingChange,onBusyChange}:Props){
  const ask=useConfirm();
  const [messages,setMessages]=useState<Record<string,any>>({}),[messageErrors,setMessageErrors]=useState<Record<string,string>>({}),[moreOpen,setMoreOpen]=useState(false),[internal,setInternal]=useState<any[]>([]),[internalTotal,setInternalTotal]=useState(0),[internalOpen,setInternalOpen]=useState(false),[error,setError]=useState('');
  const [noteOpen,setNoteOpen]=useState(false),[note,setNote]=useState(''),[date,setDate]=useState(todayBerlin()),[busy,setBusy]=useState(false),[noteError,setNoteError]=useState('');
@@ -57,7 +58,8 @@ export default function OrganisationView({entity,entities,links,history,historyT
  {moreOpen&&<div className="overview-details"><p className="muted">Letzter belegter Kontakt: {formatDate(entity.values[15])}</p>
  <details className="data-details" open={internalOpen} onToggle={e=>setInternalOpen(e.currentTarget.open)}><summary>Änderungsprotokoll</summary>{internal.map(h=><article className="internal-event" key={h.ereignis_id}><small>{formatDate(h.datum)} · {h.art}</small><p>{h.text}</p>{h.autor_name&&<small>{h.autor_name}</small>}</article>)}{internalTotal>internal.length&&<button className="text-button" onClick={()=>internalHistory(internal.length)}>Ältere Einträge</button>}</details>
  {(text(entity,16)||text(entity,19))&&<details className="data-details"><summary>Weitere Angaben</summary>{text(entity,16)&&<p>Nächster Schritt: {text(entity,16)}</p>}{text(entity,19)&&<p>Prüfnotizen: {text(entity,19)}</p>}</details>}
- <details className="data-details"><summary>Quellen ({sources.length})</summary>{sources.map((s,i)=><div className="source" key={i}>{websiteURL(s.url)&&<a href={websiteURL(s.url)} target="_blank" rel="noopener noreferrer">Quelle öffnen</a>}<pre>{JSON.stringify(s,null,2)}</pre></div>)}</details></div>}{error&&<p className="save-error">{error}</p>}
+ <details className="data-details"><summary>Quellen ({sources.length})</summary>{sources.map((s,i)=><div className="source" key={i}>{websiteURL(s.url)&&<a href={websiteURL(s.url)} target="_blank" rel="noopener noreferrer">Quelle öffnen</a>}<pre>{JSON.stringify(s,null,2)}</pre></div>)}</details>
+ <OrganisationManage entity={entity} entities={entities} disabled={pending||headerBusy||fieldsBusy||toolsBusy||busy||loading} onRemoved={onRemoved}/></div>}{error&&<p className="save-error">{error}</p>}
  </section><aside className="organisation-sidebar" aria-label="Organisation im Überblick">
 
  <a className="button secondary gmail-search" data-tour="gmail" href={gmail.url} title={gmail.query} target="_blank" rel="noopener noreferrer"><Mail size={17}/>In Gmail suchen <ArrowUpRight size={14}/></a>
