@@ -86,7 +86,8 @@ export function extensionAction(db,user,b,origin){
   const conversation=b.organisationId?null:conversationOrganisation(db,user,b),selected=b.organisationId?brief(getOrg(db,field(b.organisationId,100))):conversation?brief(getOrg(db,conversation)):best;
   const known=selected?contacts(db,selected.id):[];
   const linked=selected?db.prepare('SELECT o.id,o.name,o.version FROM organisation_links l JOIN organisations o ON o.id=CASE WHEN l.a=? THEN l.b ELSE l.a END WHERE l.a=? OR l.b=?').all(selected.id,selected.id,selected.id).map(brief):[];
-  return{organisation:selected,conversation:!!conversation,direction:p.direction,candidates,participants:p.participants.filter(a=>!a.internal&&a.role!=='quoted').map(a=>{const c=known.find(c=>c.e_mails.some(e=>e.toLowerCase()===a.email)),crm=crmContact(db,a.email);return{...a,name:contactName(c?.name&&!c.name.includes('@')?c.name:crm?.name||a.name,a.email),known:!!c,contactId:c?.id,phones:c?.telefone||[],crm};}),linked:linked.length===1?linked[0]:null};
+  // With no client address in the email, the organisation's two most recently active contacts are offered instead.
+  return{organisation:selected,conversation:!!conversation,direction:p.direction,candidates,suggested:known.slice(0,2).map(c=>({contactId:c.id,email:c.e_mails[0]||'',name:contactName(c.name,c.e_mails[0]),phones:c.telefone,known:true})),participants:p.participants.filter(a=>!a.internal&&a.role!=='quoted').map(a=>{const c=known.find(c=>c.e_mails.some(e=>e.toLowerCase()===a.email)),crm=crmContact(db,a.email);return{...a,name:contactName(c?.name&&!c.name.includes('@')?c.name:crm?.name||a.name,a.email),known:!!c,contactId:c?.id,phones:c?.telefone||[],crm};}),linked:linked.length===1?linked[0]:null};
  }
  if(b.action!=='save'||b.confirmed!==true)throw new Problem('Explicit confirmation required.');
  if(typeof b.requestId!=='string'||!/^[a-f0-9-]{36}$/.test(b.requestId))throw new Problem('Invalid request ID.');
