@@ -135,6 +135,8 @@ let host,lastFocus;
 async function send(message){try{const r=await chrome.runtime.sendMessage(message);if(!r?.ok)throw Object.assign(new Error(r?.error||'Extension unavailable. Refresh Gmail.'),{code:r?.code||'request_failed'});return r.data;}catch(error){if(/Extension context invalidated|Receiving end does not exist|Extension unavailable/.test(error.message))throw Object.assign(new Error('The extension was reloaded. Copy any unsaved edits, then refresh Gmail.'),{code:'reload_required'});throw error;}}
 const api=payload=>send({type:'api',payload});
 async function messageFingerprint(d){const data='extension-v1:'+JSON.stringify([d.from.email,d.timestampRaw,d.subject,d.bodyText]);const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(data));return[...new Uint8Array(bytes)].map(v=>v.toString(16).padStart(2,'0')).join('');}
+// Gmail HTML layouts leave indentation, wide gaps and stacked blank lines in the text. Tidy what the user reviews and saves; bodyText stays raw for dedupe.
+function readableBody(text){return String(text||'').replace(/\u00a0/g,' ').split('\n').map(line=>line.replace(/[ \t]{2,}/g,' ').trim()).join('\n').replace(/\n{3,}/g,'\n\n').trim();}
 function completeBody(body){if(!body)return '';const c=body.cloneNode(true);c.querySelectorAll('script,style').forEach(e=>e.remove());c.querySelectorAll('br').forEach(e=>e.replaceWith('\n'));c.querySelectorAll('td,th').forEach(e=>e.append('\t'));c.querySelectorAll('div,p,blockquote,tr,li').forEach(e=>e.append('\n'));return(c.textContent||'').replace(/[ \t]+\n/g,'\n').replace(/\n[ \t]*\n[ \t]*\n/g,'\n\n').trim();}
 function localInput(d){return new Date(+d-d.getTimezoneOffset()*60000).toISOString().slice(0,19);}
 async function open(n){
@@ -156,7 +158,7 @@ async function open(n){
  $('#date').title='Time in '+Intl.DateTimeFormat().resolvedOptions().timeZone+' · Gmail: '+d.timestampRaw;
  if(!parsed){$('#error').textContent='Check the email date and time. Gmail shows: '+(d.timestampRaw||'not found');}
  if(!d.mailbox)$('#details').open=true;
- function setBody(value){fullBody=value;expanded=value.length<=6000;$('#body').value=expanded?value:value.slice(0,6000)+'\n…';$('#body').readOnly=!expanded||!!savedMessage;$('#full-body').classList.toggle('hidden',expanded);}
+ function setBody(value){value=readableBody(value);fullBody=value;expanded=value.length<=6000;$('#body').value=expanded?value:value.slice(0,6000)+'\n…';$('#body').readOnly=!expanded||!!savedMessage;$('#full-body').classList.toggle('hidden',expanded);}
  function showAttachments(items){$('#attachments').textContent=items.length?'📎 '+items.map(a=>a.name+(a.size?' · '+a.size:'')).join(' · ')+' — references only; files remain in the mailbox.':'';}
  $('#full-body').onclick=()=>{expanded=true;$('#body').value=fullBody;$('#body').readOnly=!!savedMessage;$('#full-body').classList.add('hidden');};
  function controls(){$('#settings').hidden=connected;const calling=[...callStates.values()].some(c=>c.open||c.busy);for(const e of sh.querySelectorAll('#org,#linked,#mailbox'))e.disabled=busy||calling||(!!contactEdit&&!!selected?.id);for(const e of sh.querySelectorAll('.contact-edit-button'))e.disabled=busy||calling||!!contactEdit||checking>0||!connected;for(const e of sh.querySelectorAll('.phone-number'))e.disabled=busy||calling||!!contactEdit||checking>0||!connected;const contactSaveButton=sh.querySelector('.contact-editor .primary');if(contactSaveButton)contactSaveButton.disabled=busy||calling||!connected||checking>0;if(savedMessage){$('#save-open').disabled=busy||!!contactEdit;return;}for(const id of ['#save','#save-open'])$(id).disabled=!connected||busy||!!contactEdit||checking>0||!selected||!$('#date').value||!$('#mailbox').value||[...callStates.values()].some(c=>c.open||c.busy);}
@@ -356,7 +358,7 @@ async function open(n){
 }
 const paperCSS=`
 :host{--sf-paper:#ffffff;--sf-ink:#141827;--sf-ink-muted:#6a7086;--sf-paper-edge:#c9cbe2}
-:host([data-theme="dark"]){--sf-paper:#eeebe4;--sf-ink:#161925;--sf-ink-muted:#676a7a;--sf-paper-edge:#eeebe4}
+:host([data-theme="dark"]){--sf-paper:#232b4a;--sf-ink:#ffffff;--sf-ink-muted:#aab3cf;--sf-paper-edge:#3d4774}
 #org,#subject,#body{background-color:var(--sf-paper);color:var(--sf-ink);border-color:var(--sf-paper-edge);caret-color:var(--sf-accent)}
 #org::placeholder,#subject::placeholder,#body::placeholder{color:var(--sf-ink-muted)}
 #org{font-size:19px;font-weight:650;letter-spacing:-.2px;padding:13px 16px;box-shadow:inset 4px 0 0 var(--sf-accent)}
