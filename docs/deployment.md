@@ -10,6 +10,7 @@ Prepare a separate production Compose configuration before deploying:
 
 - Build the reviewed source into a pinned image.
 - Set `NODE_ENV=production`, `APP_URL=https://<your-crm-host>` and the persistent `DATA_DIR`.
+- Set `INTERNAL_DOMAINS=stage.bio,jaimo-solutions.com` (comma separated). Addresses on these domains, aliases like billing@ included, count as colleagues: they are never suggested as client contacts, and mail sent from them is filed as sent. CRM users' own domains always count.
 - Put the service behind your HTTPS reverse proxy with a valid certificate. Do not expose the development port publicly.
 - Route `/api/integrations/extension` to the application. It authenticates a personal bearer key, not Google credentials or a browser-only proxy login.
 - Never log request bodies or Authorization headers. Restrict server access and encrypt the host disk and backups.

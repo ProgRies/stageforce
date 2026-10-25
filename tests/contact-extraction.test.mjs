@@ -12,13 +12,24 @@ const message={...envelope,action:'save',confirmed:true,requestId:randomUUID(),g
 async function setup(){const db=openDB(':memory:');const id=await addUser(db,envelope.mailbox,'Alex','long-password-1234'),user=db.prepare('SELECT * FROM users WHERE id=?').get(id);const action=b=>extensionAction(db,user,b,origin);return{db,user,action};}
 test('selection parser handles booking labels, signatures, phones alone and ignores fax/date numbers',()=>{
  const parse=globalThis.stageForceExtract.contact;
- assert.deepEqual(parse(message.body),{name:'Erika Musterfrau',emails:['emusterfrau@pruefstelle.example'],phones:['+491701234567']});
- assert.deepEqual(parse('Jane Doe\njane.doe@example.org\nPhone: +49 (0)30 1234567\nFax: +49 30 7654321'),{name:'Jane Doe',emails:['jane.doe@example.org'],phones:['+49 (0)30 1234567']});
+ assert.deepEqual(parse(message.body),{name:'Erika Musterfrau',emails:['emusterfrau@pruefstelle.example'],phones:['+491701234567'],role:'',organisation:''});
+ assert.deepEqual(parse('Jane Doe\njane.doe@example.org\nPhone: +49 (0)30 1234567\nFax: +49 30 7654321'),{name:'Jane Doe',emails:['jane.doe@example.org'],phones:['+49 (0)30 1234567'],role:'',organisation:''});
  assert.deepEqual(parse('030 1234567').phones,['030 1234567']);
  assert.deepEqual(parse('23.10.2026\nFax\n+49 30 7654321').phones,[]);
  assert.equal(parse('socialmedia@client.com').name,'Socialmedia');
  assert.equal(parse('Jane Doe <jane@example.org>').name,'Jane Doe');
  assert.deepEqual(parse('Name\n<script>alert(1)</script>\nx@example.org').emails,['x@example.org']);
+});
+test('selection parser reads German signatures: titles, role, company, first and last name fields',()=>{
+ const parse=globalThis.stageForceExtract.contact;
+ assert.deepEqual(parse('Dr. Max Mustermann\nGeschäftsführer\nMuster GmbH | Musterstr. 1 | 10115 Berlin\nT +49 30 1234567\nM: 0171 7654321\nF +49 30 1234568\nmax@muster.de'),{name:'Dr. Max Mustermann',emails:['max@muster.de'],phones:['+49 30 1234567','0171 7654321'],role:'Geschäftsführer',organisation:'Muster GmbH'});
+ assert.equal(parse('Anna Schmidt\nMusterfirma GmbH\n+49 30 1234567\nanna@muster.de').name,'Anna Schmidt');
+ assert.equal(parse('Viele Grüße\nAnna\nHandy: 0171 7654321').name,'Anna');
+ assert.deepEqual(parse('Vorname: Erika\nNachname: Musterfrau\nE-Mail: erika@x.de\nTelefon: 0170 1234567'),{name:'Erika Musterfrau',emails:['erika@x.de'],phones:['0170 1234567'],role:'',organisation:''});
+ assert.deepEqual(parse('Name\tErika Musterfrau\nFirma\tPrüfstelle Nord GmbH\nPosition\tEinkauf\nE-Mail\terika@x.de'),{name:'Erika Musterfrau',emails:['erika@x.de'],phones:[],role:'Einkauf',organisation:'Prüfstelle Nord GmbH'});
+ assert.equal(parse('Sabine Leitner\nsabine@x.de').name,'Sabine Leitner');
+ assert.deepEqual(parse('Tel. +49 30 1234567 | Fax +49 30 1234568 | Mobil +49 171 2222222').phones,['+49 30 1234567','+49 171 2222222']);
+ assert.deepEqual(parse('Tel: 12.10.2026\nBestellnummer 4711-0815').phones,[]);
 });
 test('explicit extension contact save supports header-free contacts, call preparation and email linkage',async()=>{
  const {db,user,action}=await setup();try{
@@ -39,7 +50,8 @@ test('saved-email contact edits preserve secondary addresses and role, replace p
  const edit={action:'contactSave',confirmed:true,mailbox:envelope.mailbox,organisationId:org.id,version:getOrg(db,org.id).version,contactId:cid,email:'jane@example.org',name:'Jane Doe',phones:['+49305555555'],gmailMessageId:'booking',messageId:detail.message.id};
  action(edit);const c=contacts(db,org.id)[0];assert.equal(c.name,'Jane Doe');assert.deepEqual(c.e_mails,['jane@example.org','other@example.org']);assert.deepEqual(c.telefone,['+49305555555']);assert.equal(c.rolle,'Sales');assert.throws(()=>action({...edit,name:'Stale'}),/inzwischen/);
  const version=getOrg(db,org.id).version;assert.throws(()=>action({...edit,version,contactId:foreign}),/belong/);assert.equal(getOrg(db,org.id).version,version);
- assert.throws(()=>action({...edit,version,phones:['not a number']}),/phone/);assert.throws(()=>action({...edit,version,mailbox:'wrong@team.test'}),/mailbox/);
+ assert.throws(()=>action({...edit,version,phones:['not a number']}),/phone/);
+ action({...edit,version,phones:['+49305555555'],role:'Einkauf'});assert.equal(contacts(db,org.id)[0].rolle,'Einkauf');action({...edit,version:getOrg(db,org.id).version,phones:['+49305555555']});assert.equal(contacts(db,org.id)[0].rolle,'Einkauf');assert.throws(()=>action({...edit,version,mailbox:'wrong@team.test'}),/mailbox/);
  }finally{db.close();}
 });
 test('contact-to-email association is transactional and restricted to the selected organisation',async()=>{
