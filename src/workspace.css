@@ -203,3 +203,19 @@
 .entity-list .item-meta .mini-status{margin-left:0;font-size:13px;font-weight:650}
 .entity-list .item-meta .organisation-subtitle{flex-basis:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .entity-list .organisation-subtitle:empty{display:none}
+
+/* Organisation view: header stays put, the timeline scrolls on its own and the sidebar only when it overflows. */
+.timeline-scroll{min-width:0}
+@media(min-width:701px){
+.detail-pane:has(>.organisation-overview){display:flex;flex-direction:column;overflow:hidden;padding-bottom:0}
+.detail-pane:has(>.organisation-overview)>*{flex-shrink:0}
+.detail-pane>.organisation-overview{flex:1 1 auto;min-height:0;grid-template-rows:minmax(0,1fr);align-items:stretch}
+.detail-pane>.organisation-overview>.communication-column{display:flex;flex-direction:column;min-height:0}
+.detail-pane>.organisation-overview .timeline-heading{margin-bottom:14px}
+.detail-pane>.organisation-overview .timeline-scroll{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;margin:0 -12px;padding:12px 12px 28px;-webkit-mask-image:linear-gradient(to bottom,transparent,#000 12px,#000 calc(100% - 24px),transparent);mask-image:linear-gradient(to bottom,transparent,#000 12px,#000 calc(100% - 24px),transparent)}
+.detail-pane>.organisation-overview>.organisation-sidebar{min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;padding-bottom:28px}
+}
+@container(max-width:560px){
+.detail-pane>.organisation-overview{overflow-y:auto}
+.detail-pane>.organisation-overview .timeline-scroll,.detail-pane>.organisation-overview>.organisation-sidebar{overflow:visible;margin:0;padding-left:0;padding-right:0;-webkit-mask-image:none;mask-image:none}
+}
