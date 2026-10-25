@@ -356,7 +356,7 @@ async function open(n){
 }
 const paperCSS=`
 :host{--sf-paper:#ffffff;--sf-ink:#141827;--sf-ink-muted:#6a7086;--sf-paper-edge:#c9cbe2}
-:host([data-theme="dark"]){--sf-paper:#0a1023;--sf-ink:#f6f7ff;--sf-ink-muted:#9ba6c6;--sf-paper-edge:#5b6793}
+:host([data-theme="dark"]){--sf-paper:#232b4a;--sf-ink:#ffffff;--sf-ink-muted:#aab3cf;--sf-paper-edge:#3d4774}
 #org,#subject,#body{background-color:var(--sf-paper);color:var(--sf-ink);border-color:var(--sf-paper-edge);caret-color:var(--sf-accent)}
 #org::placeholder,#subject::placeholder,#body::placeholder{color:var(--sf-ink-muted)}
 #org{font-size:19px;font-weight:650;letter-spacing:-.2px;padding:13px 16px;box-shadow:inset 4px 0 0 var(--sf-accent)}
