@@ -89,7 +89,7 @@ test('wizard HTTP endpoint returns position and persists selected contacts via a
  }finally{await new Promise(r=>server.close(r));db.close();}});
 
 test('schema 3 upgrade preserves existing messages and contacts without inventing associations',()=>{const dir=mkdtempSync(join(tmpdir(),'stage-wizard-'));let db=openDB(join(dir,'crm.sqlite'));try{
- const org=createOrg(db,null,'Example');addContact(db,org.id,{name:'Existing'});db.exec('DROP TABLE activity_contacts; DELETE FROM schema_versions WHERE version=4; PRAGMA user_version=3');db.close();db=openDB(join(dir,'crm.sqlite'));assert.equal(db.prepare('PRAGMA user_version').get().user_version,8);assert.equal(contacts(db,org.id).length,1);assert.equal(db.prepare('SELECT count(*) n FROM activity_contacts').get().n,0);
+ const org=createOrg(db,null,'Example');addContact(db,org.id,{name:'Existing'});db.exec('DROP TABLE activity_contacts; DELETE FROM schema_versions WHERE version=4; PRAGMA user_version=3');db.close();db=openDB(join(dir,'crm.sqlite'));assert.equal(db.prepare('PRAGMA user_version').get().user_version,9);assert.equal(contacts(db,org.id).length,1);assert.equal(db.prepare('SELECT count(*) n FROM activity_contacts').get().n,0);
  }finally{db.close();rmSync(dir,{recursive:true,force:true});}});
 
 test('duplicate source without a Date header offers the previously reviewed date and direction',async()=>{const{db,user}=setup();try{

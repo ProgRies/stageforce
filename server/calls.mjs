@@ -1,5 +1,6 @@
 import {uid,now,transaction,reindex} from './db.mjs';
 import {formatPhone} from '../src/domain.ts';
+import {claimOnCall} from './leads.mjs';
 import {Problem,getOrg,contacts,createOrg,addContact,audit,addActivity,assertVersion} from './crm.mjs';
 const field=(v,max=1000)=>{if(typeof v!=='string'||v.length>max||v.includes('\0'))throw new Problem('Invalid field.');return v.trim();};
 export const dialNumber=value=>{const s=formatPhone(field(value,100)).replace(/[^+\d]/g,'');if(!/^\+?\d{6,15}$/.test(s))throw new Problem('Check the phone number.');return s;};
@@ -34,6 +35,7 @@ export function saveCall(db,user,b){return transaction(db,()=>{
  const aid=addActivity(db,call.organisation_id,user,{type:'Anruf gestartet',text:note||'Anruf gestartet · keine Notiz',date,contacted:false});
  db.prepare('INSERT INTO activity_contacts VALUES(?,?)').run(aid,call.contact_id);db.prepare('UPDATE call_attempts SET activity_id=? WHERE id=?').run(aid,call.id);
  audit(db,call.organisation_id,user,'call',{activityId:aid,contactId:call.contact_id,phone:call.phone,startedAt:call.started_at,sourceMessageId:call.source_message_id});
+ claimOnCall(db,user,call.organisation_id);
  db.prepare('UPDATE organisations SET version=version+1,updated_at=? WHERE id=?').run(now(),call.organisation_id);reindex(db,call.organisation_id);return{saved:true,organisation:{id:call.organisation_id,version:String(getOrg(db,call.organisation_id).version)}};
  });}
 export function cancelCall(db,user,b){const call=db.prepare('SELECT * FROM call_attempts WHERE id=?').get(field(b.callId,36));if(!call)return{cancelled:true};if(call.user_id!==user.id)throw new Problem('Call not found.',404);if(call.activity_id)throw new Problem('This call has already been saved.');db.prepare('DELETE FROM call_attempts WHERE id=? AND activity_id IS NULL').run(call.id);return{cancelled:true};}

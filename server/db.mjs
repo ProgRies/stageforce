@@ -8,8 +8,8 @@ export function openDB(path=resolve(process.env.DATA_DIR||'data','crm.sqlite')){
  if(path!==':memory:')mkdirSync(dirname(path),{recursive:true,mode:0o700});
  const db=new DatabaseSync(path,{timeout:5000});
  db.exec('PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;');
- const version=db.prepare('PRAGMA user_version').get().user_version;if(version>8)throw Error('Database is newer than this application. Upgrade the application.');
- transaction(db,()=>{db.exec(readFileSync(new URL('./schema.sql',import.meta.url),'utf8'));db.exec("INSERT OR IGNORE INTO schema_versions VALUES(8,datetime('now')); PRAGMA user_version=8");});
+ const version=db.prepare('PRAGMA user_version').get().user_version;if(version>9)throw Error('Database is newer than this application. Upgrade the application.');
+ transaction(db,()=>{db.exec(readFileSync(new URL('./schema.sql',import.meta.url),'utf8'));db.exec("INSERT OR IGNORE INTO schema_versions VALUES(9,datetime('now')); PRAGMA user_version=9");});
  if(path!==':memory:')chmodSync(path,0o600);return db;
 }
 export function transaction(db,fn){const nested=db.isTransaction,point='s'+uid().replaceAll('-','');db.exec(nested?'SAVEPOINT '+point:'BEGIN IMMEDIATE');try{const value=fn();db.exec(nested?'RELEASE '+point:'COMMIT');return value;}catch(e){db.exec(nested?'ROLLBACK TO '+point:'ROLLBACK');if(nested)db.exec('RELEASE '+point);throw e;}}

@@ -1,5 +1,6 @@
 import {appearance,saveAppearance} from './appearance.mjs';
 import {prepareCall,saveCall,cancelCall} from './calls.mjs';
+import {reserveQueue} from './leads.mjs';
 import {extensionStatus,extensionCreate,extensionRevoke,authorizeExtension,extensionAction} from './extension.mjs';
 import {createServer} from 'node:http';
 import {readFile} from 'node:fs/promises';
@@ -74,6 +75,7 @@ export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:300
    case 'callPrepare':data=prepareCall(db,session,b);break;
    case 'callCancel':data=cancelCall(db,session,b);break;
    case 'callSave':data=saveCall(db,session,b);break;
+   case 'queueReserve':data=reserveQueue(db,session,b);break;
    case 'activitySave':data=activitySave(db,session,b);break;
    case 'contact':data=contactSave(db,session,b);break;
    case 'link':data=linkSave(db,session,b);break;
