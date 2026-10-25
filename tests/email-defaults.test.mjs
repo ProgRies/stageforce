@@ -61,3 +61,13 @@ test('old conversations can be saved in any order: shared organisation, date ord
   assert.throws(()=>action({action:'lookup',mailbox,gmailThreadId:'bad thread<>',from:{name:'',email:'x@y.test'},recipients:[]}),/conversation/);
  }finally{db.close();}
 });
+test('lookup names Gmail local-part names properly and says where an address is already stored',async()=>{
+ const {db,user,action}=await setup();try{
+  const worms=createOrg(db,user,'Stadt Worms'),other=createOrg(db,user,'Kreis Alzey');addContact(db,worms.id,{name:'Daniel Körbel',e_mails:['daniel.koerbel@worms.de']});addContact(db,other.id,{name:'',e_mails:['margaretha.mohr@worms.de']});
+  const out=action({action:'lookup',mailbox,from:{name:'margaretha.mohr',email:'margaretha.mohr@worms.de'},recipients:[{email:'daniel.koerbel@worms.de',name:'daniel.koerbel'},{email:'jf@internet-connect.de',name:'jf'},{email:mailbox,name:''}],organisationId:worms.id});
+  const by=Object.fromEntries(out.participants.map(p=>[p.email,p]));
+  assert.equal(by['margaretha.mohr@worms.de'].name,'Margaretha Mohr');assert.equal(by['margaretha.mohr@worms.de'].known,false);assert.deepEqual(by['margaretha.mohr@worms.de'].crm.organisations.map(o=>o.name),['Kreis Alzey']);
+  assert.equal(by['daniel.koerbel@worms.de'].name,'Daniel Körbel');assert.equal(by['daniel.koerbel@worms.de'].known,true);
+  assert.equal(by['jf@internet-connect.de'].name,'Jf');assert.equal(by['jf@internet-connect.de'].crm,null);
+ }finally{db.close();}
+});

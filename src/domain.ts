@@ -13,8 +13,9 @@ export function formatPhone(value:unknown):string {
  return s;
 }
 export function contactName(name:unknown,address:unknown):string {
- const supplied=String(name||'').trim();if(supplied&&!supplied.includes('@'))return supplied;
  const local=String(address||'').trim().split('@')[0].split('+')[0];
+ // Gmail repeats the address's local part as the name when there is no display name ("margaretha.mohr").
+ const supplied=String(name||'').trim();if(supplied&&!supplied.includes('@')&&supplied.toLowerCase()!==local.toLowerCase())return supplied;
  if(!/\p{L}/u.test(local))return '';
  return local.split(/[._-]+/).filter(Boolean).map(part=>part.charAt(0).toLocaleUpperCase()+part.slice(1).toLocaleLowerCase()).join(' ').slice(0,300);
 }
