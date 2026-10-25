@@ -94,11 +94,18 @@ export function matcher(db,scope){
   }
   return[...found.values()].sort((a,b)=>b.score-a.score).slice(0,5).map(({best,...c})=>({...c,reason:c.reasons.join(' · ')}));};
 }
+// A customer export says nothing about bills. Only a staged invoice export for the same customer
+// (not cancelled, not a draft) makes a new organisation a Kunde; otherwise it starts as Lead.
+const VOID=/^(1|ja|yes|true|storniert|canceled|cancelled)$/i,DRAFT=/entwurf|draft/i;
+function billed(db,scope,p){const keys=keysOf(p);if(!keys.length)return false;
+ return db.prepare(`SELECT r.payload_json FROM fastbill_rows r JOIN fastbill_batches b ON b.id=r.batch_id WHERE b.scope=? AND r.source_key IN (${keys.map(()=>'?').join(',')})`).all(scope,...keys).map(x=>JSON.parse(x.payload_json))
+  .some(i=>i.kind==='invoices'&&i.reference&&!VOID.test(i.canceled)&&!DRAFT.test(i.documentType+' '+i.state));}
 // Click to add: a new organisation from one FastBill customer row, with only what the row says.
 function createFromRow(db,user,r){
  const p=r.payload;if(p.kind!=='customers')throw new Problem('Neue Organisationen nur aus Kundendaten anlegen.');
  const name=clean(p.name,500);if(!name)throw new Problem('Name erforderlich.');
- const id='STG-'+uid();db.prepare("INSERT INTO organisations(id,name,status,fastbill_url,city,website,created_at,updated_at) VALUES(?,?,'Kunde',?,?,?,?,?)").run(id,name,fastbillURL(p.url),clean(p.city,500),websiteURL(p.website)?p.website:'',now(),now());
+ const status=billed(db,r.scope,p)?'Kunde':'Lead';
+ const id='STG-'+uid();db.prepare("INSERT INTO organisations(id,name,status,fastbill_url,city,website,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)").run(id,name,status,fastbillURL(p.url),clean(p.city,500),websiteURL(p.website)?p.website:'',now(),now());
  const em=email(p.email)?p.email:'',phones=[...new Set(p.phones.map(formatPhone).filter(x=>x.replace(/\D/g,'').length>=6))];
  if(p.contactName||em||phones.length)addContact(db,id,{name:p.contactName,rolle:p.role,e_mails:em?[em]:[],telefone:phones},true);
  // Same handoff as a call that needs an email: it shows up in Prüfen until someone resolves it.

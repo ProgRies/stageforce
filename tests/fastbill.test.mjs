@@ -103,7 +103,7 @@ test('click to add creates one organisation per row, refuses likely duplicates a
  const csv='Kundennummer;Firmenname;Vorname;Nachname;E-Mail;Telefon;Ort\n0012;Example Studio GmbH;Pat;Test;pat@example.test;+49 12345678;Bonn\n0012;Example Studio GmbH;Sam;Other;sam@example.test;;Bonn\n0013;Quiet Theatre;;;;0221 9876543;Köln';
  const b=stage(db,user,csv),[a,second,quiet]=fastbillRows(db,user,{batchId:b.id}).items;
  assert.equal(a.match,null);const created=decideFastbill(db,user,{rowId:a.id,decision:'create'}).entity;
- assert.equal(created.values[1],'Example Studio GmbH');assert.equal(created.values[9],'Kunde');assert.equal(created.values[4],'Bonn');assert.equal(contacts(db,created.id)[0].e_mails[0],'pat@example.test');assert.equal(created.values[19],'');
+ assert.equal(created.values[1],'Example Studio GmbH');assert.equal(created.values[9],'Lead');assert.equal(created.values[4],'Bonn');assert.equal(contacts(db,created.id)[0].e_mails[0],'pat@example.test');assert.equal(created.values[19],'');
  // The second contact of the same customer points at the organisation just added instead of a new one.
  const hint=fastbillRows(db,user,{batchId:b.id}).items.find(r=>r.id===second.id).match;assert.equal(hint.id,created.id);assert.match(hint.reason,/Bestätigte Zuordnung/);
  assert.throws(()=>decideFastbill(db,user,{rowId:second.id,decision:'create'}),/Mögliche Treffer: Example Studio GmbH/);assert.equal(db.prepare('SELECT count(*) n FROM organisations').get().n,1);
@@ -130,4 +130,10 @@ test('re-importing the same file only asks about undecided rows and decisions re
  const again=stage(db,user,csv);assert.equal(again.pending,1);assert.equal(again.known,2);
  const open=fastbillRows(db,user,{batchId:again.id}).items;assert.deepEqual(open.map(r=>r.payload.name),['Gamma Halle']);
  decideFastbill(db,user,{rowId:open[0].id,decision:'ignored'});assert.equal(fastbillBatches(db,user).every(b=>b.pending===0),true);
+ }finally{db.close();}});
+
+test('a new organisation is a Kunde only when an invoice export shows a real bill for that customer',()=>{const{db,user}=setup();try{
+ stageFastbill(db,user,{scope:'main',records:csvRecords('Kundennummer;Firmenname;Rechnungsnummer;Typ;Storniert?\n1;Alpha;R-1;Rechnung;nein\n2;Beta;R-2;Rechnung;ja\n3;Gamma;R-3;Entwurf;nein',undefined,'invoices')});
+ const rows=fastbillRows(db,user,{batchId:stage(db,user,'Kundennummer;Firmenname\n1;Alpha\n2;Beta\n3;Gamma\n4;Delta').id}).items;
+ assert.deepEqual(rows.map(r=>decideFastbill(db,user,{rowId:r.id,decision:'create',confirmDuplicate:true}).entity.values[9]),['Kunde','Lead','Lead','Lead']);
  }finally{db.close();}});
