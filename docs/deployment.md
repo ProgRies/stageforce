@@ -13,6 +13,7 @@ Prepare a separate production Compose configuration before deploying:
 - Set `INTERNAL_DOMAINS=stage.bio,jaimo-solutions.com` (comma separated). Addresses on these domains, aliases like billing@ included, count as colleagues: they are never suggested as client contacts, and mail sent from them is filed as sent. CRM users' own domains always count.
 - Put the service behind your HTTPS reverse proxy with a valid certificate. Do not expose the development port publicly.
 - Route `/api/integrations/extension` to the application. It authenticates a personal bearer key, not Google credentials or a browser-only proxy login.
+- Route `/api/live` to the application without response buffering and with a read timeout above one minute (nginx: `proxy_buffering off; proxy_read_timeout 120s;`). It is a long-lived Server-Sent Events stream that tells open tabs which organisations changed; the server sends a heartbeat every 25 seconds. It uses the normal session cookie and carries only organisation and user ids, never contents.
 - Never log request bodies or Authorization headers. Restrict server access and encrypt the host disk and backups.
 - Create individual users. Every active CRM user currently has team-wide read/edit access; there are no per-organisation access rules.
 - Pair each extension with the hosted CRM address and a key issued by that CRM.
