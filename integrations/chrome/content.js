@@ -208,12 +208,13 @@ async function open(n){
  function renderContacts(items){
   participants=items;$('#contacts').replaceChildren();
   for(const person of items){
-   const key=personKey(person);if(!choices.has(key))choices.set(key,true);
+   const key=personKey(person);if(!choices.has(key))choices.set(key,!person.suggested);
    const card=document.createElement('div');card.className='contact';card.dataset.key=key;
    const check=document.createElement('input');check.type='checkbox';check.checked=choices.get(key);check.disabled=!!savedMessage;check.onchange=()=>choices.set(key,check.checked);check.setAttribute('aria-label','Include '+(person.email||person.name));
    const info=document.createElement('span'),name=document.createElement('strong'),mail=document.createElement('small');info.className='contact-info';name.textContent=person.name||person.email||'Contact';mail.textContent=person.email;info.append(name,mail);
    const inOrg=person.known&&selected?.id,elsewhere=person.crm?.organisations?.filter(o=>o.id!==selected?.id)||[];
-   if(inOrg||elsewhere.length){const status=document.createElement('small');status.className='contact-crm'+(inOrg?' known':'');status.textContent=inOrg?'✓ Already a contact of '+selected.name:'In CRM · '+elsewhere.map(o=>o.name).join(', ')+(person.crm.more?' +'+person.crm.more:'');status.title=inOrg?'Saved contact; this email is added to their history':'This address belongs to a contact of another organisation';info.append(status);}card.append(check,info);
+   if(person.suggested&&selected?.name){const status=document.createElement('small');status.className='contact-crm';status.textContent='Suggested · contact of '+selected.name;status.title='No client address in this email. Tick to add the email to this contact’s history.';info.append(status);}
+   else if(inOrg||elsewhere.length){const status=document.createElement('small');status.className='contact-crm'+(inOrg?' known':'');status.textContent=inOrg?'✓ Already a contact of '+selected.name:'In CRM · '+elsewhere.map(o=>o.name).join(', ')+(person.crm.more?' +'+person.crm.more:'');status.title=inOrg?'Saved contact; this email is added to their history':'This address belongs to a contact of another organisation';info.append(status);}card.append(check,info);
    if(!phoneChoices.has(key))phoneChoices.set(key,unique([...(person.phones||[]),...(!savedMessage&&person.email===d.from.email?d.signaturePhones:[])]));
    const edit=document.createElement('button');edit.type='button';edit.className='contact-edit-button';edit.setAttribute('aria-label','Edit '+(person.name||person.email||'contact'));edit.title='Edit contact';edit.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m16 3 5 5-13 13H3v-5Z"/><path d="m14 5 5 5"/></svg>';edit.onclick=()=>beginContactEdit(person);card.append(edit);
    for(const number of phoneChoices.get(key)){
@@ -272,7 +273,7 @@ async function open(n){
   try{const p=await popupApi({action:'lookup',...envelope(),organisationId:!auto&&selected?.id||undefined});if(!active||generation!==lookupGeneration)return;
    if(p.direction&&!directionTouched)$('#direction').value=p.direction;if(auto&&p.organisation){selected=p.organisation;$('#org').value=selected.name;$('#org-status').textContent=p.conversation?'✓ Same conversation as an email already saved':'✓ Matched by email address';}
    else if(!auto&&selected?.id&&p.organisation)selected=p.organisation;
-   renderContacts([...p.participants,...extraContacts.filter(extra=>!p.participants.some(p=>p.contactId===extra.contactId||(p.email&&p.email===extra.email)))]);
+   renderContacts([...p.participants,...extraContacts.filter(extra=>!p.participants.some(p=>p.contactId===extra.contactId||(p.email&&p.email===extra.email))),...(p.participants.length?[]:(p.suggested||[]).filter(s=>!extraContacts.some(e=>e.contactId===s.contactId)).map(s=>({...s,manual:true,confirmedContact:true,suggested:true})))]);
    if(auto&&!selected&&p.candidates.length){showResults('org',p.candidates);$('#org-status').textContent='Choose the matching organization';}
    if(p.linked&&!linked){linked=p.linked;$('#linked').value=linked.name;$('#linked-status').textContent='Existing CRM link';}
   }catch(e){if(active&&generation===lookupGeneration)$('#error').textContent=e.message;}finally{checking--;if(active)controls();}

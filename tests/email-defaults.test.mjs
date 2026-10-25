@@ -71,3 +71,12 @@ test('lookup names Gmail local-part names properly and says where an address is 
   assert.equal(by['jf@internet-connect.de'].name,'Jf');assert.equal(by['jf@internet-connect.de'].crm,null);
  }finally{db.close();}
 });
+test('lookup offers the selected organisation\'s two most recent contacts for emails without client addresses',async()=>{
+ const {db,user,action}=await setup();try{
+  const org=createOrg(db,user,'Stadt Worms');for(const n of ['Anna','Ben','Cleo'])addContact(db,org.id,{name:n,e_mails:[n.toLowerCase()+'@worms.de']});
+  const out=action({action:'lookup',mailbox,from:{name:'Alex',email:mailbox},recipients:[{email:'colleague@team.test',name:''}],organisationId:org.id});
+  assert.equal(out.participants.length,0);assert.equal(out.suggested.length,2);assert.ok(out.suggested.every(s=>s.contactId&&s.known));
+  const saved=action({action:'save',confirmed:true,requestId:randomUUID(),mailbox,from:{name:'Alex',email:mailbox},recipients:[{email:'colleague@team.test',name:''}],gmailMessageId:'internal',originalSubject:'Intern',subject:'Intern',body:'Notiz',originalBody:'Notiz',timestamp:'2026-07-31T06:47:00Z',timestampRaw:'',contactEmails:[],extraContactIds:[out.suggested[0].contactId],organisationId:org.id,version:getOrg(db,org.id).version});
+  assert.equal(saved.saved,true);assert.equal(db.prepare('SELECT contact_id FROM activity_contacts').get().contact_id,out.suggested[0].contactId);
+ }finally{db.close();}
+});
