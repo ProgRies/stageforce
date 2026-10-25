@@ -1,10 +1,9 @@
 import {readFileSync,writeFileSync} from 'node:fs';
-import {createInterface,emitKeypressEvents} from 'node:readline';
+import {emitKeypressEvents} from 'node:readline';
 import {openDB,backupDB} from './db.mjs';
 import {addUser,hashPassword} from './auth.mjs';
 import {migrateSnapshot} from './migrate.mjs';
-import {createOrg,save,addContact} from './crm.mjs';
-import {randomUUID} from 'node:crypto';
+import {createOrg,addContact} from './crm.mjs';
 process.umask(0o077);
 async function password(){if(!process.stdin.isTTY){if(!process.argv.includes('--password-stdin'))throw Error('Use an interactive terminal, or explicitly pass --password-stdin with a secret piped via stdin.');let s='';for await(const c of process.stdin)s+=c;return s.replace(/[\r\n]+$/,'');}
  process.stdout.write('Passwort (mindestens 12 Zeichen): ');emitKeypressEvents(process.stdin);process.stdin.setRawMode(true);process.stdin.resume();return await new Promise((resolve,reject)=>{let value='';const onkey=(s,key={})=>{if(key.ctrl&&key.name==='c'){done();reject(Error('Abgebrochen.'));}else if(key.name==='return'){done();resolve(value);}else if(key.name==='backspace')value=value.slice(0,-1);else if(!key.ctrl&&!key.meta&&s)value+=s;};const done=()=>{process.stdin.off('keypress',onkey);process.stdin.setRawMode(false);process.stdin.pause();process.stdout.write('\n');};process.stdin.on('keypress',onkey);});}

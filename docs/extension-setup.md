@@ -7,8 +7,8 @@ There are two user-facing parts: StageForce (web UI, API and SQLite in one conta
 From the project folder, with Docker Desktop running:
 
 ```sh
-docker compose -f compose.local.yaml up -d --build
-docker compose -f compose.local.yaml exec crm node server/cli.mjs user:add ries@jaimo-solutions.com "Christian Ries"
+docker compose up -d --build
+docker compose exec crm node server/cli.mjs user:add you@example.com "Your Name"
 ```
 
 Use the exact email address of the Gmail account you will import from. Choose a password of at least 12 characters at the hidden prompt. Open http://localhost:3000 and sign in. The database starts empty and persists in the Docker volume. Do not run `down -v` unless you intend to delete it. Existing production data is not downloaded or included.
@@ -16,7 +16,7 @@ Use the exact email address of the Gmail account you will import from. Choose a 
 Optional fictional records, only in a fresh test database:
 
 ```sh
-docker compose -f compose.local.yaml exec crm node server/cli.mjs demo
+docker compose exec crm node server/cli.mjs demo
 ```
 
 After editing source code, rebuild with the first command. The database survives rebuilds.

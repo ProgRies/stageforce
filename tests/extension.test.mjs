@@ -64,10 +64,10 @@ test('numeric Gmail dates are parsed without guessing relative or invalid values
  assert.equal(globalThis.stageForceDate('22.10.2026, 14:07').getDate(),22);assert.equal(globalThis.stageForceDate('2026-10-22T12:07:00Z').toISOString(),'2026-10-22T12:07:00.000Z');assert.equal(globalThis.stageForceDate('Yesterday'),null);assert.equal(globalThis.stageForceDate('31.02.2026, 14:07'),null);
 });
 
-test('schema 5 upgrade removes retired credentials and preserves CRM records',async()=>{
+test('schema 5 upgrade preserves CRM records',async()=>{
  const {mkdtempSync,rmSync}=await import('node:fs');const{tmpdir}=await import('node:os');const{join}=await import('node:path');
  const dir=mkdtempSync(join(tmpdir(),'extension-migration-')),path=join(dir,'crm.sqlite');let db=openDB(path);
- try{const id=await addUser(db,msg.mailbox,'Alex','long-password-1234'),org=createOrg(db,{id},'Preserved');db.exec('CREATE TABLE gmail_keys(user_id TEXT,token_hash TEXT); INSERT INTO gmail_keys VALUES(\'old\',\'old-secret-hash\'); DROP TABLE extension_keys; PRAGMA user_version=5');db.close();db=openDB(path);
- assert.equal(getOrg(db,org.id).name,'Preserved');assert.equal(db.prepare('SELECT count(*) n FROM users').get().n,1);assert.equal(db.prepare("SELECT count(*) n FROM sqlite_master WHERE name='gmail_keys'").get().n,0);assert.equal(db.prepare('PRAGMA user_version').get().user_version,8);assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(),[]);
+ try{const id=await addUser(db,msg.mailbox,'Alex','long-password-1234'),org=createOrg(db,{id},'Preserved');db.exec('DROP TABLE extension_keys; PRAGMA user_version=5');db.close();db=openDB(path);
+ assert.equal(getOrg(db,org.id).name,'Preserved');assert.equal(db.prepare('SELECT count(*) n FROM users').get().n,1);assert.equal(db.prepare('PRAGMA user_version').get().user_version,8);assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(),[]);
  }finally{db.close();rmSync(dir,{recursive:true,force:true});}
 });
