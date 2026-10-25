@@ -9,7 +9,7 @@ export function liveHub(db,{perUser=6,total=200,coalesceMs=250,heartbeatMs=25000
  function flush(){timer=null;const data={ids:all?[]:[...ids],all,by:[...by]};ids=new Set();by=new Set();all=false;for(const c of clients)send(c,'change',data);}
  // Bursts (a FastBill batch, a merge) become one message per tab.
  function changed(orgIds=[],userId=null){const list=orgIds.filter(id=>typeof id==='string'&&id);if(!list.length)all=true;for(const id of list)ids.add(id);if(userId)by.add(userId);if(!timer&&clients.size)timer=setTimeout(flush,coalesceMs);}
- const valid=c=>!!db.prepare('SELECT 1 FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>? AND u.active=1').get(c.tokenHash,Date.now());
+ const valid=c=>!!db.prepare('SELECT 1 FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>? AND u.active=1 AND EXISTS(SELECT 1 FROM user_mfa m WHERE m.user_id=u.id)').get(c.tokenHash,Date.now());
  const ticks=[
   setInterval(()=>{for(const c of clients)write(c,': ping\n\n');},heartbeatMs),
   // A logout in another tab, an expired session or a deactivated user ends the stream.

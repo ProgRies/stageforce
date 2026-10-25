@@ -9,7 +9,8 @@ import {parseCSV,inspectCSV,csvRecords,stageFastbill,fastbillBatches,fastbillRow
 import {reviewItems} from '../server/crm.mjs';
 import {makeServer} from '../server/http.mjs';
 import {createSession} from '../server/auth.mjs';
-function setup(){const db=openDB(':memory:');for(const id of['one','two'])db.prepare('INSERT INTO users VALUES(?,?,?,?,1,?)').run(id,id+'@example.test',id,'unused','2026-01-01');return{db,user:{id:'one',email:'one@example.test'},other:{id:'two',email:'two@example.test'}};}
+import {enableMfa,newSecret} from '../server/mfa.mjs';
+function setup(){const db=openDB(':memory:');for(const id of['one','two'])db.prepare('INSERT INTO users VALUES(?,?,?,?,1,?)').run(id,id+'@example.test',id,'unused','2026-01-01');enableMfa(db,'one',newSecret());return{db,user:{id:'one',email:'one@example.test'},other:{id:'two',email:'two@example.test'}};}
 const sample='Kundennummer;Firmenname;Vorname;Nachname;E-Mail;Telefon;Ort;IBAN;Betrag brutto\r\n0012;Example Studio;Pat;Test;pat@example.test;+49 12345678;Bonn;BANKSECRET;999.00';
 function stage(db,user,text=sample,opts={}){return stageFastbill(db,user,{scope:'main',records:csvRecords(text),...opts});}
 const first=(db,user,b)=>fastbillRows(db,user,{batchId:b.id}).items[0];
@@ -82,7 +83,7 @@ test('FastBill HTTP routes require signed-in session, origin and CSRF; no arbitr
  }finally{await new Promise(r=>server.close(r));db.close();}});
 
 test('version 2 upgrades preserve CRM and add empty import tables',()=>{const dir=mkdtempSync(join(tmpdir(),'stage-fastbill-'));let db=openDB(join(dir,'crm.sqlite'));try{
- const o=createOrg(db,null,'Example');db.exec('DROP TABLE fastbill_rows; DROP TABLE fastbill_batches; DROP TABLE fastbill_decisions; DROP TABLE fastbill_mappings; DELETE FROM schema_versions WHERE version=3; PRAGMA user_version=2');db.close();db=openDB(join(dir,'crm.sqlite'));assert.equal(db.prepare('PRAGMA user_version').get().user_version,9);assert.equal(entity(db,o.id).values[1],'Example');assert.equal(db.prepare('SELECT count(*) n FROM fastbill_batches').get().n,0);assert.equal(db.prepare('PRAGMA foreign_key_check').all().length,0);
+ const o=createOrg(db,null,'Example');db.exec('DROP TABLE fastbill_rows; DROP TABLE fastbill_batches; DROP TABLE fastbill_decisions; DROP TABLE fastbill_mappings; DELETE FROM schema_versions WHERE version=3; PRAGMA user_version=2');db.close();db=openDB(join(dir,'crm.sqlite'));assert.equal(db.prepare('PRAGMA user_version').get().user_version,10);assert.equal(entity(db,o.id).values[1],'Example');assert.equal(db.prepare('SELECT count(*) n FROM fastbill_batches').get().n,0);assert.equal(db.prepare('PRAGMA foreign_key_check').all().length,0);
  }finally{db.close();rmSync(dir,{recursive:true,force:true});}});
 
 test('reviewer can append addresses to an existing contact without overwriting its name or creating a duplicate',()=>{const{db,user}=setup();try{

@@ -5,6 +5,18 @@ Rebuild the CRM and reload the extension in `chrome://extensions`. No database c
 - Ticking **Include quoted history** now also checks the earlier emails in the thread for contacts and phone numbers. Numbers of people already in the email header appear as removable "new" chips. Other authors appear unticked with "From quoted history", their found numbers and an add-contact button; colleagues are left out. Unticking removes them again.
 - The Gmail inbox list shows a small **✓ CRM** mark on conversations that are already in StageForce. Only Gmail ids are sent to the CRM and only a yes or no comes back, so no client names are put into the Gmail page. Results are cached, so an inbox page costs at most one request per minute.
 
+## Unreleased · Two-factor sign-in
+
+Rebuild the CRM. The database moves to schema 10 on start. Everyone is signed out once and every browser-extension key is revoked, because neither was confirmed with a second factor.
+
+- Sign-in now needs a password **and** a six-digit code from an authenticator app. The password alone only opens a ten-minute step for the code; no session exists until the code is correct.
+- The first sign-in after the update shows a QR code (and the key for typing it in by hand). Scan it, confirm with a code, and save the ten recovery codes, which are shown only once. Without this setup the login cannot complete.
+- "Kein Zugriff auf die App?" accepts a recovery code instead. Each recovery code works once.
+- A code is accepted once; five wrong codes end the step and the password has to be entered again.
+- Sessions, extension keys and live updates only work for accounts with a confirmed authenticator.
+- After signing in again, create a new key in settings and paste it into the browser extension.
+- Admin: `user:mfa-reset EMAIL` removes a lost authenticator, ends that user's sessions and revokes their extension key; the next sign-in sets up a new app. `user:list` shows who has set it up.
+
 ## Unreleased · Live updates
 
 Rebuild the CRM and refresh its browser tab. No database change.

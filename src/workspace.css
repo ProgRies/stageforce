@@ -219,3 +219,24 @@
 .review-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 14px;padding:12px 14px;border:1px solid #ddc28d;border-radius:12px;background:#fff9ea;color:#5d3f10}.review-bar p{flex:1;margin:0;white-space:pre-line}.review-bar .button{flex:0 0 auto;margin:0}
 [data-theme="dark"] .review-bar{background:#302b25;border-color:#806844;color:#f4d394}
 .entity-item .review-preview{display:block;color:var(--muted);font-size:12.5px;line-height:1.4;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal}
+/* Second factor: setup with QR code, code entry and the one-time list of recovery codes. */
+.mfa-card{gap:16px}
+.mfa-heading{display:flex;align-items:center;gap:10px;color:var(--action)}
+.mfa-heading h1{color:var(--ink);font-size:25px}
+.mfa-qr{width:200px;height:200px;align-self:center;border-radius:14px;box-shadow:0 0 0 1px var(--line)}
+.mfa-manual{font-size:13px;color:var(--muted)}
+.mfa-manual summary{cursor:pointer}
+.mfa-manual p{margin:10px 0 6px;font-size:13px}
+.mfa-manual code,.mfa-codes code{font:600 12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap;color:var(--ink);overflow-wrap:anywhere}
+.mfa-manual code{white-space:normal;display:block;padding:10px 12px;border-radius:9px;background:#fff8;border:1px solid var(--line);margin-bottom:6px}
+.mfa-codes{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;margin:0;padding:14px 16px 14px 34px;border-radius:12px;background:#fff8;border:1px solid var(--line);font-size:12px;color:var(--muted)}
+.mfa-actions{display:flex;gap:10px}
+.mfa-actions .button{flex:1}
+.mfa-confirm{display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.5;color:var(--muted)}
+.mfa-confirm input{margin-top:3px}
+.mfa-links{display:flex;justify-content:space-between;gap:12px}
+.link-button{font-size:13px;color:var(--action);padding:0}
+.link-button:hover{text-decoration:underline}
+@media(max-width:480px){.mfa-codes{grid-template-columns:1fr}}
+[data-theme="dark"] .mfa-manual code,[data-theme="dark"] .mfa-codes{background:#0d152b80;border-color:#bbcaff30}
+[data-theme="dark"] .mfa-manual code,[data-theme="dark"] .mfa-codes code,[data-theme="dark"] .mfa-heading h1{color:#e3e9fa}

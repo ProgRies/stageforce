@@ -14,7 +14,7 @@ export function extensionCreate(db,user){const token='sf_ext_'+randomBytes(32).t
 export function authorizeExtension(db,req,rateLimit=true){
  const origin=req.headers.origin;if(origin&&!/^chrome-extension:\/\/[a-p]{32}$/.test(origin))throw new Problem('Extension requests only.',403);
  const m=/^Bearer (sf_ext_[A-Za-z0-9_-]{43})$/.exec(req.headers.authorization||'');
- const user=m&&db.prepare('SELECT u.* FROM extension_keys k JOIN users u ON u.id=k.user_id WHERE k.token_hash=? AND k.expires_at>? AND u.active=1').get(hashToken(m[1]),Date.now());
+ const user=m&&db.prepare('SELECT u.* FROM extension_keys k JOIN users u ON u.id=k.user_id WHERE k.token_hash=? AND k.expires_at>? AND u.active=1 AND EXISTS(SELECT 1 FROM user_mfa m WHERE m.user_id=u.id)').get(hashToken(m[1]),Date.now());
  if(!user)throw new Problem('Connect your extension in Stage Force settings.',401);
  if(rateLimit&&limited(db,'extension:'+user.id,180,60000))throw new Problem('Please wait a minute.',429);
  db.prepare('UPDATE extension_keys SET last_used_at=? WHERE user_id=?').run(Date.now(),user.id);return user;
