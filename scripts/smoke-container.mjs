@@ -8,10 +8,12 @@ try{
  let base=address();
  for(let i=0;i<30;i++){try{if((await fetch(base+'/healthz')).ok)break;}catch{}if(i===29)throw Error('Container did not become healthy');await new Promise(r=>setTimeout(r,500));}
  docker(['exec','-i',name,'node','server/cli.mjs','user:add','demo@example.test','Demo','--password-stdin'],{input:password+'\n'});
- docker(['exec',name,'node','server/cli.mjs','demo']);
+ const login=async()=>{const r=await fetch(base+'/api/login',{method:'POST',headers:{Origin:'https://crm.example.test','Content-Type':'application/json'},body:JSON.stringify({email:'demo@example.test',password})});if(!r.ok)throw Error('Login failed');const session=await r.json();return{csrf:session.data.csrf,cookie:r.headers.get('set-cookie').split(';')[0]};};
+ const crm=async(auth,body)=>(await fetch(base+'/api/crm',{method:'POST',headers:{Origin:'https://crm.example.test','Content-Type':'application/json','X-CSRF-Token':auth.csrf,Cookie:auth.cookie},body:JSON.stringify(body)})).json();
+ await crm(await login(),{action:'create',name:'Persistence check'});
  docker(['restart',name]);
  // Docker may assign a new ephemeral host port when the container restarts.
  base=address();
  let ready=false;for(let i=0;i<30;i++){try{if((await fetch(base+'/healthz')).ok){ready=true;break;}}catch{}await new Promise(r=>setTimeout(r,500));}if(!ready)throw Error('Restart health failed');
- const response=await fetch(base+'/api/login',{method:'POST',headers:{Origin:'https://crm.example.test','Content-Type':'application/json'},body:JSON.stringify({email:'demo@example.test',password})});if(!response.ok)throw Error('Login failed after restart');const session=await response.json(),cookie=response.headers.get('set-cookie').split(';')[0];const loaded=await fetch(base+'/api/crm',{method:'POST',headers:{Origin:'https://crm.example.test','Content-Type':'application/json','X-CSRF-Token':session.data.csrf,Cookie:cookie},body:'{"action":"load"}'});if((await loaded.json()).data.entities.length!==45)throw Error('Persistence check failed');console.log('Container login and restart persistence passed.');
+ const loaded=await crm(await login(),{action:'load'});if(loaded.data.entities.map(e=>e.values[1]).join()!=='Persistence check')throw Error('Persistence check failed');console.log('Container login and restart persistence passed.');
 }catch(error){try{console.error(docker(['logs','--tail','40',name]));}catch{}throw error;}finally{try{docker(['rm','-f',name]);}catch{}try{docker(['volume','rm',volume]);}catch{}}
