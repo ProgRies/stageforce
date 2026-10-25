@@ -80,5 +80,16 @@
   if(!organisation)organisation=lines.flatMap(segments).map(s=>s.trim()).find(l=>l.length<=120&&company.test(l)&&!/@|https?:|www\./i.test(l)&&!/^\+?[\d ()/.-]+$/.test(l))||'';
   return{name:name.slice(0,300),emails,phones:numbers,role:role.slice(0,500),organisation:organisation.slice(0,300)};
  }
- globalThis.stageForceExtract={phones,attachments,normalize,contact};
+ // Cuts reply history that Gmail did not mark as a quote (e.g. Outlook replies): the first reply header and everything after it.
+ function stripQuoted(text){
+  const lines=String(text||'').split('\n');
+  for(let i=0;i<lines.length;i++){
+   const line=lines[i].trim();
+   const marker=/^(?:On .{1,250} wrote:|Am .{1,250} schrieb .{0,150}:|-{2,}\s*(?:Original Message|Ursprüngliche Nachricht)\s*-{2,})$/i.test(line);
+   const header=/^(?:From|Von):\s*\S/i.test(line)&&lines.slice(i+1,i+5).some(l=>/^(?:Sent|Date|Gesendet|Datum):\s*\S/i.test(l.trim()));
+   if(marker||header)return lines.slice(0,i).join('\n').trim();
+  }
+  return String(text||'').trim();
+ }
+ globalThis.stageForceExtract={phones,attachments,normalize,contact,stripQuoted};
 })();

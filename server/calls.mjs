@@ -1,12 +1,13 @@
 import {uid,now,transaction,reindex} from './db.mjs';
+import {formatPhone} from '../src/domain.ts';
 import {Problem,getOrg,contacts,createOrg,addContact,audit,addActivity,assertVersion} from './crm.mjs';
 const field=(v,max=1000)=>{if(typeof v!=='string'||v.length>max||v.includes('\0'))throw new Problem('Invalid field.');return v.trim();};
-export const dialNumber=value=>{const s=field(value,100).replace(/\(0\)/g,'').replace(/[^+\d]/g,'');if(!/^\+?\d{6,15}$/.test(s))throw new Problem('Check the phone number.');return s;};
+export const dialNumber=value=>{const s=formatPhone(field(value,100)).replace(/[^+\d]/g,'');if(!/^\+?\d{6,15}$/.test(s))throw new Problem('Check the phone number.');return s;};
 export function mergePhones(db,user,orgId,contact,phones){
  if(!Array.isArray(phones)||phones.length>10)throw new Problem('Check phone numbers.');
  let changed=false;
  for(const raw of phones){const number=dialNumber(raw);if(contact.telefone.some(p=>{try{return dialNumber(p)===number;}catch{return false;}}))continue;
- db.prepare("INSERT OR IGNORE INTO contact_addresses VALUES(?,?,'phone',?,?)").run(uid(),contact.id,field(raw,100),contact.telefone.length);contact.telefone.push(raw);changed=true;}
+ db.prepare("INSERT OR IGNORE INTO contact_addresses VALUES(?,?,'phone',?,?)").run(uid(),contact.id,formatPhone(field(raw,100)),contact.telefone.length);contact.telefone.push(formatPhone(raw));changed=true;}
  if(changed){audit(db,orgId,user,'contact_phone',{contactId:contact.id,phones});for(const row of db.prepare('SELECT organisation_id FROM organisation_contacts WHERE contact_id=?').all(contact.id)){db.prepare('UPDATE organisations SET version=version+1,updated_at=? WHERE id=?').run(now(),row.organisation_id);reindex(db,row.organisation_id);}}
 }
 export function prepareCall(db,user,b,{participant=null}={}){

@@ -6,6 +6,12 @@ export const STATUSES = ["Kunde","Lead","Partner / Agentur","Unklar","Ehemaliger
 export const PHASES = ["Unbearbeitet","Kontaktaufnahme","Im Gespräch","Termin vereinbart","Angebot","Testphase","Gewonnen","Aktuell kein Bedarf","Verloren","Unklar"];
 export const TYPES = ["Stadt/Gemeinde","Landkreis","Landesregierung","Bundesministerium","Landesministerium","Landeseinrichtung","Bundeseinrichtung","Sonstige öffentliche Einrichtung","Schule","Hochschule/Universität","NGO/Verband","Unternehmen","Agentur","Sonstiges","Unklar"];
 export function text(e: Entity, col: number) { return String(e.values[col] ?? ""); }
+// German national numbers (0…) and 00 prefixes become international; other numbers keep their spelling.
+export function formatPhone(value:unknown):string {
+ let s=String(value??'').trim().replace(/^\((0\d+)\)\s*/,'$1 ').replace(/\s*\(0\)\s*/g,' ').replace(/\s*\/\s*/g,' ').replace(/\s+/g,' ').trim();
+ if(/^00[1-9]/.test(s))s='+'+s.slice(2);else if(/^0[1-9]/.test(s))s='+49 '+s.slice(1);
+ return s;
+}
 export function contactName(name:unknown,address:unknown):string {
  const supplied=String(name||'').trim();if(supplied&&!supplied.includes('@'))return supplied;
  const local=String(address||'').trim().split('@')[0].split('+')[0];

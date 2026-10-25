@@ -1,10 +1,10 @@
-import {contactName} from '../src/domain.ts';
+import {contactName,formatPhone} from '../src/domain.ts';
 import {appearance} from './appearance.mjs';
 import {prepareCall,saveCall,cancelCall,mergePhones,dialNumber} from './calls.mjs';
 import {randomBytes,createHash} from 'node:crypto';
 import {hashToken,limited,email} from './auth.mjs';
 import {transaction,now} from './db.mjs';
-import {Problem,matchEmail,stageImport,confirmImport,getOrg,contacts,createOrg,linkSave,contactSave,assertVersion} from './crm.mjs';
+import {Problem,ourAddresses,matchEmail,stageImport,confirmImport,getOrg,contacts,createOrg,linkSave,contactSave,assertVersion} from './crm.mjs';
 const brief=o=>({id:o.id,name:o.name,version:String(o.version)});
 const field=(v,max=1000)=>{if(typeof v!=='string'||v.length>max||v.includes('\0'))throw new Problem('Invalid field.');return v.trim();};
 export function extensionStatus(db,user){const k=db.prepare('SELECT created_at,expires_at,last_used_at FROM extension_keys WHERE user_id=?').get(user.id);return{email:user.email,connected:!!k&&k.expires_at>Date.now(),...k};}
@@ -18,11 +18,11 @@ export function authorizeExtension(db,req,rateLimit=true){
  if(rateLimit&&limited(db,'extension:'+user.id,180,60000))throw new Problem('Please wait a minute.',429);
  db.prepare('UPDATE extension_keys SET last_used_at=? WHERE user_id=?').run(Date.now(),user.id);return user;
 }
-function envelope(b,user){
+function envelope(b,user,db){
  const mailbox=field(b.mailbox,254).toLowerCase();if(mailbox!==user.email.toLowerCase())throw new Problem('The Gmail mailbox must match your CRM account. Check the selected mailbox.',403);
  const address=a=>{const e=field(a?.email,254).toLowerCase();if(!email(e))throw new Problem('Check the sender and recipient addresses.');return{name:field(a.name||'',300),email:e};};
  const sender=[address(b.from)];if(!Array.isArray(b.recipients)||b.recipients.length>100)throw new Problem('Invalid participants.');
- return{sender,recipients:b.recipients.map(address),cc:[],mailbox,direction:sender[0].email===mailbox?'outgoing':'incoming',original:'',dedupeKey:''};
+ return{sender,recipients:b.recipients.map(address),cc:[],mailbox,direction:ourAddresses(db,user,mailbox).internal(sender[0].email)?'outgoing':'incoming',original:'',dedupeKey:''};
 }
 function identity(b,user){const mailbox=field(b.mailbox,254).toLowerCase();if(mailbox!==user.email.toLowerCase())throw new Problem('The Gmail mailbox must match your CRM account.',403);return{mailbox,gmailId:field(b.gmailMessageId||'',200)};}
 function fingerprint(b){return createHash('sha256').update('extension-v1:'+JSON.stringify([field(b.from?.email,254).toLowerCase(),field(b.timestampRaw||b.timestamp,150),field(b.originalSubject,1000),field(b.originalBody,500000)])).digest('hex');}
@@ -42,7 +42,7 @@ export function extensionAction(db,user,b,origin){
   const name=field(b.name||'',300),role=field(b.role||'',500),address=field(b.email||'',254).toLowerCase();
   if(address&&!email(address))throw new Problem('Check the email address.');
   if(!Array.isArray(b.phones)||b.phones.length>10)throw new Problem('Check phone numbers.');
-  const phones=[...new Set(b.phones.map(p=>{dialNumber(p);return field(p,100);}))];
+  const phones=[...new Set(b.phones.map(p=>{dialNumber(p);return formatPhone(field(p,100));}))];
   if(!address&&!phones.length)throw new Problem('Enter an email address or phone number.');
   return transaction(db,()=>{
    let id=b.organisationId;
@@ -61,7 +61,7 @@ export function extensionAction(db,user,b,origin){
   });
  }
  if(b.action==='callPrepare'){
-  const e=envelope(b,user),person=[...e.sender,...e.recipients].find(p=>p.email===b.contactEmail&&p.email!==e.mailbox);
+  const e=envelope(b,user,db),person=[...e.sender,...e.recipients].find(p=>p.email===b.contactEmail&&p.email!==e.mailbox);
   // Saved message contacts may have changed in the CRM after import.
   if(b.messageId){identity(b,user);const m=existingMessage(db,user,b);if(!m||m.id!==b.messageId||m.organisation_id!==b.organisationId)throw new Problem('Email not found.',404);return prepareCall(db,user,b);}
   if(b.confirmedContact===true&&b.contactId)return prepareCall(db,user,b);
@@ -74,14 +74,14 @@ export function extensionAction(db,user,b,origin){
   return{items:db.prepare('SELECT id,name,version FROM organisations WHERE instr(lower(name),lower(?))>0 ORDER BY name COLLATE NOCASE LIMIT 20').all(q).map(brief)};
  }
  if(b.action==='lookup'){
-  const p=matchEmail(db,user,envelope(b,user));
+  const p=matchEmail(db,user,envelope(b,user,db));
   const candidates=p.candidates.map(c=>({...brief(getOrg(db,c.id)),reason:c.reason,score:c.score}));
   // Only an unambiguous exact external address selects an organisation automatically.
   const exact=candidates.filter(c=>c.score>=80),best=exact.length===1?exact[0]:null;
   const selected=b.organisationId?brief(getOrg(db,field(b.organisationId,100))):best;
   const known=selected?contacts(db,selected.id):[];
   const linked=selected?db.prepare('SELECT o.id,o.name,o.version FROM organisation_links l JOIN organisations o ON o.id=CASE WHEN l.a=? THEN l.b ELSE l.a END WHERE l.a=? OR l.b=?').all(selected.id,selected.id,selected.id).map(brief):[];
-  return{organisation:selected,candidates,participants:p.participants.filter(a=>!a.internal&&a.role!=='quoted').map(a=>{const c=known.find(c=>c.e_mails.some(e=>e.toLowerCase()===a.email));return{...a,name:contactName(c?.name&&!c.name.includes('@')?c.name:a.name,a.email),known:!!c,contactId:c?.id,phones:c?.telefone||[]};}),linked:linked.length===1?linked[0]:null};
+  return{organisation:selected,direction:p.direction,candidates,participants:p.participants.filter(a=>!a.internal&&a.role!=='quoted').map(a=>{const c=known.find(c=>c.e_mails.some(e=>e.toLowerCase()===a.email));return{...a,name:contactName(c?.name&&!c.name.includes('@')?c.name:a.name,a.email),known:!!c,contactId:c?.id,phones:c?.telefone||[]};}),linked:linked.length===1?linked[0]:null};
  }
  if(b.action!=='save'||b.confirmed!==true)throw new Problem('Explicit confirmation required.');
  if(typeof b.requestId!=='string'||!/^[a-f0-9-]{36}$/.test(b.requestId))throw new Problem('Invalid request ID.');
@@ -91,7 +91,7 @@ export function extensionAction(db,user,b,origin){
   const prior=db.prepare('SELECT * FROM requests WHERE id=?').get(receipt);
   if(prior){if(prior.user_id!==user.id)throw new Problem('Request not found.',404);return response(prior.organisation_id,true);}
   const found=existingMessage(db,user,b);if(found){let source='';try{const u=new URL(b.sourceUrl);if(u.origin==='https://mail.google.com'&&u.href.length<=2000)source=u.href;}catch{}db.prepare('INSERT OR IGNORE INTO message_sources VALUES(?,?,?,?)').run(found.id,user.id,user.email,source);db.prepare('INSERT INTO requests VALUES(?,?,?,?)').run(receipt,user.id,found.organisation_id,now());return response(found.organisation_id,true);}
-  const p=envelope(b,user),original=field(b.originalBody,500000),subject=field(b.subject,1000),originalSubject=field(b.originalSubject,1000);
+  const p=envelope(b,user,db),original=field(b.originalBody,500000),subject=field(b.subject,1000),originalSubject=field(b.originalSubject,1000);
   const stamp=field(b.timestamp,50);if(!/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(stamp)||!Number.isFinite(Date.parse(stamp))||Date.parse(stamp)>Date.now()+300000)throw new Problem('Check the email timestamp.');
   const sentAt=new Date(stamp).toISOString();
   const direction=['incoming','outgoing'].includes(b.direction)?b.direction:p.direction;
