@@ -35,7 +35,7 @@ function extract(n) {
  const from = (sender?.getAttribute('email') || emails(text(sender))[0] || '').toLowerCase();
  const to = unique(recipients.map(e => e.getAttribute('email')));
  // Gmail's name attribute holds the display name; the visible text can be "me" or a short first name.
- const recipientNames = Object.fromEntries(recipients.map(e => [String(e.getAttribute('email')).toLowerCase(), (e.getAttribute('name') || '').trim()]).filter(([email, name]) => name && name.toLowerCase() !== email));
+ const recipientNames = Object.fromEntries(recipients.map(e => [String(e.getAttribute('email')).toLowerCase(), (e.getAttribute('name') || '').trim()]).filter(([email, name]) => name && name.toLowerCase() !== email && name.toLowerCase() !== email.split('@')[0]));
  const me = account();
  const warnings = [];
  if (!from) warnings.push('Sender email address not found.');
@@ -126,7 +126,7 @@ function createPopupBackdrop(modalHost,sh){
  return()=>{disposed=true;cancelAnimationFrame(frame);resizeObserver.disconnect();themeObserver.disconnect();motion.removeEventListener('change',synchronize);forced.removeEventListener('change',synchronize);document.removeEventListener('visibilitychange',synchronize);};
 }
 const contactCSS=`
-.contact-info{flex:1;min-width:0}.contact-edit-button{display:grid;place-items:center;flex:none;padding:6px;border:0;background:transparent;color:var(--sf-muted);border-radius:7px}.contact-edit-button:hover{background:var(--sf-hover)}
+.contact-info{flex:1;min-width:0}.contact .contact-crm{margin-top:3px;color:var(--sf-link);font-weight:600}.contact .contact-crm.known{color:#16814d}:host([data-theme="dark"]) .contact .contact-crm.known{color:#6fd6a0}.contact-edit-button{display:grid;place-items:center;flex:none;padding:6px;border:0;background:transparent;color:var(--sf-muted);border-radius:7px}.contact-edit-button:hover{background:var(--sf-hover)}
 .contact-editor{width:100%;border-top:1px solid var(--sf-border);padding-top:12px;display:flex;flex-direction:column;gap:9px}.contact-editor label{font-size:12px;color:var(--sf-muted)}.contact-editor input{margin-top:4px;font-size:14px}.contact-editor .contact-input{position:relative;display:block}.contact-editor .contact-input input{margin-top:0;padding-right:40px}.contact-editor .contact-input svg{position:absolute;right:12px;top:50%;transform:translateY(-50%);width:17px;height:17px;pointer-events:none;color:var(--sf-muted)}.contact-editor>small{font-size:11px;color:var(--sf-muted)}.contact-editor .actions{margin-top:3px}
 .extract-selection{position:fixed;z-index:3;padding:10px 14px;border:1px solid #aa97df;border-radius:10px;background:#fff;color:#43306d;box-shadow:0 4px 16px #18122f26;font-size:13px;font-weight:600}.extract-selection[hidden]{display:none}
 `;
@@ -211,7 +211,9 @@ async function open(n){
    const key=personKey(person);if(!choices.has(key))choices.set(key,true);
    const card=document.createElement('div');card.className='contact';card.dataset.key=key;
    const check=document.createElement('input');check.type='checkbox';check.checked=choices.get(key);check.disabled=!!savedMessage;check.onchange=()=>choices.set(key,check.checked);check.setAttribute('aria-label','Include '+(person.email||person.name));
-   const info=document.createElement('span'),name=document.createElement('strong'),mail=document.createElement('small');info.className='contact-info';name.textContent=person.name||person.email||'Contact';mail.textContent=person.email;info.append(name,mail);card.append(check,info);
+   const info=document.createElement('span'),name=document.createElement('strong'),mail=document.createElement('small');info.className='contact-info';name.textContent=person.name||person.email||'Contact';mail.textContent=person.email;info.append(name,mail);
+   const inOrg=person.known&&selected?.id,elsewhere=person.crm?.organisations?.filter(o=>o.id!==selected?.id)||[];
+   if(inOrg||elsewhere.length){const status=document.createElement('small');status.className='contact-crm'+(inOrg?' known':'');status.textContent=inOrg?'✓ Already a contact of '+selected.name:'In CRM · '+elsewhere.map(o=>o.name).join(', ')+(person.crm.more?' +'+person.crm.more:'');status.title=inOrg?'Saved contact; this email is added to their history':'This address belongs to a contact of another organisation';info.append(status);}card.append(check,info);
    if(!phoneChoices.has(key))phoneChoices.set(key,unique([...(person.phones||[]),...(!savedMessage&&person.email===d.from.email?d.signaturePhones:[])]));
    const edit=document.createElement('button');edit.type='button';edit.className='contact-edit-button';edit.setAttribute('aria-label','Edit '+(person.name||person.email||'contact'));edit.title='Edit contact';edit.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m16 3 5 5-13 13H3v-5Z"/><path d="m14 5 5 5"/></svg>';edit.onclick=()=>beginContactEdit(person);card.append(edit);
    for(const number of phoneChoices.get(key)){
