@@ -1,6 +1,6 @@
 import {contactName,formatPhone} from '../src/domain.ts';
 import {appearance} from './appearance.mjs';
-import {detectMeeting,logMeeting} from './meetings.mjs';
+import {detectMeeting,logMeeting,manualMeeting} from './meetings.mjs';
 import {prepareCall,saveCall,cancelCall,mergePhones,dialNumber} from './calls.mjs';
 import {randomBytes,createHash} from 'node:crypto';
 import {hashToken,limited,email} from './auth.mjs';
@@ -36,7 +36,7 @@ const threadId=b=>{const t=field(b.gmailThreadId||'',200);if(t&&!/^[\w:.#-]+$/.t
 // A Gmail conversation whose saved emails all sit in one organisation prefills that organisation for its other emails.
 function conversationOrganisation(db,user,b){const thread=threadId(b);if(!thread)return null;const rows=db.prepare('SELECT DISTINCT a.organisation_id AS id FROM extension_thread_refs t JOIN activities a ON a.message_id=t.message_id WHERE t.mailbox=? AND t.thread_id=?').all(identity(b,user).mailbox,thread);return rows.length===1?rows[0].id:null;}
 function linksIn(b){if(b.links===undefined)return[];if(!Array.isArray(b.links)||b.links.length>200)throw new Problem('Too many links.');return b.links.map(l=>field(l,4000));}
-function meetingIn(b){const m=detectMeeting({subject:field(b.originalSubject||b.subject||'',1000),body:field(b.originalBody||'',500000),links:linksIn(b),sentAt:field(b.timestamp||'',50)});return m&&{provider:m.provider,title:m.title,date:m.date,time:m.time,likely:m.likely,cancelled:m.cancelled};}
+function meetingIn(b){const m=detectMeeting({subject:field(b.originalSubject||b.subject||'',1000),body:field(b.originalBody||'',500000),links:linksIn(b),attachments:attachmentRefs(b.attachments).map(a=>a.name),sentAt:field(b.timestamp||'',50)});return m&&{provider:m.provider,title:m.title,date:m.date,time:m.time,likely:m.likely,cancelled:m.cancelled};}
 function attachmentRefs(value){if(value===undefined)return[];if(!Array.isArray(value)||value.length>100)throw new Problem('Too many attachment references.');return value.map(a=>({name:field(a.name,500),size:field(a.size||'',100),type:field(a.type||'',100),referenceOnly:true})).filter(a=>a.name);}
 export function extensionAction(db,user,b,origin){
  if(b.action==='check')return{email:user.email,appearance:appearance(db,user)||'system'};
@@ -143,10 +143,9 @@ export function extensionAction(db,user,b,origin){
    if(!other||other===id)throw new Problem('Choose a different linked organisation.');
    const [a,z]=[id,other].sort();if(!db.prepare('SELECT 1 FROM organisation_links WHERE a=? AND b=?').get(a,z))linkSave(db,user,{id,version:getOrg(db,id).version,other,note:''});
   }
-  // A detected video-call invitation is also logged as a Meeting, on the meeting date the user confirmed.
+  // A ticked meeting is logged on the date the user confirmed; with nothing detected it is a meeting for this email alone.
   if(b.meeting?.log===true&&!result.duplicate){
-   const meeting=detectMeeting({subject:originalSubject,body:original,links:linksIn(b),sentAt}),day=field(b.meeting.date||'',10)||meeting?.date||date,hour=field(b.meeting.time||'',5);
-   if(!meeting)throw new Problem('No meeting found in this email.');
+   const meeting=detectMeeting({subject:originalSubject,body:original,links:linksIn(b),attachments:payload.attachments.map(a=>a.name),sentAt})||manualMeeting(subject||originalSubject,mid),day=field(b.meeting.date||'',10)||meeting?.date||date,hour=field(b.meeting.time||'',5);
    if(!/^\d{4}-\d{2}-\d{2}$/.test(day)||!Number.isFinite(Date.parse(day))||(hour&&!/^\d{2}:\d{2}$/.test(hour)))throw new Problem('Check the meeting date.');
    logMeeting(db,user,{organisationId:id,meeting,date:day,time:hour||meeting.time,messageId:mid,contactIds:db.prepare('SELECT ac.contact_id AS id FROM activity_contacts ac JOIN activities a ON a.id=ac.activity_id WHERE a.message_id=?').all(mid).map(r=>r.id)});
   }

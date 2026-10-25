@@ -27,10 +27,22 @@ test('detects the common video-call invitations with their date and time',()=>{
 });
 test('ordinary emails, invitation replies and loose mentions are told apart',()=>{
  assert.equal(detectMeeting({subject:'Angebot',body:'Anbei das Angebot.'}),null);
- assert.equal(detectMeeting({subject:'Akzeptiert: Projekt-Kickoff',body:'https://meet.google.com/abc-defg-hij'}),null);
+ assert.equal(detectMeeting({subject:'Abgelehnt: Projekt-Kickoff',body:'https://meet.google.com/abc-defg-hij'}),null);
  const loose=detectMeeting({subject:'Re: Angebot',body:'Sollen wir kurz per Google Meet sprechen?'});
  assert.equal(loose.likely,false);assert.equal(loose.date,'');
  assert.equal(detectMeeting({subject:'Abgesagt: Projekt-Kickoff',body:'https://meet.google.com/abc-defg-hij'}).cancelled,true);
+});
+test('calendar and booking confirmations without a video link are offered as meetings',()=>{
+ const accepted=detectMeeting({subject:'Akzeptiert: Kickoff @ Di. 27. Okt. 2026 10:00 - 11:00 (MEZ) (pat@customer.test)',body:'Pat hat diese Einladung angenommen.'});
+ assert.deepEqual([accepted.provider,accepted.title,accepted.date,accepted.time,accepted.likely],['','Kickoff','2026-10-27','10:00',true]);
+ const calendly=detectMeeting({subject:'New Event: Pat Doe - 30 Minute Meeting',body:'Event Type: 30 Minute Meeting\nDate: Nov 3, 2026 02:00 PM (Central European Time)\nPowered by Calendly'});
+ assert.deepEqual([calendly.date,calendly.time,calendly.likely],['2026-11-03','14:00',true]);
+ const german=detectMeeting({subject:'Terminbestätigung: Beratungsgespräch',body:'Ihr Termin am 05.11.2026 um 15:30 Uhr ist bestätigt.\nAdresse: Hauptstraße 1, Berlin'});
+ assert.deepEqual([german.title,german.date,german.time,german.likely],['Beratungsgespräch','2026-11-05','15:30',true]);
+ assert.equal(detectMeeting({subject:'Projekt',body:'Siehe Anhang',attachments:['invite.ics']}).likely,true);
+ assert.equal(detectMeeting({subject:'Abgelehnt: Kickoff',body:''}),null);
+ assert.equal(detectMeeting({subject:'Re: Angebot',body:'Passt gut.\n\nGruß Pat\nTermin buchen: calendly.com/pat'}),null);
+ assert.equal(detectMeeting({subject:'Rechnung 2026-11',body:'Fällig am 05.11.2026'}),null);
 });
 test('saving an invitation logs one meeting that later invitations move or cancel',async()=>{
  const{db,user}=await setup();try{
@@ -49,7 +61,11 @@ test('saving an invitation logs one meeting that later invitations move or cance
   assert.ok(history(db,id,0,'communication').items.some(i=>i.art==='Meeting'));
   save(db,user,{originalSubject:'Angebot',originalBody:'Per Google Meet?',organisationId:id,version:version(),timestamp:'2026-10-16T10:07:00Z'});
   assert.equal(meeting().length,1);
-  assert.throws(()=>save(db,user,{originalSubject:'Angebot 2',originalBody:'Anbei',organisationId:id,version:version(),timestamp:'2026-10-16T11:07:00Z',meeting:{log:true}}),/No meeting/);
+  save(db,user,{originalSubject:'Re: Kurzer Austausch',originalBody:'Danke für das Gespräch heute.',organisationId:id,version:version(),timestamp:'2026-10-16T11:07:00Z',meeting:{log:true,date:'2026-10-16',time:'09:00'}});
+  save(db,user,{originalSubject:'Re: Kurzer Austausch',originalBody:'Noch eine Frage.',organisationId:id,version:version(),timestamp:'2026-10-16T11:37:00Z',meeting:{log:true,date:'2026-10-16'}});
+  const manual=meeting().filter(m=>m.body.includes('Kurzer Austausch'));
+  assert.equal(manual.length,2,'each ticked email without an invitation is its own meeting');assert.equal(manual[0].body,'09:00 Uhr · Kurzer Austausch');
+  assert.equal(db.prepare('SELECT last_contact FROM organisations WHERE id=?').get(id).last_contact,'2026-10-16');
   assert.throws(()=>save(db,user,{...invite,originalSubject:'Einladung: Zwei',organisationId:id,version:version(),timestamp:'2026-10-16T12:07:00Z',meeting:{log:true,date:'27.10.2026'}}),/meeting date/);
  }finally{db.close();}
 });

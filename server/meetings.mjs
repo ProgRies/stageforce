@@ -1,5 +1,5 @@
 import {addActivity} from './crm.mjs';
-// Video-call invitations in saved emails become Meeting entries in the organisation timeline.
+// Video-call invitations and calendar or booking confirmations in saved emails become Meeting entries in the organisation timeline.
 const PROVIDERS=[
  {name:'Zoom',link:/https?:\/\/(?:[\w-]+\.)?zoom(?:gov)?\.us\/(?:j|w|s|my)\/[\w.-]+(?:\?pwd=[\w.-]+)?/i,text:/\bjoin zoom meeting\b|\bzoom[- ]meeting\b|\bzoom-besprechung\b|\bzoom video communications\b/i,key:l=>/\/(?:j|w|s|my)\/([\w.-]+)/i.exec(l)?.[1]},
  {name:'Microsoft Teams',link:/https?:\/\/teams\.(?:microsoft|live)\.com\/(?:l\/meetup-join|meet)\/[^\s<>"')\]]+/i,text:/\bmicrosoft teams[- ](?:meeting|besprechung)\b|\bmicrosoft teams need help\b|\bjoin the meeting now\b|\bjetzt an der besprechung teilnehmen\b/i,key:l=>{try{return decodeURIComponent(l).match(/meeting_[\w-]+|\/meet\/(\d+)/i)?.[0];}catch{return null;}}},
@@ -12,7 +12,12 @@ const PROVIDERS=[
 ];
 const INVITE=/^(?:(?:aktualisierte |updated |neue )?(?:einladung|invitation|meeting invitation|besprechungsanfrage)|termin|meeting|besprechung)\s*(?:mit[^:]{0,80})?:\s*/i;
 const CANCELLED=/^(?:abgesagt|abgesagter termin|abgesagtes ereignis|canceled|cancelled|canceled event|cancelled event|absage)\s*(?:with[^:]{0,80})?:\s*/i;
-const RESPONSE=/^(?:akzeptiert|zugesagt|abgelehnt|mit vorbehalt|vorläufig|accepted|declined|tentative|tentatively accepted|updated invitation with note|neue zeit vorgeschlagen|new time proposed)\s*:/i;
+// Declines and counter-proposals say nothing about a meeting taking place; acceptances confirm it.
+const RESPONSE=/^(?:abgelehnt|mit vorbehalt|vorläufig|declined|tentative|tentatively accepted|neue zeit vorgeschlagen|new time proposed)\s*:/i;
+const ACCEPTED=/^(?:akzeptiert|zugesagt|angenommen|accepted|updated invitation with note)\s*:\s*/i;
+// Calendar and booking-tool confirmations, with or without a video link.
+const CONFIRMED=/\b(?:termin ?bestätigung|terminbestätigung|buchungsbestätigung|termin (?:bestätigt|gebucht|vereinbart)|meeting (?:bestätigt|confirmed|scheduled|booked)|(?:booking|appointment|event) (?:confirmed|scheduled)|confirmed:|bestätigt:|new event:|neuer termin:|neues ereignis:|neue veranstaltung:|invitation from google calendar|einladung von google kalender)/i;
+const BOOKING=/\b(?:calendly|cal\.com|hubspot meetings|microsoft bookings|doodle|youcanbook\.me|acuity scheduling|zcal|savvycal|tidycal)\b/i;
 const MONTHS={jan:1,januar:1,january:1,jän:1,feb:2,februar:2,february:2,mär:3,mrz:3,märz:3,mar:3,march:3,apr:4,april:4,mai:5,may:5,jun:6,juni:6,june:6,jul:7,juli:7,july:7,aug:8,august:8,sep:9,sept:9,september:9,okt:10,oct:10,oktober:10,october:10,nov:11,november:11,dez:12,dec:12,dezember:12,december:12};
 const MONTH='(jan(?:uar|uary)?|jän(?:ner)?|feb(?:ruar|ruary)?|mär(?:z)?|mrz|mar(?:ch)?|apr(?:il)?|mai|may|jun[ei]?|jul[iy]?|aug(?:ust)?|sept?(?:ember)?|okt(?:ober)?|oct(?:ober)?|nov(?:ember)?|dez(?:ember)?|dec(?:ember)?)\\.?';
 const pad=n=>String(n).padStart(2,'0');
@@ -37,27 +42,37 @@ export function meetingDate(line,fallbackYear){
  return{date:y+'-'+pad(m)+'-'+pad(d),time:time(rest.slice(0,40))};
 }
 const WHEN=/^\s*(?:when|wann|time|zeit|uhrzeit|date|datum|termin|start|beginn)\s*:?\s*(.*)$/i;
-function scheduled(subject,body,year){
+function scheduled(subject,body,year,loose=false){
  const at=/\s@\s(.+)$/.exec(subject);if(at){const found=meetingDate(at[1],year);if(found)return found;}
  const lines=body.split('\n').map(l=>l.trim()).slice(0,400);
  for(let i=0;i<lines.length;i++){const m=WHEN.exec(lines[i]);if(!m)continue;const found=meetingDate(m[1]||lines[i+1]||'',year)||(!m[1]?null:meetingDate(lines[i+1]||'',year));if(found)return found;}
- return meetingDate(subject,year);
+ const inSubject=meetingDate(subject,year);if(inSubject||!loose)return inSubject;
+ // Confirmations often name the date in a sentence ("Ihr Termin am 05.11.2026 um 15:30 Uhr").
+ for(const line of lines.slice(0,60)){const found=meetingDate(line,year);if(found)return found;}
+ return null;
 }
-const cleanTitle=s=>s.replace(CANCELLED,'').replace(INVITE,'').replace(/\s@\s.+$/,'').replace(/\s*\((?:[^()]*@[^()]*)\)\s*$/,'').trim().slice(0,300);
-// Finds a video-call invitation in an email. `links` are href values the client read from the message.
-export function detectMeeting({subject='',body='',links=[],sentAt=''}={}){
+const PREFIX=/^(?:(?:re|aw|fwd?|wg)\s*:\s*)*(?:(?:termin|buchungs)bestätigung|termin ?bestätigung|bestätigt|bestätigung|confirmed|confirmation|new event|neuer termin|neues ereignis|neue veranstaltung|(?:booking|appointment|meeting) confirmed)\s*:\s*/i;
+const cleanTitle=s=>s.replace(PREFIX,'').replace(CANCELLED,'').replace(ACCEPTED,'').replace(INVITE,'').replace(/\s@\s.+$/,'').replace(/\s*\((?:[^()]*@[^()]*)\)\s*$/,'').trim().slice(0,300);
+// Finds a meeting in an email. `links` are href values and `attachments` file names the client read from the message.
+export function detectMeeting({subject='',body='',links=[],attachments=[],sentAt=''}={}){
  subject=String(subject).trim();body=String(body).slice(0,200000);
  if(RESPONSE.test(subject))return null;
  const hay=[...links.map(String),body].join('\n');let provider=null,link='';
  for(const p of PROVIDERS){const m=p.link.exec(hay);if(m){provider=p;link=m[0];break;}}
  if(!provider)provider=PROVIDERS.find(p=>p.text.test(subject+'\n'+body));
- if(!provider)return null;
- const year=Number((sentAt||'').slice(0,4))||new Date().getFullYear(),when=scheduled(subject,body,year);
+ const calendar=attachments.some(a=>/\.ics$/i.test(String(a))),confirmed=ACCEPTED.test(subject)||CONFIRMED.test(subject)||CONFIRMED.test(body.slice(0,600))||calendar;
+ // Booking-tool names also sit in signatures ("book a call: calendly.com/…"), so alone they only count with a labelled date.
+ if(!provider&&!confirmed&&!BOOKING.test(subject+'\n'+body.slice(0,5000))&&!INVITE.test(subject)&&!CANCELLED.test(subject))return null;
+ provider??={name:'',key:()=>null};
+ const year=Number((sentAt||'').slice(0,4))||new Date().getFullYear(),when=scheduled(subject,body,year,confirmed);
+ if(!provider.name&&!when&&!calendar&&!confirmed)return null;
  const id=link&&provider.key(link);
- const title=cleanTitle(subject)||provider.name;
- return{provider:provider.name,title,link,likely:!!(link||when||INVITE.test(subject)||CANCELLED.test(subject)),date:when?.date||'',time:when?.time||'',cancelled:CANCELLED.test(subject),key:(provider.name+':'+(id||title.toLowerCase())).slice(0,500)};
+ const title=cleanTitle(subject)||provider.name||'Meeting';
+ return{provider:provider.name,title,link,likely:!!(link||when||confirmed||INVITE.test(subject)||CANCELLED.test(subject)),date:when?.date||'',time:when?.time||'',cancelled:CANCELLED.test(subject),key:((provider.name||'Termin')+':'+(id||title.toLowerCase())).slice(0,500)};
 }
-export const meetingText=(m,cancelled=false)=>(cancelled?'Abgesagt · ':'')+m.provider+(m.time?' · '+m.time+' Uhr':'')+(m.title&&m.title!==m.provider?' · '+m.title:'');
+export const meetingText=(m,cancelled=false)=>[cancelled&&'Abgesagt',m.provider,m.time&&m.time+' Uhr',m.title&&m.title!==m.provider&&m.title!=='Meeting'&&m.title].filter(Boolean).join(' · ')||'Meeting';
+// The user ticked "log as meeting" on an email nothing was detected in: one meeting for that email.
+export const manualMeeting=(subject,messageId)=>({provider:'',title:cleanTitle(String(subject||'').replace(/^(?:(?:re|aw|fwd?|wg)\s*:\s*)+/i,''))||'Meeting',link:'',date:'',time:'',cancelled:false,likely:false,key:'Manuell:'+messageId});
 // One meeting per invitation: updated invitations move the existing entry, cancellations mark it.
 export function logMeeting(db,user,{organisationId,meeting,date,time,messageId,contactIds=[]}){
  const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Berlin'}).format(new Date());

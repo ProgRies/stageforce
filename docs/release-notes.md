@@ -1,3 +1,11 @@
+## Unreleased · extension 0.4.17
+
+Log any email as a meeting. Reload the extension and refresh Gmail; rebuild the CRM. No database migration is required.
+
+- The popup always shows "Also log as meeting" with a date and time, so any email (a thank-you after a call, a confirmation the detection misses) can be logged as a Meeting in the same save. It starts unticked unless the email is an invitation or confirmation.
+- Calendar and booking confirmations without a video link are recognised and ticked with their date: Google/Outlook acceptances ("Akzeptiert:", "Accepted:"), "Terminbestätigung", "Buchungsbestätigung", "Termin bestätigt", "New Event:" (Calendly and similar), and emails with an .ics invitation. Dates in a sentence ("Ihr Termin am 05.11.2026 um 15:30 Uhr") are read too.
+- Declines and counter-proposals are still ignored. A booking-tool link in a signature alone does not tick the box.
+
 ## Unreleased · extension 0.4.16
 
 Rebuild the CRM and reload the extension in `chrome://extensions`. No database change.
