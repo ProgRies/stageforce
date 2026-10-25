@@ -10,12 +10,14 @@ In FastBill, open **Kunden → Export**, select **CSV**, and enable **Ansprechpa
 2. Enter the FastBill main account's email as the account identifier. Use the same value for every export, including imports by colleagues. API imports use that email automatically. This keeps identical customer numbers from different accounts separate.
 3. Select the original CSV, without opening and re-saving it in Excel. Review the suggested column mappings and the first-row sample. Choose **Nicht übernehmen** for unneeded columns. Internal customer ID and customer number are distinct fields.
 4. Select **Zur Prüfung laden**. The private review queue survives browser closure and application restart.
-5. Select a row, inspect the source values and suggested organisations, and choose the correct organisation. A shared email/name is only a suggestion; multiple candidates stay unresolved.
-6. Tick fields to copy. Existing values appear alongside proposed values; only blank city, website or customer-link fields are preselected when a value is available. These still require confirmation.
-7. To import phone/email data, tick **Kontaktdaten übernehmen**. Choose an existing contact to append addresses without replacing its name or position, or create a new contact. Shared contacts belonging to multiple organisations must be edited through the contact editor. Primary-contact selection is unchanged.
-8. **Bestätigen** saves the chosen data, account/customer references and optional team note with your authorship. **Nicht relevant** records a skip decision without touching CRM data.
+5. Select a row. Stage Force lists **Mögliche Treffer im CRM**: a confirmed customer number/ID, the same email address, phone number or company domain, the same contact person, or a similar name (legal forms such as GmbH, e.V. or & Co. KG are ignored). Free-mail domains and short generic names are not counted. The list on the left shows the best guess (`≈ Name`) or **Neu** for each open row.
+6. If the row belongs to an existing organisation, pick it and select **Zuordnen**. Tick fields to copy; only blank city, website or customer-link fields are preselected. To import phone/email data, tick **Kontaktdaten übernehmen** and choose an existing contact to append addresses to, or create a new one.
+7. If the customer is not in the CRM yet, select **Als neue Organisation hinzufügen**. One click creates exactly one organisation from that row: name, city, website and customer link where present, and the row's contact person as main contact. No other fields are added. The customer export carries no billing data, so the organisation starts as **Lead**; it starts as **Kunde** only when an invoice export of the same FastBill account, staged before, holds a bill for that customer number/ID that is neither cancelled nor a draft. If there are possible matches, Stage Force asks once more before adding. A new organisation without an email address goes to **Prüfen** ("E-Mail-Adresse fehlt (FastBill-Import)"), the same list a call with "E-Mail nötig" uses.
+8. **Nicht relevant** records a skip decision without touching CRM data.
 
-A manually created organisation is saved immediately by **Neue Organisation**, independently of the later import confirmation. Check for an existing organisation first.
+After each decision the next open row opens, so a large export can be worked through click by click over several sessions. Nothing is added to the CRM without one of these clicks. Further contact rows of a customer you just added show that organisation as a confirmed match instead of offering a second one.
+
+To pick up later, import the same file again with the same account identifier. Rows already added, assigned or marked **Nicht relevant** are recognised and skipped; only new or changed rows stay open. A decision also closes the same row in older import runs.
 
 ## Invoice exports are evidence, not a second ledger
 
@@ -48,7 +50,7 @@ FastBill currently documents 100 results per page and plan-dependent hourly call
 - Fingerprints cover retained source fields. Identical reviewed or skipped rows are marked accordingly on another import. Changed retained fields create a new pending review. Changes to discarded financial fields do not trigger CRM review.
 - Confirmed customer ID/number mappings are scoped to the FastBill account. One payer can have multiple explicitly confirmed CRM associations; this never merges organisations. Agency/ministry relationships still require human judgment.
 - **Erneut prüfen** clears the remembered decision and that customer's remembered mapping to the prior organisation. Previously approved CRM fields, contacts, provenance and history remain. Correct those in the organisation editor if needed; reopening is not a rollback.
-- Queue rows are private to the uploader. Decisions and confirmed mappings are shared. A decision made in another import blocks a conflicting save and appears on reloading the row. Organisation versions protect concurrent edits.
+- Queue rows are private to the uploader. Decisions and confirmed mappings are shared. A decision closes identical open rows in every run for that FastBill account; a stale screen gets a conflict message instead of a second save. Organisation versions protect concurrent edits.
 - Deleting an import run removes its staged rows, not confirmed CRM changes, shared mappings or fingerprint decisions. Kept runs are included in SQLite backups.
 - Maximum 8 MB CSV, 10,000 rows per run and 20 retained runs per user. Lists page at 100 rows. API pages also append up to 10,000 records per run. Delete completed runs when no longer needed.
 - Supported: UTF-8/BOM and browser-decoded Windows-1252, comma/semicolon/tab delimiters, quoted delimiters, escaped quotes, multiline cells. XLSX, ZIP, DATEV and attachment imports are not supported. Malformed structure rejects the whole upload before staging.
@@ -56,7 +58,7 @@ FastBill currently documents 100 results per page and plan-dependent hourly call
 
 ## Upgrade and verification
 
-Back up before upgrading: schema version 3 adds four import tables transactionally. Existing CRM records are retained. Do not re-run the original spreadsheet migration. An older version refuses schema 3; rollback requires the pre-upgrade backup. The existing full-database backup/restore workflow moves local review work to your hosted deployment.
+Back up before upgrading: schema version 3 adds four import tables transactionally. Existing CRM records are retained. The original spreadsheet migration has been removed. An older version refuses schema 3; rollback requires the pre-upgrade backup. The existing full-database backup/restore workflow moves local review work to your hosted deployment.
 
 Automated tests cover parsing, column validation, staged-data minimization, ownership, CSRF/origin/session checks, read-only API requests, repeat imports, conflicts, transactional rollback, contact enrichment, ID/number separation and additive schema upgrades. API tests use mocked responses and fictional records. A real FastBill export, live credentials and interactive browser testing are still needed for final compatibility validation.
 

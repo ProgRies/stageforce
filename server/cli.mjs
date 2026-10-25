@@ -1,8 +1,6 @@
-import {readFileSync,writeFileSync} from 'node:fs';
 import {emitKeypressEvents} from 'node:readline';
 import {openDB,backupDB} from './db.mjs';
 import {addUser,hashPassword} from './auth.mjs';
-import {migrateSnapshot} from './migrate.mjs';
 import {createOrg,addContact} from './crm.mjs';
 process.umask(0o077);
 async function password(){if(!process.stdin.isTTY){if(!process.argv.includes('--password-stdin'))throw Error('Use an interactive terminal, or explicitly pass --password-stdin with a secret piped via stdin.');let s='';for await(const c of process.stdin)s+=c;return s.replace(/[\r\n]+$/,'');}
@@ -12,7 +10,6 @@ const db=openDB();try{const [cmd,...args]=process.argv.slice(2);
  else if(cmd==='user:password'){const user=db.prepare('SELECT id FROM users WHERE email=? COLLATE NOCASE').get(args[0]);if(!user)throw Error('Account nicht gefunden.');db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(await hashPassword(await password()),user.id);db.prepare('DELETE FROM sessions WHERE user_id=?').run(user.id);db.prepare('DELETE FROM extension_keys WHERE user_id=?').run(user.id);console.log('Passwort geändert; Sitzungen beendet und Browser-Schlüssel widerrufen.');}
  else if(cmd==='user:disable'){const u=db.prepare('SELECT id FROM users WHERE email=? COLLATE NOCASE').get(args[0]);if(!u)throw Error('Account nicht gefunden.');db.prepare('UPDATE users SET active=0 WHERE id=?').run(u.id);db.prepare('DELETE FROM sessions WHERE user_id=?').run(u.id);db.prepare('DELETE FROM extension_keys WHERE user_id=?').run(u.id);console.log('Account deaktiviert.');}
  else if(cmd==='user:list')console.table(db.prepare('SELECT name,email,active FROM users').all());
- else if(cmd==='migrate'){if(!args[0])throw Error('migrate /path/to/snapshot.json [report.json]');const report=migrateSnapshot(db,JSON.parse(readFileSync(args[0],'utf8')));if(args[1])writeFileSync(args[1],JSON.stringify(report,null,2),{mode:0o600});console.log(JSON.stringify({...report,warnings:report.warnings.length},null,2));}
  else if(cmd==='backup'){if(!args[0])throw Error('backup /path/to/backup.sqlite');await backupDB(db,args[0]);console.log('Konsistente SQLite-Sicherung erstellt.');}
- else{console.log('Befehle: user:add EMAIL "NAME", user:password EMAIL, user:disable EMAIL, user:list, migrate SNAPSHOT [REPORT], backup FILE');}
+ else{console.log('Befehle: user:add EMAIL "NAME", user:password EMAIL, user:disable EMAIL, user:list, backup FILE');}
 }catch(e){console.error(e.message);process.exitCode=1;}finally{db.close();}
