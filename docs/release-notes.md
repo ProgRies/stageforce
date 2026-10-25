@@ -4,6 +4,7 @@ Log any email as a meeting. Reload the extension and refresh Gmail; rebuild the 
 
 - The popup always shows "Also log as meeting" with a date and time, so any email (a thank-you after a call, a confirmation the detection misses) can be logged as a Meeting in the same save. It starts unticked unless the email is an invitation or confirmation.
 - Calendar and booking confirmations without a video link are recognised and ticked with their date: Google/Outlook acceptances ("Akzeptiert:", "Accepted:"), "Terminbestätigung", "Buchungsbestätigung", "Termin bestätigt", "New Event:" (Calendly and similar), and emails with an .ics invitation. Dates in a sentence ("Ihr Termin am 05.11.2026 um 15:30 Uhr") are read too.
+- Several emails about one meeting (invite, acceptance, reminder, booking confirmation) stay one entry: an email belongs to a meeting with the same join link or title, or else to a meeting of that organisation on the same day at the same time. The popup then says "Meeting on … already logged" and stays unticked; ticking only adds the email's contacts. Updated invitations and cancellations still move or mark the entry.
 - Declines and counter-proposals are still ignored. A booking-tool link in a signature alone does not tick the box.
 
 ## Unreleased · extension 0.4.16

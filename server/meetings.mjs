@@ -51,7 +51,7 @@ function scheduled(subject,body,year,loose=false){
  for(const line of lines.slice(0,60)){const found=meetingDate(line,year);if(found)return found;}
  return null;
 }
-const PREFIX=/^(?:(?:re|aw|fwd?|wg)\s*:\s*)*(?:(?:termin|buchungs)bestätigung|termin ?bestätigung|bestätigt|bestätigung|confirmed|confirmation|new event|neuer termin|neues ereignis|neue veranstaltung|(?:booking|appointment|meeting) confirmed)\s*:\s*/i;
+const PREFIX=/^(?:(?:re|aw|fwd?|wg)\s*:\s*)*(?:erinnerung|reminder|(?:termin|buchungs)bestätigung|termin ?bestätigung|bestätigt|bestätigung|confirmed|confirmation|new event|neuer termin|neues ereignis|neue veranstaltung|(?:booking|appointment|meeting) confirmed)\s*:\s*/i;
 const cleanTitle=s=>s.replace(PREFIX,'').replace(CANCELLED,'').replace(ACCEPTED,'').replace(INVITE,'').replace(/\s@\s.+$/,'').replace(/\s*\((?:[^()]*@[^()]*)\)\s*$/,'').trim().slice(0,300);
 // Finds a meeting in an email. `links` are href values and `attachments` file names the client read from the message.
 export function detectMeeting({subject='',body='',links=[],attachments=[],sentAt=''}={}){
@@ -73,12 +73,24 @@ export function detectMeeting({subject='',body='',links=[],attachments=[],sentAt
 export const meetingText=(m,cancelled=false)=>[cancelled&&'Abgesagt',m.provider,m.time&&m.time+' Uhr',m.title&&m.title!==m.provider&&m.title!=='Meeting'&&m.title].filter(Boolean).join(' · ')||'Meeting';
 // The user ticked "log as meeting" on an email nothing was detected in: one meeting for that email.
 export const manualMeeting=(subject,messageId)=>({provider:'',title:cleanTitle(String(subject||'').replace(/^(?:(?:re|aw|fwd?|wg)\s*:\s*)+/i,''))||'Meeting',link:'',date:'',time:'',cancelled:false,likely:false,key:'Manuell:'+messageId});
-// One meeting per invitation: updated invitations move the existing entry, cancellations mark it.
+const uhr=body=>/(\d{2}:\d{2}) Uhr/.exec(body||'')?.[1]||'';
+// The entry an email belongs to: the same invitation (join link or title), or else any meeting of the
+// organisation on the same day at a matching time, so an invite, its acceptance, a booking confirmation
+// and a reminder end up as one entry.
+export function findMeeting(db,organisationId,meeting,date,time){
+ const byKey=db.prepare('SELECT a.id,a.occurred_on AS date,a.body FROM meeting_refs r JOIN activities a ON a.id=r.activity_id WHERE a.organisation_id=? AND r.meeting_key=? ORDER BY a.created_at LIMIT 1').get(organisationId,meeting.key);
+ if(byKey)return{...byKey,match:'key'};
+ if(!date)return null;const at=time??meeting.time;
+ const sameDay=db.prepare("SELECT id,occurred_on AS date,body FROM activities WHERE organisation_id=? AND kind='Meeting' AND occurred_on=? ORDER BY created_at").all(organisationId,date).find(a=>!at||!uhr(a.body)||uhr(a.body)===at);
+ return sameDay?{...sameDay,match:'date'}:null;
+}
+// One meeting per invitation: updated invitations move the existing entry, cancellations mark it,
+// other emails about the same meeting only add their contacts.
 export function logMeeting(db,user,{organisationId,meeting,date,time,messageId,contactIds=[]}){
  const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Berlin'}).format(new Date());
- const m={...meeting,time:time??meeting.time};let activityId=db.prepare('SELECT r.activity_id AS id FROM meeting_refs r JOIN activities a ON a.id=r.activity_id WHERE a.organisation_id=? AND r.meeting_key=? ORDER BY a.created_at LIMIT 1').get(organisationId,meeting.key)?.id;
- if(activityId){const held=!meeting.cancelled&&date<=today;db.prepare('UPDATE activities SET occurred_on=?,body=?,is_contact=? WHERE id=?').run(date,meetingText(m,meeting.cancelled),held?1:0,activityId);if(held)db.prepare('UPDATE organisations SET last_contact=CASE WHEN last_contact IS NULL OR last_contact<? THEN ? ELSE last_contact END WHERE id=?').run(date,date,organisationId);}
- else{
+ const m={...meeting,time:time??meeting.time},found=findMeeting(db,organisationId,meeting,date,m.time);let activityId=found?.id;
+ if(found?.match==='key'||found&&meeting.cancelled){const held=!meeting.cancelled&&date<=today;db.prepare('UPDATE activities SET occurred_on=?,body=?,is_contact=? WHERE id=?').run(date,meetingText(m,meeting.cancelled),held?1:0,activityId);if(held)db.prepare('UPDATE organisations SET last_contact=CASE WHEN last_contact IS NULL OR last_contact<? THEN ? ELSE last_contact END WHERE id=?').run(date,date,organisationId);}
+ else if(!found){
   if(meeting.cancelled)return null;
   activityId=addActivity(db,organisationId,user,{type:'Meeting',text:meetingText(m),date,contacted:date<=today});
   db.prepare('INSERT INTO meeting_refs VALUES(?,?,?,?)').run(activityId,meeting.key,messageId||null,meeting.link||'');

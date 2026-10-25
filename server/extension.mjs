@@ -1,6 +1,6 @@
 import {contactName,formatPhone} from '../src/domain.ts';
 import {appearance} from './appearance.mjs';
-import {detectMeeting,logMeeting,manualMeeting} from './meetings.mjs';
+import {detectMeeting,logMeeting,manualMeeting,findMeeting,meetingText} from './meetings.mjs';
 import {prepareCall,saveCall,cancelCall,mergePhones,dialNumber} from './calls.mjs';
 import {randomBytes,createHash} from 'node:crypto';
 import {hashToken,limited,email} from './auth.mjs';
@@ -36,7 +36,10 @@ const threadId=b=>{const t=field(b.gmailThreadId||'',200);if(t&&!/^[\w:.#-]+$/.t
 // A Gmail conversation whose saved emails all sit in one organisation prefills that organisation for its other emails.
 function conversationOrganisation(db,user,b){const thread=threadId(b);if(!thread)return null;const rows=db.prepare('SELECT DISTINCT a.organisation_id AS id FROM extension_thread_refs t JOIN activities a ON a.message_id=t.message_id WHERE t.mailbox=? AND t.thread_id=?').all(identity(b,user).mailbox,thread);return rows.length===1?rows[0].id:null;}
 function linksIn(b){if(b.links===undefined)return[];if(!Array.isArray(b.links)||b.links.length>200)throw new Problem('Too many links.');return b.links.map(l=>field(l,4000));}
-function meetingIn(b){const m=detectMeeting({subject:field(b.originalSubject||b.subject||'',1000),body:field(b.originalBody||'',500000),links:linksIn(b),attachments:attachmentRefs(b.attachments).map(a=>a.name),sentAt:field(b.timestamp||'',50)});return m&&{provider:m.provider,title:m.title,date:m.date,time:m.time,likely:m.likely,cancelled:m.cancelled};}
+function meetingIn(db,b){const m=detectMeeting({subject:field(b.originalSubject||b.subject||'',1000),body:field(b.originalBody||'',500000),links:linksIn(b),attachments:attachmentRefs(b.attachments).map(a=>a.name),sentAt:field(b.timestamp||'',50)});if(!m)return null;
+ // With an organisation chosen, say whether this meeting is already in its timeline.
+ const id=b.organisationId&&field(b.organisationId,100),found=id&&db.prepare('SELECT 1 FROM organisations WHERE id=?').get(id)&&findMeeting(db,id,m,m.date,m.time);
+ return{provider:m.provider,title:m.title,date:m.date,time:m.time,likely:m.likely,cancelled:m.cancelled,logged:found?{date:found.date,text:found.body,update:found.match==='key'&&(found.date!==m.date||m.cancelled||found.body!==meetingText(m))}:null};}
 function attachmentRefs(value){if(value===undefined)return[];if(!Array.isArray(value)||value.length>100)throw new Problem('Too many attachment references.');return value.map(a=>({name:field(a.name,500),size:field(a.size||'',100),type:field(a.type||'',100),referenceOnly:true})).filter(a=>a.name);}
 export function extensionAction(db,user,b,origin){
  if(b.action==='check')return{email:user.email,appearance:appearance(db,user)||'system'};
@@ -83,7 +86,7 @@ export function extensionAction(db,user,b,origin){
   if(!person)throw new Problem('Select a contact from the email headers.');return prepareCall(db,user,b,{participant:person});
  }
  // Preview for the popup; the save request repeats detection on the server.
- if(b.action==='meeting')return{meeting:meetingIn(b)};
+ if(b.action==='meeting')return{meeting:meetingIn(db,b)};
  if(b.action==='callCancel')return cancelCall(db,user,b);
  if(b.action==='callSave')return saveCall(db,user,b);
  if(b.action==='search'){
