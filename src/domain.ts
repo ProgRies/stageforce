@@ -1,5 +1,6 @@
 export type CellValue = string | number;
-export type Entity = { id: string; row: number; values: CellValue[]; version: string; ownerId?: string; reservedBy?: string };
+export type UpcomingMeeting = { date: string; text: string };
+export type Entity = { id: string; row: number; values: CellValue[]; version: string; ownerId?: string; reservedBy?: string; upcoming?: UpcomingMeeting|null };
 export type TeamUser = { id: string; name: string; email: string };
 export type EntityLink = { id: string; a: string; b: string; note: string };
 export const HEADERS = ["Entität-ID","Name","Entitätstyp","FastBill-Link (manuell)","Ort","Bundesland","Website","Größe","Größenmaß","Beziehungsstatus","Vertriebsphase","Zuständig intern","Hauptkontakt","E-Mail","Telefon","Letzter belegter Kontakt","Nächster Schritt","Wiedervorlage","Kurzüberblick","Prüfbedarf","Kontakte JSON","Historie JSON","Verknüpfte Entitäten JSON","Quellen JSON"];
@@ -29,6 +30,9 @@ export function dateISO(value: unknown): string {
   const m = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/); return m ? `${m[3]}-${m[2]}-${m[1]}` : "";
 }
 export function validDate(s: string) { if(!/^\d{4}-\d{2}-\d{2}$/.test(s))return false;const d=new Date(s+"T12:00:00Z");return !isNaN(+d)&&d.toISOString().slice(0,10)===s; }
+// "heute", "morgen" or "Di., 03.11." for a planned meeting.
+export function meetingWhen(date:string,today=todayBerlin()){const days=Math.round((Date.parse(date+"T12:00:00Z")-Date.parse(today+"T12:00:00Z"))/86400000);if(days===0)return "heute";if(days===1)return "morgen";return new Intl.DateTimeFormat("de-DE",{weekday:"short",day:"2-digit",month:"2-digit",timeZone:"UTC"}).format(new Date(date+"T12:00:00Z"));}
+export function latestMeetingDate(today=todayBerlin()){const d=new Date(today+"T12:00:00Z");d.setUTCFullYear(d.getUTCFullYear()+2);return d.toISOString().slice(0,10);}
 export function formatDate(value: unknown) { const s=dateISO(value); return s ? new Intl.DateTimeFormat("de-DE",{day:"2-digit",month:"2-digit",year:"numeric",timeZone:"UTC"}).format(new Date(s+"T12:00:00Z")) : "—"; }
 export function fastbillURL(value: unknown): string { try { const u=new URL(String(value)); return u.protocol==="https:" && !u.username && !u.password && (u.hostname==="fastbill.com"||u.hostname.endsWith(".fastbill.com")) ? u.href : ""; } catch { return ""; } }
 // A normal browser shortcut, with no mailbox API or extra permission.
@@ -68,6 +72,8 @@ export function contactLabel(e: Entity) { const days=contactAge(e);return days==
 // A scheduled follow-up wins: a future date keeps the organisation out, a due date brings it back
 // even after "Kein Interesse". Only "Verloren" stays out for good.
 export function callable(e:Entity,today=todayBerlin()){
+  // A booked meeting replaces the call until it has taken place.
+  if(e.upcoming)return false;
   if(!phone(e)||text(e,10)==="Verloren"||["Ehemaliger Kunde","Partner / Agentur"].includes(text(e,9)))return false;
   const due=dateISO(e.values[17]);if(due)return due<=today;
   return text(e,10)!=="Aktuell kein Bedarf";

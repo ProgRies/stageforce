@@ -10,6 +10,7 @@
 | contact_addresses | Multiple email addresses/phone numbers per contact; primary address ordered first |
 | activities | One interaction/note per row; linked organisation and optional signed-in author/message |
 | meeting_refs | One row per detected video-call invitation per organisation; points at its Meeting activity so updated or cancelled invitations change that entry instead of adding another |
+| meeting_status | Marks a Meeting activity as cancelled; planned meetings are Meeting activities dated in the future |
 | activity_contacts | Explicitly reviewed email/call activity ↔ contact associations; no backfill/inferred links for old messages |
 | messages | Approved text, subject, participants, sent timestamp, direction, attachment metadata and unique deduplication key |
 | message_sources | Mailbox owner and optional original URL; multiple colleagues may reference one message |

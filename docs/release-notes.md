@@ -1,3 +1,13 @@
+## Unreleased · Upcoming meetings
+
+Plan meetings ahead and see what is coming up. Rebuild the CRM. The CRM adds one table on start (cancelled meetings); no data is changed.
+
+- "Notiz hinzufügen" → Meeting takes dates up to two years ahead ("Meeting planen"), e.g. an Intro or Setup meeting in two weeks. Notes stay limited to today or earlier.
+- Planned meetings show "Geplant" on their card, a "Nächstes Meeting …" line above the timeline, and a "Meeting morgen" / "Meeting Mo., 09.11." chip next to the organisation in the lists.
+- An organisation with a booked meeting is left out of new call lists until the meeting has taken place or is cancelled.
+- The pencil on a meeting now also changes its date and marks it "Abgesagt" (shown struck through). Cancellation emails saved through the extension set the same mark.
+- A planned meeting counts as the last contact once its day has come, unless it was cancelled.
+
 ## Unreleased · extension 0.4.17
 
 Log any email as a meeting. Reload the extension and refresh Gmail; rebuild the CRM. No database migration is required.

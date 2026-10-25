@@ -240,3 +240,18 @@
 @media(max-width:480px){.mfa-codes{grid-template-columns:1fr}}
 [data-theme="dark"] .mfa-manual code,[data-theme="dark"] .mfa-codes{background:#0d152b80;border-color:#bbcaff30}
 [data-theme="dark"] .mfa-manual code,[data-theme="dark"] .mfa-codes code,[data-theme="dark"] .mfa-heading h1{color:#e3e9fa}
+
+/* Planned and cancelled meetings */
+.upcoming-chip{display:inline-flex;align-items:center;gap:3px;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:650;white-space:nowrap;color:#1f7a5c;background:#dcf2e8;vertical-align:middle}
+.upcoming-meeting{display:flex;align-items:center;gap:8px;margin:0 0 10px;padding:9px 12px;border-radius:12px;font-size:13px;color:#1f5c47;background:#e9f7f0;border:1px solid #9fd3bd}
+.upcoming-meeting svg{flex:none;color:#1f7a5c}
+.meeting-badge{margin-left:6px;padding:1px 7px;border-radius:999px;font-weight:650;color:#1f7a5c;background:#c8eadb}
+.meeting-badge.cancelled{color:#8a3b2e;background:#f6dfd9}
+.communication-event.meeting:has(.meeting-badge.cancelled) strong,.communication-event.meeting:has(.meeting-badge.cancelled) .event-preview{text-decoration:line-through;opacity:.7}
+.meeting-edit{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:8px 0}
+.meeting-edit input[type=date]{width:auto}
+.meeting-edit label{display:inline-flex;align-items:center;gap:6px;font-size:13px}
+[data-theme="dark"] .upcoming-chip,[data-theme="dark"] .meeting-badge{color:#9be3c4;background:#203f36}
+[data-theme="dark"] .upcoming-meeting{color:#c9efdd;background:#1b2f2b;border-color:#3f7a66}
+[data-theme="dark"] .upcoming-meeting svg{color:#9be3c4}
+[data-theme="dark"] .meeting-badge.cancelled{color:#f0b8aa;background:#4a2a24}
