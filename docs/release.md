@@ -2,7 +2,7 @@
 
 Canonical repository: https://github.com/ProgRies/stageforce.
 
-Production `compose.yaml` pulls `ghcr.io/progries/stageforce:latest` by default. See [deployment.md](deployment.md) for server setup. `compose.local.yaml` remains the separate local source-build configuration.
+On `local-development`, `compose.yaml` builds the local source for testing. The production Compose file that pulls `ghcr.io/progries/stageforce:latest` lives on `main`; see [deployment.md](deployment.md) for server setup.
 
 Keep the private initial-data archive in a completely separate location. No customer rows, email exports, database files or passwords belong in Git or the Docker build context.
 
@@ -10,7 +10,7 @@ Keep the private initial-data archive in a completely separate location. No cust
 
 ## Checks
 
-Every push to main and pull request runs `.github/workflows/ci.yml`: tests, type checking, UI build, source checks, production/local Compose validation, Docker build and login/restart-persistence smoke test.
+Every push to main and pull request runs `.github/workflows/ci.yml`: tests, type checking, UI build, source checks, Compose validation, Docker build and login/restart-persistence smoke test.
 
 ## Publish an image
 

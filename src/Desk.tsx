@@ -8,9 +8,9 @@ import GuidedTour from "./GuidedTour";
 import {ReviewCategories,ReviewResults} from "./Review";
 
 import {useEffect,useMemo,useRef,useState} from "react";
-import {PanelLeftClose,PanelLeftOpen,LogOut,Search,Users,Phone,ArrowUpRight,RefreshCw,ChevronRight,ChevronDown,ArrowLeft,Check,Plus,SlidersHorizontal,AlertCircle,Link2,Globe,MapPin,UserRound,Copy,Mail,MessageSquare,NotebookPen,CheckCheck,X,LoaderCircle,ArrowDown,CalendarDays, CircleHelp} from "lucide-react";
+import {PanelLeftClose,PanelLeftOpen,LogOut,Search,Users,Phone,ArrowUpRight,RefreshCw,ChevronRight,ChevronDown,ArrowLeft,Check,Plus,SlidersHorizontal,AlertCircle,Mail,X,LoaderCircle, CircleHelp} from "lucide-react";
 import type {Entity,EntityLink,QueueItem,ReviewSelection} from "./domain";
-import {HEADERS,STATUSES,PHASES,TYPES,text,jsonList,dateISO,formatDate,todayBerlin,fastbillURL,websiteURL,phone,issues,reviewOverview,findingsFor,REVIEW_CATEGORIES,contactLabel,buildQueue,normalize,searchText,organisationSubtitle} from "./domain";
+import {HEADERS,PHASES,TYPES,text,dateISO,formatDate,todayBerlin,phone,reviewOverview,findingsFor,REVIEW_CATEGORIES,buildQueue,normalize,searchText,organisationSubtitle} from "./domain";
 type User={id:string;name:string;email:string}|null;
 type Dataset={entities:Entity[];links:EntityLink[];loadedAt:string};
 type Failure={status:string;message:string;retryAfterMs?:number};

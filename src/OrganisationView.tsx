@@ -4,7 +4,7 @@ import type {ContactSuggestion} from './contactExtraction';
 import OrganisationHeader from './OrganisationHeader';
 import PhoneCall from './PhoneCall';
 import {useEffect,useRef,useState} from 'react';
-import {Mail,Phone,ChevronDown,ArrowUpRight,Plus,Check,X,Pencil,AlertCircle,MessageSquare} from 'lucide-react';
+import {Mail,Phone,ChevronDown,ArrowUpRight,Plus,Check,X,Pencil,MessageSquare} from 'lucide-react';
 import {api} from './api';
 import OrganisationFields from './OrganisationFields';
 import EntityTools from './EntityTools';
