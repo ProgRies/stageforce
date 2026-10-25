@@ -13,6 +13,8 @@ docker compose exec crm node server/cli.mjs user:add you@example.com "Your Name"
 
 Use the Gmail address you will import from. Choose a password of at least 12 characters at the hidden prompt. Open http://localhost:3000 and sign in. Your database starts empty and persists across rebuilds.
 
+Every account needs an authenticator app (Google Authenticator, Microsoft Authenticator, 1Password, …). On the first sign-in, StageForce shows a QR code after the password; scan it, enter the six-digit code, and store the ten recovery codes it shows once. Later sign-ins ask for the current code. Without it, the login does not complete.
+
 `compose.yaml` builds the local source and binds to localhost. Never run `down -v` unless you intend to delete your local database.
 
 ## Reset your local database

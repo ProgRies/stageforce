@@ -3,13 +3,14 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {openDB} from '../server/db.mjs';
 import {addUser,hashToken,createSession} from '../server/auth.mjs';
+import {enableMfa,newSecret} from '../server/mfa.mjs';
 import {createOrg,addContact,getOrg} from '../server/crm.mjs';
 import {extensionCreate,extensionRevoke,authorizeExtension,extensionAction} from '../server/extension.mjs';
 import {makeServer} from '../server/http.mjs';
 import '../integrations/chrome/date.js';
 const origin='http://localhost:3000';
 const msg={mailbox:'alex@team.test',from:{name:'Pat',email:'pat@customer.test'},recipients:[{email:'alex@team.test',name:'Alex'}],originalSubject:'Hello',subject:'Hello',originalBody:'Confidential\n<script>not executable</script>',body:'Reviewed confidential email',timestamp:'2026-10-13T10:07:00Z',timestampRaw:'13.10.2026, 12:07',direction:'incoming',sourceUrl:'https://mail.google.com/mail/u/0/#inbox/example',contactEmails:['pat@customer.test']};
-async function setup(){const db=openDB(':memory:');const id=await addUser(db,msg.mailbox,'Alex','long-password-1234');const user=db.prepare('SELECT * FROM users WHERE id=?').get(id);return{db,user};}
+async function setup(){const db=openDB(':memory:');const id=await addUser(db,msg.mailbox,'Alex','long-password-1234');enableMfa(db,id,newSecret());const user=db.prepare('SELECT * FROM users WHERE id=?').get(id);return{db,user};}
 const action=(db,user,b)=>extensionAction(db,user,b,origin);
 test('extension keys are separate, hashed, revocable, rotating, expiring and disabled with accounts',async()=>{
  const{db,user}=await setup();try{const first=extensionCreate(db,user);const req={headers:{authorization:'Bearer '+first.token,origin:'chrome-extension://'+'a'.repeat(32)}};
@@ -68,6 +69,6 @@ test('schema 5 upgrade preserves CRM records',async()=>{
  const {mkdtempSync,rmSync}=await import('node:fs');const{tmpdir}=await import('node:os');const{join}=await import('node:path');
  const dir=mkdtempSync(join(tmpdir(),'extension-migration-')),path=join(dir,'crm.sqlite');let db=openDB(path);
  try{const id=await addUser(db,msg.mailbox,'Alex','long-password-1234'),org=createOrg(db,{id},'Preserved');db.exec('DROP TABLE extension_keys; PRAGMA user_version=5');db.close();db=openDB(path);
- assert.equal(getOrg(db,org.id).name,'Preserved');assert.equal(db.prepare('SELECT count(*) n FROM users').get().n,1);assert.equal(db.prepare('PRAGMA user_version').get().user_version,9);assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(),[]);
+ assert.equal(getOrg(db,org.id).name,'Preserved');assert.equal(db.prepare('SELECT count(*) n FROM users').get().n,1);assert.equal(db.prepare('PRAGMA user_version').get().user_version,10);assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(),[]);
  }finally{db.close();rmSync(dir,{recursive:true,force:true});}
 });

@@ -7,12 +7,13 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {openDB} from '../server/db.mjs';
 import {addUser,createSession} from '../server/auth.mjs';
+import {enableMfa,newSecret} from '../server/mfa.mjs';
 import {extensionCreate} from '../server/extension.mjs';
 import {makeServer} from '../server/http.mjs';
 const origin='http://localhost:3000';
 async function fixture(run,path=':memory:'){
  const db=openDB(path);const users=[];
- for(const [mail,name] of [['alex@team.test','Alex'],['sam@team.test','Sam']]){const id=await addUser(db,mail,name,'long-password-1234');const user=db.prepare('SELECT * FROM users WHERE id=?').get(id),session=createSession(db,user);users.push({user,session,auth:{Origin:origin,Cookie:'stage_session='+session.token,'X-CSRF-Token':session.csrf}});}
+ for(const [mail,name] of [['alex@team.test','Alex'],['sam@team.test','Sam']]){const id=await addUser(db,mail,name,'long-password-1234');enableMfa(db,id,newSecret());const user=db.prepare('SELECT * FROM users WHERE id=?').get(id),session=createSession(db,user);users.push({user,session,auth:{Origin:origin,Cookie:'stage_session='+session.token,'X-CSRF-Token':session.csrf}});}
  const server=makeServer(db,{origin});await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port;
  const post=(path,body,headers)=>fetch(base+path,{method:'POST',headers:{'Content-Type':'application/json',...headers},body:JSON.stringify(body)}).then(r=>r.json());
  try{await run({db,users,base,post,server});}finally{await new Promise(r=>server.close(r));db.close();}

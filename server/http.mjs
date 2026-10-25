@@ -8,6 +8,7 @@ import {resolve,extname} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {openDB} from './db.mjs';
 import {getSession,verifyPassword,createSession,limited,publicUser} from './auth.mjs';
+import {startChallenge,challengeUser,completeChallenge} from './mfa.mjs';
 import {Problem,listData,entity,history,search,save,createOrg,activitySave,contactSave,linkSave,reviewDone,stageImport,importPreview,confirmImport,timelinePosition} from './crm.mjs';
 import {inspectCSV,csvRecords,stageFastbill,fastbillBatches,fastbillRows,fastbillPreview,decideFastbill,deleteFastbillBatch,fetchFastbillPage} from './fastbill.mjs';
 import {parseEmail} from './email.mjs';
@@ -22,6 +23,9 @@ export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:300
  const success=(res,data)=>json(res,200,{status:'success',data});
  const body=async(req,max=1024*1024)=>{const buffers=[];let size=0;for await(const chunk of req){size+=chunk.length;if(size>max)throw new Problem('Datei/Eingabe ist zu groß.',413);buffers.push(chunk);}return Buffer.concat(buffers);};
  const cookie=(token,maxAge=604800)=>`stage_session=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAge}${secure?'; Secure':''}`;
+ // The half-finished login (password correct, code still missing) is only sent back to the code endpoint.
+ const challengeCookie=(token,maxAge=600)=>`stage_mfa=${token}; HttpOnly; SameSite=Strict; Path=/api/login; Max-Age=${maxAge}${secure?'; Secure':''}`;
+ const readCookie=(req,name)=>{for(const part of (req.headers.cookie||'').split(';')){const p=part.trim().indexOf('=');if(p>0&&part.trim().slice(0,p)===name)return part.trim().slice(p+1);}return null;};
  const server=createServer(async(req,res)=>{res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');res.setHeader('X-Frame-Options','DENY');res.setHeader('Permissions-Policy','camera=(), microphone=(), geolocation=()');res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");if(secure)res.setHeader('Strict-Transport-Security','max-age=31536000');
  try{const path=new URL(req.url,'http://internal').pathname;
  if(req.method==='GET'&&path==='/healthz')return json(res,200,{ok:db.prepare('SELECT 1 AS ok').get().ok===1});
@@ -36,7 +40,16 @@ export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:300
  }
  if(req.method==='POST'){
   if(req.headers.origin!==origin)throw new Problem('Unzulässiger Ursprung.',403,'forbidden');
-  if(path==='/api/login'){if(!String(req.headers['content-type']).startsWith('application/json'))throw new Problem('JSON erwartet.',415);const b=JSON.parse((await body(req,8192)).toString());const address=String(b.email||'').trim().toLowerCase();if(limited(db,'global-login',200)||limited(db,'login:'+address,10))throw new Problem('Zu viele Versuche. Bitte in zehn Minuten erneut versuchen.',429,'rate_limited');const user=db.prepare('SELECT * FROM users WHERE email=? COLLATE NOCASE AND active=1').get(address);const valid=await verifyPassword(b.password,user?.password_hash);if(!valid||!user)throw new Problem('Anmeldung fehlgeschlagen.',401,'unauthorized');const session=createSession(db,user);res.setHeader('Set-Cookie',cookie(session.token));return success(res,{user:session.user,csrf:session.csrf,appearance:appearance(db,user)});}
+  if(path==='/api/login'){if(!String(req.headers['content-type']).startsWith('application/json'))throw new Problem('JSON erwartet.',415);const b=JSON.parse((await body(req,8192)).toString());const address=String(b.email||'').trim().toLowerCase();if(limited(db,'global-login',200)||limited(db,'login:'+address,10))throw new Problem('Zu viele Versuche. Bitte in zehn Minuten erneut versuchen.',429,'rate_limited');const user=db.prepare('SELECT * FROM users WHERE email=? COLLATE NOCASE AND active=1').get(address);const valid=await verifyPassword(b.password,user?.password_hash);if(!valid||!user)throw new Problem('Anmeldung fehlgeschlagen.',401,'unauthorized');const challenge=startChallenge(db,user);res.setHeader('Set-Cookie',challengeCookie(challenge.token));return success(res,challenge.setup?{mfa:'setup',email:user.email,...challenge.setup}:{mfa:'verify'});}
+  if(path==='/api/login/mfa'){
+   if(!String(req.headers['content-type']).startsWith('application/json'))throw new Problem('JSON erwartet.',415);const b=JSON.parse((await body(req,4096)).toString());
+   const challenge=challengeUser(db,readCookie(req,'stage_mfa'));if(!challenge)throw new Problem('Die Anmeldung ist abgelaufen. Bitte gib dein Passwort erneut ein.',401,'mfa_expired');
+   if(limited(db,'mfa:'+challenge.id,10))throw new Problem('Zu viele Versuche. Bitte in zehn Minuten erneut versuchen.',429,'rate_limited');
+   const result=completeChallenge(db,challenge,b.code);
+   if(!result){const left=challengeUser(db,readCookie(req,'stage_mfa'));if(!left||left.attempts>=5){res.setHeader('Set-Cookie',challengeCookie('',0));throw new Problem('Zu viele falsche Codes. Bitte gib dein Passwort erneut ein.',401,'mfa_expired');}throw new Problem('Der Code stimmt nicht.',401,'mfa_invalid');}
+   const session=createSession(db,result.user);res.setHeader('Set-Cookie',[cookie(session.token),challengeCookie('',0)]);
+   return success(res,{user:session.user,csrf:session.csrf,appearance:appearance(db,result.user),recoveryCodes:result.recoveryCodes,recoveryLeft:result.usedRecovery?result.recoveryLeft:undefined});
+  }
  }
  if(path.startsWith('/api/')){
   const session=getSession(db,req);if(!session)throw new Problem('Bitte anmelden.',401,'unauthorized');
