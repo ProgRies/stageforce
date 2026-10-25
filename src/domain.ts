@@ -46,58 +46,35 @@ export function gmailSearch(e:Entity,mailbox:string) {
 export function websiteURL(value: unknown) { const s=String(value||"").trim(); if(!s)return "";try{const u=new URL(/^https?:\/\//i.test(s)?s:"https://"+s);return ["http:","https:"].includes(u.protocol)&&!u.username&&!u.password?u.href:"";}catch{return "";} }
 export function needsFastbill(e: Entity) { return ["Kunde","Ehemaliger Kunde"].includes(text(e,9)) || text(e,10)==="Angebot"; }
 export function phone(e: Entity) { const primary=text(e,14).trim();if(primary.replace(/\D/g,"").length>=6)return primary; for(const c of jsonList(e.values[20]))for(const p of c.telefone||[])if(String(p).replace(/\D/g,"").length>=6)return String(p);return ""; }
-export const REVIEW_CATEGORIES = [
-  {id:"fastbill",label:"FastBill-Link",source:"field",description:"Fehlender oder ungültiger Link bei Kunden, ehemaligen Kunden oder offenen Angeboten."},
-  {id:"phone",label:"Telefonnummer",source:"field",description:"Keine verwendbare Telefonnummer hinterlegt."},
-  {id:"status",label:"Kundenstatus prüfen",source:"field",description:"Zahlungspflicht bei gewonnenen Leads oder bisher unklarem/ehemaligem Kundenstatus prüfen."},
-  {id:"note-billing",label:"Vertrag & Rechnung",source:"note",description:"Prüfnotizen zu Vertragspartnern, Rechnungsempfängern und Abrechnung."},
-  {id:"note-relationship",label:"Organisation & Verknüpfung",source:"note",description:"Prüfnotizen zu Agenturen, Zuordnung und möglichen Dubletten."},
-  {id:"note-status",label:"Kundenstatus & Nutzung",source:"note",description:"Prüfnotizen zu Kundenstatus, Angeboten, Tests und Nutzung."},
-  {id:"note-contact",label:"Kontakt & Zuständigkeit",source:"note",description:"Prüfnotizen zu Kontaktdaten, Ansprechpartnern und Zuständigkeit."},
-  {id:"note-other",label:"Weitere Prüfnotizen",source:"note",description:"Offene Notizen ohne eindeutig erkennbares Thema."},
-] as const;
-export type ReviewCategoryId = typeof REVIEW_CATEGORIES[number]['id'];
-export type ReviewSelection = ReviewCategoryId | 'all';
-export type ReviewFinding = {source:'field'|'note';categories:ReviewCategoryId[];text:string};
-// Routing by topic only, never an interpretation of whether a note is true or resolved.
-// Keep the whole original note even when it mentions multiple topics or confirmed facts.
-export function reviewFindings(e:Entity):ReviewFinding[]{
-  const out:ReviewFinding[]=[];
-  const note=text(e,19).trim();
-  if(note){
-    const n=normalize(note),categories:ReviewCategoryId[]=[];
-    if(/vertrag|rechnung|fastbill|abrechn|zahlung|bezahlt|zahlend|zahler|billing|invoice/.test(n))categories.push('note-billing');
-    if(/agentur|verknupf|zuordn|dublett|duplikat|identitat|rechtstrager|tochter|verbund|endkund|ministerium|organisation|agency|duplicate/.test(n))categories.push('note-relationship');
-    if(/kundenstatus|beziehungsstatus|vertriebsphase|kundschaft|bestandskund|ehemalig|kund[e ]|nutz|betrieb|betreib|aktiv|kundig|angebot|trial|testphase|lizenz|laufzeit|status|gewonnen|paying|customer/.test(n))categories.push('note-status');
-    if(/kontakt|ansprech|zustand|telefon|e[ -]?mail|rufnummer|durchwahl|contact/.test(n))categories.push('note-contact');
-    if(!categories.length)categories.push('note-other');
-    out.push({source:'note',categories,text:note.replace(/^Manuell prüfen:\s*/i,'')});
-  }
-  if(needsFastbill(e)&&!fastbillURL(e.values[3]))out.push({source:'field',categories:['fastbill'],text:text(e,3)?'FastBill-Link ist nicht gültig.':'FastBill-Link fehlt.'});
-  if(!phone(e))out.push({source:'field',categories:['phone'],text:'Telefonnummer fehlt.'});
-  if(!['Kunde','Lead','Partner / Agentur'].includes(text(e,9)))out.push({source:'field',categories:['status'],text:'Zahlenden Kundenstatus prüfen; bisher: '+(text(e,9)||'unbekannt')+'.'});
-  if(text(e,9)==='Lead'&&text(e,10)==='Gewonnen')out.push({source:'field',categories:['status'],text:'Als Lead mit Phase Gewonnen geführt: Zahlungspflicht prüfen.'});
-  return out;
-}
-export function findingsFor(findings:ReviewFinding[],category:ReviewSelection){return category==='all'?findings:findings.filter(f=>f.categories.includes(category));}
-export function reviewOverview(entities:Entity[]){
-  const findings=new Map(entities.map(e=>[e.id,reviewFindings(e)]));
-  const counts=Object.fromEntries(REVIEW_CATEGORIES.map(c=>[c.id,0])) as Record<ReviewCategoryId,number>;
-  let affected=0;
-  for(const list of findings.values()){
-    if(list.length)affected++;
-    for(const category of new Set(list.flatMap(f=>f.categories)))counts[category]++;
-  }
-  return {findings,counts,affected};
-}
-export function issues(e: Entity) {return reviewFindings(e).map(f=>f.text);}
+// One tap after a call decides when the organisation comes back. Nobody drops out for good unless
+// the phase is set to "Verloren" by hand.
+export const CALL_OUTCOMES = {
+  not_reached:{label:"Nicht erreicht",days:2,next:"Erneut anrufen",contacted:false},
+  callback:{label:"Später anrufen",days:1,next:"Rückruf vereinbart",contacted:true},
+  meeting:{label:"Termin",days:14,next:"Nach dem Termin nachfassen",contacted:true,phase:"Termin vereinbart"},
+  email:{label:"E-Mail nötig",days:7,next:"Nach der E-Mail nachfassen",contacted:true,review:"E-Mail senden"},
+  no_interest:{label:"Kein Interesse",days:365,next:"In einem Jahr wieder anrufen",contacted:true,phase:"Aktuell kein Bedarf"},
+} as const;
+export type CallOutcome = keyof typeof CALL_OUTCOMES;
+export const BOOKING_URL = "https://calendar.google.com/calendar/u/0/appointments/schedules/AcZssZ2Ihic54_5fuPXHGTSxvpiy_8_KR4baKXWw4HJlO5-0nlCL5JI7wwinxG4mSJzzk4cRpPZbPD4F";
+export function addDays(date:string,days:number){const d=new Date(date+"T12:00:00Z");d.setUTCDate(d.getUTCDate()+days);return d.toISOString().slice(0,10);}
+// Timeline label for an activity kind; call results are stored as "Anruf · <Ergebnis>".
+export function activityLabel(kind:string){return kind.startsWith("Anruf · ")?kind.slice(8):kind==="Anrufversuch"?"Nicht erreicht":kind==="Anruf gestartet"?"Anruf gestartet":kind;}
+export type ReviewItem = {id:string;text:string;last:{kind:string;text:string;subject:string;date:string;author:string}|null};
 export function normalize(s: string) { return s.toLowerCase().normalize("NFKD").replace(/\p{M}/gu,""); }
 export function searchText(e: Entity) { return normalize(e.values.map(v=>String(v)).join(" ")); }
 export function contactAge(e: Entity, today=todayBerlin()): number | null { const d=dateISO(e.values[15]);return d?Math.max(0,Math.floor((Date.parse(today)-Date.parse(d))/86400000)):null; }
 export function contactLabel(e: Entity) { const days=contactAge(e);return days===null?"Kontakt unbekannt":days===0?"Heute kontaktiert":days===1?"Gestern kontaktiert":`Vor ${days} Tagen`; }
+// A scheduled follow-up wins: a future date keeps the organisation out, a due date brings it back
+// even after "Kein Interesse". Only "Verloren" stays out for good.
+export function callable(e:Entity,today=todayBerlin()){
+  if(!phone(e)||text(e,10)==="Verloren"||["Ehemaliger Kunde","Partner / Agentur"].includes(text(e,9)))return false;
+  const due=dateISO(e.values[17]);if(due)return due<=today;
+  return text(e,10)!=="Aktuell kein Bedarf";
+}
 export type QueueItem = {id:string; reason:string; kind:"followup"|"customer"|"warm"|"cold"};
 export function buildQueue(entities:Entity[], count=30, staleDays=90, customerShare=.6, today=todayBerlin()):QueueItem[] {
-  const max=Math.max(1,Math.min(100,Math.floor(count)));const eligible=entities.filter(e=>phone(e)&&!["Ehemaliger Kunde","Partner / Agentur"].includes(text(e,9))&&!["Verloren","Aktuell kein Bedarf"].includes(text(e,10)));
+  const max=Math.max(1,Math.min(100,Math.floor(count)));const eligible=entities.filter(e=>callable(e,today));
   const customer=(e:Entity)=>text(e,9)==="Kunde";
   const cold=(e:Entity)=>!customer(e)&&["Unbearbeitet","Kontaktaufnahme","Unklar",""].includes(text(e,10));
   const overdue=(e:Entity)=>{const d=dateISO(e.values[17]);return d&&d<=today;};
