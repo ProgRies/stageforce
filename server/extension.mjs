@@ -28,7 +28,10 @@ function identity(b,user){const mailbox=field(b.mailbox,254).toLowerCase();if(ma
 function fingerprint(b){return createHash('sha256').update('extension-v1:'+JSON.stringify([field(b.from?.email,254).toLowerCase(),field(b.timestampRaw||b.timestamp,150),field(b.originalSubject,1000),field(b.originalBody,500000)])).digest('hex');}
 function existingMessage(db,user,b){const {mailbox,gmailId}=identity(b,user);let m=gmailId?db.prepare('SELECT m.*,a.organisation_id FROM extension_message_refs r JOIN messages m ON m.id=r.message_id JOIN activities a ON a.message_id=m.id WHERE r.mailbox=? AND r.gmail_id=?').get(mailbox,gmailId):null;
  if(!m&&(typeof b.originalBody==='string'||/^[a-f0-9]{64}$/.test(b.legacyFingerprint||''))){m=db.prepare('SELECT m.*,a.organisation_id FROM messages m JOIN activities a ON a.message_id=m.id WHERE m.dedupe_key=?').get(b.legacyFingerprint||fingerprint(b));if(m&&gmailId)db.prepare('INSERT OR IGNORE INTO extension_message_refs VALUES(?,?,?)').run(mailbox,gmailId,m.id);}return m;}
-function attachReference(db,user,b,mid){const {mailbox,gmailId}=identity(b,user);if(gmailId)db.prepare('INSERT OR IGNORE INTO extension_message_refs VALUES(?,?,?)').run(mailbox,gmailId,mid);}
+function attachReference(db,user,b,mid){const {mailbox,gmailId}=identity(b,user),thread=threadId(b);if(gmailId)db.prepare('INSERT OR IGNORE INTO extension_message_refs VALUES(?,?,?)').run(mailbox,gmailId,mid);if(thread)db.prepare('INSERT OR IGNORE INTO extension_thread_refs VALUES(?,?,?)').run(mailbox,thread,mid);}
+const threadId=b=>{const t=field(b.gmailThreadId||'',200);if(t&&!/^[\w:.#-]+$/.test(t))throw new Problem('Invalid conversation.');return t;};
+// A Gmail conversation whose saved emails all sit in one organisation prefills that organisation for its other emails.
+function conversationOrganisation(db,user,b){const thread=threadId(b);if(!thread)return null;const rows=db.prepare('SELECT DISTINCT a.organisation_id AS id FROM extension_thread_refs t JOIN activities a ON a.message_id=t.message_id WHERE t.mailbox=? AND t.thread_id=?').all(identity(b,user).mailbox,thread);return rows.length===1?rows[0].id:null;}
 function attachmentRefs(value){if(value===undefined)return[];if(!Array.isArray(value)||value.length>100)throw new Problem('Too many attachment references.');return value.map(a=>({name:field(a.name,500),size:field(a.size||'',100),type:field(a.type||'',100),referenceOnly:true})).filter(a=>a.name);}
 export function extensionAction(db,user,b,origin){
  if(b.action==='check')return{email:user.email,appearance:appearance(db,user)||'system'};
@@ -78,10 +81,10 @@ export function extensionAction(db,user,b,origin){
   const candidates=p.candidates.map(c=>({...brief(getOrg(db,c.id)),reason:c.reason,score:c.score}));
   // Only an unambiguous exact external address selects an organisation automatically.
   const exact=candidates.filter(c=>c.score>=80),best=exact.length===1?exact[0]:null;
-  const selected=b.organisationId?brief(getOrg(db,field(b.organisationId,100))):best;
+  const conversation=b.organisationId?null:conversationOrganisation(db,user,b),selected=b.organisationId?brief(getOrg(db,field(b.organisationId,100))):conversation?brief(getOrg(db,conversation)):best;
   const known=selected?contacts(db,selected.id):[];
   const linked=selected?db.prepare('SELECT o.id,o.name,o.version FROM organisation_links l JOIN organisations o ON o.id=CASE WHEN l.a=? THEN l.b ELSE l.a END WHERE l.a=? OR l.b=?').all(selected.id,selected.id,selected.id).map(brief):[];
-  return{organisation:selected,direction:p.direction,candidates,participants:p.participants.filter(a=>!a.internal&&a.role!=='quoted').map(a=>{const c=known.find(c=>c.e_mails.some(e=>e.toLowerCase()===a.email));return{...a,name:contactName(c?.name&&!c.name.includes('@')?c.name:a.name,a.email),known:!!c,contactId:c?.id,phones:c?.telefone||[]};}),linked:linked.length===1?linked[0]:null};
+  return{organisation:selected,conversation:!!conversation,direction:p.direction,candidates,participants:p.participants.filter(a=>!a.internal&&a.role!=='quoted').map(a=>{const c=known.find(c=>c.e_mails.some(e=>e.toLowerCase()===a.email));return{...a,name:contactName(c?.name&&!c.name.includes('@')?c.name:a.name,a.email),known:!!c,contactId:c?.id,phones:c?.telefone||[]};}),linked:linked.length===1?linked[0]:null};
  }
  if(b.action!=='save'||b.confirmed!==true)throw new Problem('Explicit confirmation required.');
  if(typeof b.requestId!=='string'||!/^[a-f0-9-]{36}$/.test(b.requestId))throw new Problem('Invalid request ID.');
@@ -90,7 +93,7 @@ export function extensionAction(db,user,b,origin){
  return transaction(db,()=>{
   const prior=db.prepare('SELECT * FROM requests WHERE id=?').get(receipt);
   if(prior){if(prior.user_id!==user.id)throw new Problem('Request not found.',404);return response(prior.organisation_id,true);}
-  const found=existingMessage(db,user,b);if(found){let source='';try{const u=new URL(b.sourceUrl);if(u.origin==='https://mail.google.com'&&u.href.length<=2000)source=u.href;}catch{}db.prepare('INSERT OR IGNORE INTO message_sources VALUES(?,?,?,?)').run(found.id,user.id,user.email,source);db.prepare('INSERT INTO requests VALUES(?,?,?,?)').run(receipt,user.id,found.organisation_id,now());return response(found.organisation_id,true);}
+  const found=existingMessage(db,user,b);if(found){let source='';try{const u=new URL(b.sourceUrl);if(u.origin==='https://mail.google.com'&&u.href.length<=2000)source=u.href;}catch{}db.prepare('INSERT OR IGNORE INTO message_sources VALUES(?,?,?,?)').run(found.id,user.id,user.email,source);attachReference(db,user,b,found.id);db.prepare('INSERT INTO requests VALUES(?,?,?,?)').run(receipt,user.id,found.organisation_id,now());return response(found.organisation_id,true);}
   const p=envelope(b,user,db),original=field(b.originalBody,500000),subject=field(b.subject,1000),originalSubject=field(b.originalSubject,1000);
   const stamp=field(b.timestamp,50);if(!/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(stamp)||!Number.isFinite(Date.parse(stamp))||Date.parse(stamp)>Date.now()+300000)throw new Problem('Check the email timestamp.');
   const sentAt=new Date(stamp).toISOString();
@@ -105,6 +108,8 @@ export function extensionAction(db,user,b,origin){
   const result=confirmImport(db,user,{importId:staged.id,id:b.organisationId,version:b.version,newOrganisation:b.newOrganisation?{name:field(b.newOrganisation,500),status:'Lead'}:undefined,body:field(b.body,500000),date,direction,contactEmails:b.contactEmails,sourceUrl});
   const id=result.entity.id;
   const mid=db.prepare('SELECT id FROM messages WHERE dedupe_key=?').get(dedupeKey).id;attachReference(db,user,b,mid);
+  // The stored body may be the reply alone; the full loaded text, quoted history included, is kept beside it.
+  if(original!==field(b.body,500000))db.prepare('INSERT OR IGNORE INTO message_originals VALUES(?,?)').run(mid,original);
   if(b.extraContactIds!==undefined){
    if(!Array.isArray(b.extraContactIds)||b.extraContactIds.length>100)throw new Problem('Invalid selected contacts.');
    for(const cid of new Set(b.extraContactIds)){

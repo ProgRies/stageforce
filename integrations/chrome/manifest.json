@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Stage Force \u00b7 Gmail",
-  "version": "0.4.13",
+  "version": "0.4.14",
   "minimum_chrome_version": "120",
   "description": "Review one Gmail message and save it to your own Stage Force CRM.",
   "permissions": [

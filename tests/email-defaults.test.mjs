@@ -44,3 +44,20 @@ test('extension contact saves store German numbers in international format witho
   assert.deepEqual(contacts(db,org.id).find(c=>c.id===cid).telefone,['+49 30 1234567','+49 171 7654321']);
  }finally{db.close();}
 });
+test('old conversations can be saved in any order: shared organisation, date order and full text kept',async()=>{
+ const {db,user,action}=await setup();try{
+  const thread='thread-f:1780000000000000001';
+  const mail=(n,day,extra={})=>({action:'save',confirmed:true,requestId:randomUUID(),mailbox,gmailThreadId:thread,gmailMessageId:'m'+n,from:{name:'Pat',email:n%2?'pat@client.test':mailbox},recipients:[{email:n%2?mailbox:'pat@client.test',name:''}],originalSubject:'Offer',subject:'Offer',body:'Reply '+n,originalBody:'Reply '+n+'\n\nAm '+day+'.10.2024 schrieb Pat:\n> earlier',timestamp:`2024-10-${day}T09:00:00Z`,timestampRaw:'',sourceUrl:'https://mail.google.com/mail/u/0/#inbox/'+n,contactEmails:[],...extra});
+  const first=action(mail(6,16,{newOrganisation:'Client'}));const org=first.organisation;
+  const lookup=action({action:'lookup',mailbox,gmailThreadId:thread,from:{name:'Sam',email:'sam@another.test'},recipients:[{email:mailbox,name:''}]});
+  assert.equal(lookup.organisation.id,org.id);assert.equal(lookup.conversation,true);
+  let version=lookup.organisation.version;for(const [n,day] of [[2,12],[11,21],[1,11]])version=action(mail(n,day,{organisationId:org.id,version})).organisation.version;
+  assert.equal(action(mail(6,16,{organisationId:org.id,version})).duplicate,true);
+  const dates=db.prepare('SELECT m.sent_at FROM activities a JOIN messages m ON m.id=a.message_id WHERE a.organisation_id=? ORDER BY m.sent_at').all(org.id).map(r=>r.sent_at.slice(8,10));
+  assert.deepEqual(dates,['11','12','16','21']);
+  const stored=db.prepare("SELECT m.body,o.body AS original FROM messages m JOIN message_originals o ON o.message_id=m.id JOIN extension_message_refs r ON r.message_id=m.id WHERE r.gmail_id='m6'").get();
+  assert.equal(stored.body,'Reply 6');assert.match(stored.original,/schrieb Pat/);
+  const outgoing=db.prepare("SELECT m.direction FROM messages m JOIN extension_message_refs r ON r.message_id=m.id WHERE r.gmail_id='m2'").get();assert.equal(outgoing.direction,'outgoing');
+  assert.throws(()=>action({action:'lookup',mailbox,gmailThreadId:'bad thread<>',from:{name:'',email:'x@y.test'},recipients:[]}),/conversation/);
+ }finally{db.close();}
+});

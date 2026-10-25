@@ -46,5 +46,7 @@ CREATE TABLE IF NOT EXISTS extension_keys(user_id TEXT PRIMARY KEY REFERENCES us
 
 
 CREATE TABLE IF NOT EXISTS extension_message_refs(mailbox TEXT NOT NULL,gmail_id TEXT NOT NULL,message_id TEXT NOT NULL REFERENCES messages(id),PRIMARY KEY(mailbox,gmail_id));
+CREATE TABLE IF NOT EXISTS message_originals(message_id TEXT PRIMARY KEY REFERENCES messages(id) ON DELETE CASCADE,body TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS extension_thread_refs(mailbox TEXT NOT NULL,thread_id TEXT NOT NULL,message_id TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,PRIMARY KEY(mailbox,thread_id,message_id));
 CREATE TABLE IF NOT EXISTS call_attempts(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),organisation_id TEXT NOT NULL REFERENCES organisations(id),contact_id TEXT NOT NULL REFERENCES contacts(id),phone TEXT NOT NULL,started_at TEXT NOT NULL,source_message_id TEXT REFERENCES messages(id),activity_id TEXT UNIQUE REFERENCES activities(id));
 CREATE TABLE IF NOT EXISTS user_appearance(user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,mode TEXT NOT NULL CHECK(mode IN ('light','dark','system')));

@@ -1,5 +1,15 @@
 ## 0.3.9-local
 
+## Unreleased · extension 0.4.14
+
+Email conversations and company addresses. Rebuild the CRM, reload the extension and refresh Gmail. The CRM adds two tables on start (conversation references and full original texts); no data is changed.
+
+- Emails from an old Gmail conversation can be saved in any order. The first saved email remembers the conversation; every later email from it prefills that organisation, even from a new sender. The timeline orders them by their own send time.
+- The popup lists the other opened messages of the conversation that are not in the CRM yet, ticked by default; Save stores them all under the same organisation. Messages Gmail has not opened (collapsed and never expanded) cannot be read; use "Expand all" in Gmail first.
+- Replies are stored without the quoted history by default (Gmail quotes and Outlook "From/Sent" headers). "Include quoted history" switches it back for one email. Forwarded emails keep their content. The full loaded text is always kept in the database beside the stored reply.
+- `INTERNAL_DOMAINS` (e.g. `stage.bio,jaimo-solutions.com`) marks company domains: aliases like billing@ are never suggested as client contacts, and mail sent from them is filed as sent. The popup takes the direction from the CRM.
+- German phone numbers are stored as +49 (030 1234567 becomes +49 30 1234567; 00 becomes +). Other numbers keep their spelling. Duplicate checks treat both spellings as the same number.
+
 ## Unreleased · extension 0.4.13
 
 Better contact and phone extraction in the Gmail popup. Reload the extension and refresh Gmail; rebuild the CRM for the role field. No database migration is required.
