@@ -345,7 +345,7 @@ async function open(n){
   setMessageButton(n,'saved');
  }
  $('#save').title='Save & Continue · '+(/Mac/.test(navigator.platform)?'⌘':'Ctrl')+'+Enter';$('#save').onclick=()=>save(false);$('#save-open').onclick=()=>save(true);
- async function close(){if(!active||[...callStates.values()].some(c=>c.busy))return;if(contactEdit&&!window.confirm('Discard the unsaved contact edits?'))return;if([...callStates.values()].some(c=>c.open)){if(!window.confirm('Discard the unsaved call note? Organisation and contact remain saved.'))return;try{for(const c of callStates.values())if(c.open&&c.result){c.busy=true;await popupApi({action:'callCancel',callId:c.result.callId});c.open=false;c.busy=false;}}catch(e){for(const c of callStates.values())c.busy=false;$('#error').textContent=e.message;return;}}active=false;disposeBackdrop();media.removeEventListener('change',applyTheme);const leave=()=>{modalHost.remove();if(host===modalHost)host=null;};if(window.matchMedia('(prefers-reduced-motion: reduce)').matches)leave();else{$('.veil').classList.add('leaving');$('.veil').addEventListener('animationend',e=>{if(e.target===$('.modal'))leave();});setTimeout(leave,260);}for(const type of ['keydown','keyup','keypress'])window.removeEventListener(type,keys,true);lastFocus?.focus();}
+ async function close(){if(!active||[...callStates.values()].some(c=>c.busy))return;if(contactEdit&&!window.confirm('Discard the unsaved contact edits?'))return;if([...callStates.values()].some(c=>c.open)){if(!window.confirm('Discard the unsaved call note? Organisation and contact remain saved.'))return;try{for(const c of callStates.values())if(c.open&&c.result){c.busy=true;await popupApi({action:'callCancel',callId:c.result.callId});c.open=false;c.busy=false;}}catch(e){for(const c of callStates.values())c.busy=false;$('#error').textContent=e.message;return;}}active=false;disposeBackdrop();media.removeEventListener('change',applyTheme);const leave=()=>{modalHost.remove();if(host===modalHost)host=null;};$('.veil').classList.add('leaving');$('.veil').addEventListener('animationend',e=>{if(e.target===$('.modal'))leave();});setTimeout(leave,260);for(const type of ['keydown','keyup','keypress'])window.removeEventListener(type,keys,true);lastFocus?.focus();}
  function keys(e){if(!e.composedPath().includes(modalHost))return;e.stopImmediatePropagation();if(e.type!=='keydown')return;if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();const form=sh.querySelector('.contact-editor');if(contactEdit&&form)form.requestSubmit();else if(!savedMessage&&!$('#save').disabled)save(false);return;}if(e.key==='Enter'&&['org','linked'].includes(sh.activeElement?.id)){e.preventDefault();$('#'+sh.activeElement.id+'-options button')?.click();return;}if(e.key==='Escape'){e.preventDefault();e.stopPropagation();if(!busy)close();return;}if(e.key==='Tab'){const f=[...sh.querySelectorAll('button:not(:disabled),input:not(:disabled),textarea:not(:disabled),summary,select:not(:disabled)')].filter(visible);const first=f[0],last=f[f.length-1];if(e.shiftKey&&sh.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&sh.activeElement===last){e.preventDefault();first.focus();}}}
  const veil=$('.veil');let backdropPress=false;veil.onpointerdown=e=>{backdropPress=e.target===veil;};veil.onclick=e=>{if(e.target===veil&&backdropPress&&!busy)close();backdropPress=false;};
  $('.close').onclick=()=>{if(!busy)close();};for(const type of ['keydown','keyup','keypress'])window.addEventListener(type,keys,true);$('#org').focus();
@@ -362,13 +362,13 @@ const paperCSS=`
 :host([data-theme="dark"]){--sf-paper:#232b4a;--sf-ink:#ffffff;--sf-ink-muted:#aab3cf;--sf-paper-edge:#3d4774}
 #org,#subject,#body{background-color:var(--sf-paper);color:var(--sf-ink);border-color:var(--sf-paper-edge);caret-color:var(--sf-accent)}
 #org::placeholder,#subject::placeholder,#body::placeholder{color:var(--sf-ink-muted)}
-#org{font-size:19px;font-weight:650;letter-spacing:-.2px;padding:13px 16px;box-shadow:inset 4px 0 0 var(--sf-accent)}
-#org:focus{box-shadow:inset 4px 0 0 var(--sf-accent),0 0 0 3px #8b74e255}
+#org{font-size:19px;font-weight:650;letter-spacing:-.2px;padding:13px 16px}
+#org:focus{box-shadow:0 0 0 3px #8b74e255}
 #subject{font-size:16px;font-weight:600}
 #body{font-size:15px;line-height:1.65}
 #org:read-only,#subject:read-only,#body:read-only{background-color:color-mix(in srgb,var(--sf-paper) 88%,var(--sf-hover))}
 #org{animation:sf-org-cue .9s ease-out .3s backwards}
-@keyframes sf-org-cue{0%{box-shadow:inset 4px 0 0 var(--sf-accent),0 0 0 0 #8b74e200}35%{box-shadow:inset 4px 0 0 var(--sf-accent),0 0 0 6px #8b74e244}100%{box-shadow:inset 4px 0 0 var(--sf-accent),0 0 0 3px #8b74e255}}
+@keyframes sf-org-cue{0%{box-shadow:0 0 0 0 #8b74e200}35%{box-shadow:0 0 0 6px #8b74e244}100%{box-shadow:0 0 0 3px #8b74e255}}
 @media(forced-colors:active){#org,#subject,#body{background-color:Field;color:FieldText}}
 @media(prefers-reduced-motion:reduce){#org{animation:none!important}}
 `;
@@ -404,7 +404,8 @@ input:focus,textarea:focus,select:focus{border-color:var(--sf-accent);box-shadow
 @keyframes sf-pop{0%{transform:scale(.94)}60%{transform:scale(1.04)}100%{transform:scale(1)}}
 @keyframes sf-drop{from{opacity:0;transform:translateY(-4px) scaleY(.96)}}
 @keyframes sf-fade{from{opacity:0;transform:translateY(-2px)}}
-@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}.veil{backdrop-filter:none}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important}.working::after,.primary::after,.done,.options:not(:empty),.error:not(:empty){animation:none!important}.ghost,.primary,.connect,.contact{transform:none!important}.veil{backdrop-filter:none}
+@keyframes sf-veil-in{from{opacity:0}}@keyframes sf-veil-out{to{opacity:0}}@keyframes sf-modal-in{from{opacity:0}}@keyframes sf-modal-out{to{opacity:0}}@keyframes sf-rise{from{opacity:0}}}
 `;
 const buttonCSS=`
 :host{color-scheme:light;display:inline-flex;vertical-align:middle;margin:0 12px 0 0;white-space:nowrap}
