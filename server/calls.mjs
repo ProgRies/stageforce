@@ -1,5 +1,5 @@
 import {uid,now,transaction,reindex} from './db.mjs';
-import {formatPhone} from '../src/domain.ts';
+import {formatPhone,CALL_OUTCOMES,addDays,validDate,todayBerlin} from '../src/domain.ts';
 import {Problem,getOrg,contacts,createOrg,addContact,audit,addActivity,assertVersion} from './crm.mjs';
 const field=(v,max=1000)=>{if(typeof v!=='string'||v.length>max||v.includes('\0'))throw new Problem('Invalid field.');return v.trim();};
 export const dialNumber=value=>{const s=formatPhone(field(value,100)).replace(/[^+\d]/g,'');if(!/^\+?\d{6,15}$/.test(s))throw new Problem('Check the phone number.');return s;};
@@ -31,9 +31,20 @@ export function prepareCall(db,user,b,{participant=null}={}){
 export function saveCall(db,user,b){return transaction(db,()=>{
  const call=db.prepare('SELECT * FROM call_attempts WHERE id=? AND user_id=?').get(field(b.callId,36),user.id);if(!call)throw new Problem('Call not found.',404);if(call.activity_id)return{saved:true,duplicate:true,organisation:{id:call.organisation_id,version:String(getOrg(db,call.organisation_id).version)}};
  const note=field(b.notes||'',12000),date=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Berlin',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(call.started_at));
- const aid=addActivity(db,call.organisation_id,user,{type:'Anruf gestartet',text:note||'Anruf gestartet · keine Notiz',date,contacted:false});
+ if(b.outcome!=null&&!Object.hasOwn(CALL_OUTCOMES,b.outcome))throw new Problem('Unknown call result.');const outcome=b.outcome==null?null:CALL_OUTCOMES[b.outcome];
+ let due=null;if(outcome){due=b.outcome==='callback'&&b.callbackDate?field(b.callbackDate,10):addDays(todayBerlin(),outcome.days);if(!validDate(due)||due<todayBerlin())throw new Problem('Check the call-back date.');}
+ const aid=addActivity(db,call.organisation_id,user,{type:outcome?'Anruf · '+outcome.label:'Anruf gestartet',text:note||(outcome?outcome.label:'Anruf gestartet · keine Notiz'),date,contacted:!!outcome?.contacted});
+ if(outcome)applyOutcome(db,user,call.organisation_id,outcome,due);
  db.prepare('INSERT INTO activity_contacts VALUES(?,?)').run(aid,call.contact_id);db.prepare('UPDATE call_attempts SET activity_id=? WHERE id=?').run(aid,call.id);
- audit(db,call.organisation_id,user,'call',{activityId:aid,contactId:call.contact_id,phone:call.phone,startedAt:call.started_at,sourceMessageId:call.source_message_id});
+ audit(db,call.organisation_id,user,'call',{activityId:aid,outcome:b.outcome??null,due,contactId:call.contact_id,phone:call.phone,startedAt:call.started_at,sourceMessageId:call.source_message_id});
  db.prepare('UPDATE organisations SET version=version+1,updated_at=? WHERE id=?').run(now(),call.organisation_id);reindex(db,call.organisation_id);return{saved:true,organisation:{id:call.organisation_id,version:String(getOrg(db,call.organisation_id).version)}};
  });}
+// The open follow-up always holds the next call; a phase change or a handoff to Prüfen comes with some results.
+function applyOutcome(db,user,id,outcome,due){
+ const open=db.prepare('SELECT id FROM followups WHERE organisation_id=? AND completed_at IS NULL').get(id);
+ if(open)db.prepare('UPDATE followups SET text=?,due_date=?,owner=? WHERE id=?').run(outcome.next,due,user.id,open.id);
+ else db.prepare('INSERT INTO followups VALUES(?,?,?,?,?,NULL)').run(uid(),id,outcome.next,due,user.id);
+ if(outcome.phase)db.prepare('UPDATE organisations SET phase=? WHERE id=?').run(outcome.phase,id);
+ if(outcome.review&&!db.prepare('SELECT 1 FROM review_issues WHERE organisation_id=? AND resolved_at IS NULL AND text=?').get(id,outcome.review))db.prepare('INSERT INTO review_issues VALUES(?,?,?,NULL)').run(uid(),id,outcome.review);
+}
 export function cancelCall(db,user,b){const call=db.prepare('SELECT * FROM call_attempts WHERE id=?').get(field(b.callId,36));if(!call)return{cancelled:true};if(call.user_id!==user.id)throw new Problem('Call not found.',404);if(call.activity_id)throw new Problem('This call has already been saved.');db.prepare('DELETE FROM call_attempts WHERE id=? AND activity_id IS NULL').run(call.id);return{cancelled:true};}

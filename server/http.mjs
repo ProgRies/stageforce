@@ -7,7 +7,7 @@ import {resolve,extname} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {openDB} from './db.mjs';
 import {getSession,verifyPassword,createSession,limited,publicUser} from './auth.mjs';
-import {Problem,listData,entity,history,search,save,createOrg,activitySave,contactSave,linkSave,stageImport,importPreview,confirmImport,timelinePosition} from './crm.mjs';
+import {Problem,listData,entity,history,search,save,createOrg,activitySave,contactSave,linkSave,reviewDone,stageImport,importPreview,confirmImport,timelinePosition} from './crm.mjs';
 import {inspectCSV,csvRecords,stageFastbill,fastbillBatches,fastbillRows,fastbillPreview,decideFastbill,deleteFastbillBatch,fetchFastbillPage} from './fastbill.mjs';
 import {parseEmail} from './email.mjs';
 import {deleteOrganisation,mergeOrganisations} from './lifecycle.mjs';
@@ -77,6 +77,7 @@ export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:300
    case 'activitySave':data=activitySave(db,session,b);break;
    case 'contact':data=contactSave(db,session,b);break;
    case 'link':data=linkSave(db,session,b);break;
+   case 'reviewDone':data=reviewDone(db,session,b);break;
    case 'organisationDelete':data=deleteOrganisation(db,session,b);break;
    case 'organisationMerge':data=mergeOrganisations(db,session,b);break;
    case 'imports':data={items:db.prepare('SELECT id,payload_json FROM email_imports WHERE user_id=? AND expires_at>? ORDER BY rowid DESC').all(session.id,Date.now()).map(r=>{const p=JSON.parse(r.payload_json);return{id:r.id,subject:p.subject,sentAt:p.sentAt,direction:p.direction};})};break;
