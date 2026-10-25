@@ -8,7 +8,6 @@ import {createOrg,entity,save,contacts,history,search,addContact} from '../serve
 import {parseCSV,inspectCSV,csvRecords,stageFastbill,fastbillBatches,fastbillRows,fastbillPreview,decideFastbill,deleteFastbillBatch,fetchFastbillPage} from '../server/fastbill.mjs';
 import {makeServer} from '../server/http.mjs';
 import {createSession} from '../server/auth.mjs';
-import {reviewOverview} from '../src/domain.ts';
 function setup(){const db=openDB(':memory:');for(const id of['one','two'])db.prepare('INSERT INTO users VALUES(?,?,?,?,1,?)').run(id,id+'@example.test',id,'unused','2026-01-01');return{db,user:{id:'one',email:'one@example.test'},other:{id:'two',email:'two@example.test'}};}
 const sample='Kundennummer;Firmenname;Vorname;Nachname;E-Mail;Telefon;Ort;IBAN;Betrag brutto\r\n0012;Example Studio;Pat;Test;pat@example.test;+49 12345678;Bonn;BANKSECRET;999.00';
 function stage(db,user,text=sample,opts={}){return stageFastbill(db,user,{scope:'main',records:csvRecords(text),...opts});}
@@ -34,7 +33,7 @@ test('explicit enrichment is atomic, versioned, idempotent and never changes rel
  const b=stage(db,user),row=first(db,user,b);const request={rowId:row.id,decision:'applied',id:org.id,version:org.version,addContact:true,fields:{4:'Bonn'}};
  assert.throws(()=>decideFastbill(db,user,{...request,fields:{9:'Lead'}}),/nur Link/);assert.equal(contacts(db,org.id).length,0);
  assert.throws(()=>decideFastbill(db,user,{...request,contact:{email:'bad'}}),/E-Mail/);assert.equal(entity(db,org.id).values[4],'');
- const saved=decideFastbill(db,user,request).entity;assert.equal(saved.values[9],'Kunde');assert.equal(saved.values[15],'2025-01-01');assert.equal(saved.values[19],'Vertrag manuell prüfen.');assert.equal(reviewOverview([saved]).counts.phone,0);assert.equal(reviewOverview([saved]).counts.fastbill,1);assert.equal(contacts(db,org.id).length,1);assert.ok(search(db,'Bonn').includes(org.id));assert.equal(history(db,org.id).items[0].is_contact,false);
+ const saved=decideFastbill(db,user,request).entity;assert.equal(saved.values[9],'Kunde');assert.equal(saved.values[15],'2025-01-01');assert.equal(saved.values[19],'Vertrag manuell prüfen.');assert.equal(contacts(db,org.id).length,1);assert.ok(search(db,'Bonn').includes(org.id));assert.equal(history(db,org.id).items[0].is_contact,false);
  assert.equal(decideFastbill(db,user,request).alreadySaved,true);assert.equal(contacts(db,org.id).length,1);
  const repeat=stage(db,user);assert.equal(fastbillRows(db,user,{batchId:repeat.id}).total,0);assert.equal(fastbillRows(db,user,{batchId:repeat.id,status:'applied'}).total,1);
  const changed=stage(db,user,sample.replace('Bonn','Berlin')),next=first(db,user,changed);assert.equal(fastbillPreview(db,user,next.id).candidates[0].reason,'Bestätigte Zuordnung');assert.throws(()=>decideFastbill(db,user,{...request,rowId:next.id}),/inzwischen/);assert.equal(first(db,user,changed).status,'pending');

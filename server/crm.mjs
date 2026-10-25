@@ -1,7 +1,7 @@
 import {uid,now,transaction,reindex} from './db.mjs';
 import {email} from './auth.mjs';
 import {ownerResolver,reservations,teamUsers,validOwner} from './leads.mjs';
-import {formatPhone,contactName,STATUSES,PHASES,TYPES,HEADERS,validDate,todayBerlin,fastbillURL,websiteURL} from '../src/domain.ts';
+import {formatPhone,contactName,STATUSES,PHASES,TYPES,HEADERS,validDate,todayBerlin,fastbillURL,websiteURL,CALL_OUTCOMES} from '../src/domain.ts';
 export class Problem extends Error{constructor(message,status=400,code='invalid'){super(message);this.http=status;this.code=code;}}
 const cols={1:'name',2:'type',3:'fastbill_url',4:'city',5:'state',6:'website',7:'size',8:'size_unit',9:'status',10:'phase',11:'owner',15:'last_contact',18:'summary'};
 export const getOrg=(db,id)=>{const o=db.prepare('SELECT * FROM organisations WHERE id=?').get(id);if(!o)throw new Problem('Organisation nicht gefunden.',404,'not_found');return o;};
@@ -26,9 +26,9 @@ export function listData(db){
  const followups=new Map(db.prepare('SELECT * FROM followups WHERE completed_at IS NULL').all().map(f=>[f.organisation_id,f]));const reviews=new Map();for(const r of db.prepare('SELECT organisation_id,text FROM review_issues WHERE resolved_at IS NULL').all())reviews.set(r.organisation_id,[reviews.get(r.organisation_id),r.text].filter(Boolean).join('\n'));
  const owner=ownerResolver(db),held=reservations(db);
  const entities=db.prepare('SELECT * FROM organisations ORDER BY name COLLATE NOCASE').all().map(o=>{const c=primary.get(o.id),f=followups.get(o.id);return{id:o.id,row:0,version:String(o.version),ownerId:owner(o.owner),reservedBy:held.get(o.id)||'',values:[o.id,o.name,o.type,o.fastbill_url,o.city,o.state,o.website,o.size??'',o.size_unit,o.status,o.phase,o.owner,c?.name||'',c?.email||'',(c?.phone?.replace(/\D/g,'').length>=6?c.phone:fallback.get(o.id)||c?.phone||''),o.last_contact||'',f?.text||'',f?.due_date||'',o.summary,reviews.get(o.id)||'','[]','[]','[]','[]']};});
- return{entities,links:db.prepare('SELECT * FROM organisation_links').all(),users:teamUsers(db),loadedAt:now()};
+ return{entities,links:db.prepare('SELECT * FROM organisation_links').all(),users:teamUsers(db),review:reviewItems(db),loadedAt:now()};
 }
-const communicationSQL="(a.message_id IS NOT NULL OR a.kind='Kontakt' OR a.kind='Notiz' OR lower(a.kind) LIKE '%mail%' OR lower(a.kind) LIKE '%telefon%' OR lower(a.kind) LIKE '%anruf%' OR lower(a.kind) LIKE '%phone%' OR lower(a.kind) LIKE '%call%')";
+const communicationSQL="(a.message_id IS NOT NULL OR a.kind='Kontakt' OR a.kind='Notiz' OR lower(a.kind) LIKE '%mail%' OR lower(a.kind) LIKE '%telefon%' OR lower(a.kind) LIKE '%anruf%' OR lower(a.kind) LIKE '%phone%' OR lower(a.kind) LIKE '%call%' OR lower(a.kind) LIKE '%meeting%')";
 const historyOrder="a.occurred_on DESC, COALESCE(m.sent_at, ca.started_at, CASE WHEN a.kind='Notiz' THEN a.created_at ELSE '' END) DESC, a.created_at DESC, a.rowid DESC";
 const historyItem=a=>({ereignis_id:a.id,datum:a.occurred_on,art:a.kind,text:a.body,autor_name:a.user_name||a.author_label||'',message_id:a.message_id,subject:a.subject,direction:a.direction,sent_at:a.sent_at||a.call_started_at,call_phone:a.call_phone,call_contact:a.call_contact,call_contact_id:a.call_contact_id,call_source:a.call_source,attachments:a.attachments_json?JSON.parse(a.attachments_json):[],is_contact:!!a.is_contact});
 export function history(db,id,offset=0,kind='all'){
@@ -54,7 +54,7 @@ export function applyFields(db,id,fields){for(const[c0,value]of Object.entries(f
  if('16'in fields||'17'in fields||'11'in fields){let f=db.prepare('SELECT * FROM followups WHERE organisation_id=? AND completed_at IS NULL').get(id);const text=fields[16]??f?.text??'',due=fields[17]??f?.due_date??'',owner=fields[11]??f?.owner??'';if(f)db.prepare('UPDATE followups SET text=?,due_date=?,owner=? WHERE id=?').run(text,due||null,owner,f.id);else if(text||due)db.prepare('INSERT INTO followups VALUES(?,?,?,?,?,NULL)').run(uid(),id,text,due||null,owner);}
  if('19'in fields){db.prepare('UPDATE review_issues SET resolved_at=? WHERE organisation_id=? AND resolved_at IS NULL').run(now(),id);if(fields[19])db.prepare('INSERT INTO review_issues VALUES(?,?,?,NULL)').run(uid(),id,fields[19]);}
 }
-export function save(db,user,b){const fields=fieldsValidated(b.fields);let note=b.note;if(note){if(!['E-Mail','E-Mail erhalten','E-Mail gesendet','Telefonat','Anrufversuch','Notiz'].includes(note.type)||!validDate(note.date)||note.date>todayBerlin())throw new Problem('Ungültige Notiz oder Datum.');note={...note,text:str(note.text),contacted:!!note.contacted&&['E-Mail','E-Mail erhalten','E-Mail gesendet','Telefonat'].includes(note.type)};if(!note.text)throw new Problem('Notiz ist leer.');}
+export function save(db,user,b){const fields=fieldsValidated(b.fields);let note=b.note;if(note){if(!['E-Mail','E-Mail erhalten','E-Mail gesendet','Telefonat','Anrufversuch','Notiz','Meeting'].includes(note.type)||!validDate(note.date)||note.date>todayBerlin())throw new Problem('Ungültige Notiz oder Datum.');note={...note,text:str(note.text),contacted:note.type==='Meeting'||!!note.contacted&&['E-Mail','E-Mail erhalten','E-Mail gesendet','Telefonat'].includes(note.type)};if(!note.text)throw new Problem('Notiz ist leer.');}
  if(typeof b.requestId!=='string'||b.requestId.length>100)throw new Problem('Anfrage-ID fehlt.');
  return transaction(db,()=>{const prior=db.prepare('SELECT * FROM requests WHERE id=?').get(b.requestId);if(prior){if(prior.user_id!==user.id||prior.organisation_id!==b.id)throw new Problem('Anfrage-ID bereits verwendet.',409);return{entity:entity(db,b.id,true),alreadySaved:true};}const o=getOrg(db,b.id);assertVersion(o,b.version);if('11'in fields)validOwner(db,fields[11]);if(!Object.keys(fields).length&&!note)throw new Problem('Keine Änderung.');const before=entity(db,b.id).values;applyFields(db,b.id,fields);if(note)addActivity(db,b.id,user,note);const changes=Object.fromEntries(Object.entries(fields).map(([c,v])=>[HEADERS[+c],{from:before[+c],to:v}]));audit(db,b.id,user,'update',changes);if(Object.keys(fields).length)addActivity(db,b.id,user,{type:'CRM-Änderung',text:Object.keys(changes).join(', '),date:todayBerlin()});db.prepare('UPDATE organisations SET version=version+1,updated_at=? WHERE id=?').run(now(),b.id);db.prepare('INSERT INTO requests VALUES(?,?,?,?)').run(b.requestId,user.id,b.id,now());reindex(db,b.id);return{entity:entity(db,b.id,true)};});}
 export function createOrg(db,user,name){name=str(name,500);if(!name)throw new Problem('Name erforderlich.');return transaction(db,()=>{const id='STG-'+uid();db.prepare('INSERT INTO organisations(id,name,created_at,updated_at) VALUES(?,?,?,?)').run(id,name,now(),now());audit(db,id,user,'create',{name});reindex(db,id);return entity(db,id,true);});}
@@ -64,9 +64,9 @@ export function activitySave(db,user,b){
   getOrg(db,b.id);
   const activity=db.prepare('SELECT * FROM activities WHERE id=? AND organisation_id=?').get(b.activityId,b.id);
   if(!activity)throw new Problem('Aktivität nicht gefunden.',404,'not_found');
-  const isNote=activity.kind==='Notiz';
-  if(activity.message_id||(!isNote&&!/telefon|anruf|phone|call/i.test(activity.kind)))throw new Problem('Nur Anrufnotizen und Notizen können bearbeitet werden.');
-  const next=text||(isNote?'':'Anruf gestartet · keine Notiz');
+  const isNote=['Notiz','Meeting'].includes(activity.kind);
+  if(activity.message_id||(!isNote&&!/telefon|anruf|phone|call/i.test(activity.kind)))throw new Problem('Nur Anrufnotizen, Meetings und Notizen können bearbeitet werden.');
+  const next=text||(isNote?'':activity.kind.startsWith('Anruf · ')?activity.kind.slice(8):'Anruf gestartet · keine Notiz');
   if(!next)throw new Problem('Notiz ist leer.');
   if(typeof b.originalText!=='string'||activity.body!==b.originalText){
    if(activity.body===next)return{entity:entity(db,b.id,true),activityId:activity.id,text:next};
@@ -151,6 +151,24 @@ export function confirmImport(db,user,b){
    const cid=found[0]?.id||addContact(db,id,{name:selected.name,e_mails:[selected.email]});contactIds.push(cid);
    db.prepare('INSERT OR IGNORE INTO activity_contacts VALUES(?,?)').run(aid,cid);
   }
+  if(direction==='outgoing')resolveReview(db,id,CALL_OUTCOMES.email.review);
   applyFields(db,id,fields);audit(db,id,user,'email_import',{messageId:mid,direction,fields,contactIds});db.prepare('UPDATE organisations SET version=version+1,updated_at=? WHERE id=?').run(now(),id);db.prepare('INSERT INTO requests VALUES(?,?,?,?)').run('import:'+b.importId,user.id,id,now());db.prepare('DELETE FROM email_imports WHERE id=?').run(b.importId);reindex(db,id);return{entity:entity(db,id,true)};
  });
 }
+
+// Prüfen lists every organisation with an open handoff, with the latest timeline entry beside it
+// so the list alone usually says what to do.
+export function reviewItems(db){
+ const latest=db.prepare(`SELECT a.kind,a.body,a.occurred_on,m.subject,COALESCE(u.name,a.author_label,'') AS author FROM activities a LEFT JOIN users u ON u.id=a.author_id LEFT JOIN messages m ON m.id=a.message_id LEFT JOIN call_attempts ca ON ca.activity_id=a.id WHERE a.organisation_id=? AND ${communicationSQL} ORDER BY ${historyOrder} LIMIT 1`);
+ return db.prepare("SELECT organisation_id,group_concat(text,'\n') AS text,MIN(rowid) AS first FROM review_issues WHERE resolved_at IS NULL GROUP BY organisation_id ORDER BY first DESC").all().map(r=>{const a=latest.get(r.organisation_id);return{id:r.organisation_id,text:r.text,last:a?{kind:a.kind,text:a.body,subject:a.subject||'',date:a.occurred_on||'',author:a.author}:null};});
+}
+function resolveReview(db,id,text=null){return db.prepare(`UPDATE review_issues SET resolved_at=? WHERE organisation_id=? AND resolved_at IS NULL${text?' AND text=?':''}`).run(now(),id,...(text?[text]:[])).changes;}
+export function reviewDone(db,user,b){return transaction(db,()=>{
+ const o=getOrg(db,b.id);assertVersion(o,b.version);
+ const open=db.prepare('SELECT text FROM review_issues WHERE organisation_id=? AND resolved_at IS NULL').all(b.id).map(r=>r.text);
+ if(!open.length)return{entity:entity(db,b.id,true)};
+ resolveReview(db,b.id);audit(db,b.id,user,'review_done',{resolved:open});
+ addActivity(db,b.id,user,{type:'CRM-Änderung',text:'Erledigt: '+open.join(', '),date:todayBerlin()});
+ db.prepare('UPDATE organisations SET version=version+1,updated_at=? WHERE id=?').run(now(),b.id);reindex(db,b.id);
+ return{entity:entity(db,b.id,true)};
+});}
