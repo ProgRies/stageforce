@@ -1,3 +1,12 @@
+## Unreleased · Live updates
+
+Rebuild the CRM and refresh its browser tab. No database change.
+
+- Open CRM tabs update on their own when a colleague saves something: an email from the extension, a call, a note, a field, a FastBill decision, a merge or a delete. It usually shows within half a second.
+- While you are typing, have a note open, are on a call or are saving, the update waits until you are done, so your input is never replaced. If the organisation you are editing was changed meanwhile, a short notice says so; saving then reports the conflict as before, and nothing is overwritten.
+- Changes made with the command-line tool show up within about two seconds.
+- Behind a reverse proxy, `/api/live` must not be buffered; see the deployment notes.
+
 ## Unreleased · CRM
 
 Rebuild the CRM. The database moves to schema 9 on start (personal call lists); no data is changed.

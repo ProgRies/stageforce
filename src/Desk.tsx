@@ -18,7 +18,7 @@ export default function Desk({user}:{user:User}){
  const ask=useConfirm();
   const [navCollapsed,setNavCollapsed]=useState(()=>{try{return localStorage.getItem('stageforce-nav-collapsed')==='true';}catch{return false;}});
   useEffect(()=>{try{localStorage.setItem('stageforce-nav-collapsed',String(navCollapsed));}catch{}},[navCollapsed]);
-  const [inlineSaving,setInlineSaving]=useState(false),[inlinePending,setInlinePending]=useState(false),[tour,setTour]=useState(false),[viewEpoch,setViewEpoch]=useState(0);
+  const [inlineSaving,setInlineSaving]=useState(false),[inlinePending,setInlinePending]=useState(false),[tour,setTour]=useState(false),[viewEpoch,setViewEpoch]=useState(0),[liveTick,setLiveTick]=useState(0);
   const [data,setData]=useState<Dataset|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState<Failure|null>(null),[toast,setToast]=useState("");
   const [mode,setMode]=useState<"orgs"|"calls">("orgs"),[query,setQuery]=useState(""),[filter,setFilter]=useState("Alle"),[reviewOnly,setReviewOnly]=useState(false),[selected,setSelected]=useState(()=>new URLSearchParams(window.location.search).get('organisation')||'');
   const [saving,setSaving]=useState(false);
@@ -34,12 +34,28 @@ export default function Desk({user}:{user:User}){
   const queueKey=`stage-calls:${user?.id||"unknown"}:${todayBerlin()}`;
   async function refresh(quiet=false){if(!quiet)setLoading(true);setError(null);try{const next:Dataset=await api({action:"load"});setData(next);setSelected(prev=>next.entities.some(e=>e.id===prev)?prev:(next.entities.find(e=>text(e,9)==="Kunde")?.id||next.entities[0]?.id||""));return next;}catch(e){setError(e as Failure);return null;}finally{if(!quiet)setLoading(false);}}
   useEffect(()=>{refresh();},[]);
+  // Colleagues' changes arrive as "organisation X changed" notes; contents are fetched through the normal API.
+  // While someone types, saves or calls, the update waits so their input is never replaced underneath them.
+  const live=useRef({held:false,ids:new Set<string>(),all:false,by:new Set<string>()}),liveState=useRef({busy:false,selected:"",users:[] as TeamUser[]});
+  liveState.current={busy:inlinePending||inlineSaving||saving,selected,users:data?.users||[]};
+  function applyLive(){const l=live.current,{selected}=liveState.current;if(!l.held)return;const mine=l.all||l.ids.has(selected),others=[...l.by].filter(id=>id!==user?.id);live.current={held:false,ids:new Set(),all:false,by:new Set()};refresh(true).then(next=>{if(mine&&next?.entities.some(e=>e.id===selected))setLiveTick(t=>t+1);});if(mine&&l.ids.has(selected)&&others.length){const name=liveState.current.users.find(u=>u.id===others[0])?.name;setToast(name?`Von ${name} aktualisiert`:"Von Kollegen aktualisiert");}}
+  useEffect(()=>{let source:EventSource|null=null,retry:ReturnType<typeof setTimeout>|undefined,first=true,stopped=false;
+   const hold=(ids:string[],all:boolean,by:string[])=>{const l=live.current;l.held=true;l.all||=all;ids.forEach(id=>l.ids.add(id));by.forEach(id=>l.by.add(id));if(liveState.current.busy){if(!all&&ids.includes(liveState.current.selected)&&by.some(id=>id!==user?.id))setToast("Diese Organisation wurde gerade von jemand anderem geändert");return;}applyLive();};
+   const connect=()=>{if(stopped)return;source=new EventSource("/api/live");
+    // After a reconnect, changes made while the stream was down are unknown, so everything reloads once.
+    source.addEventListener("ready",()=>{if(!first)hold([],true,[]);first=false;});
+    source.addEventListener("change",e=>{try{const d=JSON.parse((e as MessageEvent).data);hold(d.ids||[],!!d.all,d.by||[]);}catch{}});
+    source.addEventListener("expired",()=>{stopped=true;source?.close();window.dispatchEvent(new Event("session-expired"));});
+    // The browser retries on its own after a dropped connection; a refused one (e.g. 503) needs a manual retry.
+    source.onerror=()=>{if(source?.readyState===EventSource.CLOSED){source.close();retry=setTimeout(connect,15000);}};};
+   connect();return()=>{stopped=true;clearTimeout(retry);source?.close();};},[]);
+  useEffect(()=>{if(!inlinePending&&!inlineSaving&&!saving)applyLive();},[inlinePending,inlineSaving,saving]);
   useEffect(()=>{if(!inlinePending)return;const warn=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue='';};window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);},[inlinePending]);
   async function leaveInline(){if(inlineSaving)return false;if(!inlinePending)return true;if(!await ask('Ungespeicherte Eingaben verwerfen?'))return false;setInlinePending(false);setViewEpoch(v=>v+1);return true;}
   const selectedVersion=byId.get(selected)?.version;
   const historyPaging=useRef(false),historyIdentity=useRef("");historyIdentity.current=selected+":"+selectedVersion;
   const detailIdentity=useRef(""),historyLength=useRef(0);historyLength.current=historyItems.length;
-  useEffect(()=>{let active=true;const changed=detailIdentity.current!==selected;detailIdentity.current=selected;if(changed){setDetail(null);setHistoryItems([]);setHistoryTotal(0);setDetailLoading(!!selected);}setDetailError("");if(selected){api({action:"detail",id:selected,historyKind:"communication"}).then(async r=>{const items=[...r.history.items],wanted=changed?0:historyLength.current;while(active&&items.length<wanted&&items.length<r.history.total){const page=await api({action:"history",id:selected,offset:items.length,kind:"communication"});if(!page.items.length)break;items.push(...page.items);}if(active){setDetail(r.entity);setHistoryItems(items);setHistoryTotal(r.history.total);}}).catch(e=>{if(active)setDetailError(e.message);}).finally(()=>{if(active)setDetailLoading(false);});}return()=>{active=false};},[selected,selectedVersion]);
+  useEffect(()=>{let active=true;const changed=detailIdentity.current!==selected;detailIdentity.current=selected;if(changed){setDetail(null);setHistoryItems([]);setHistoryTotal(0);setDetailLoading(!!selected);}setDetailError("");if(selected){api({action:"detail",id:selected,historyKind:"communication"}).then(async r=>{const items=[...r.history.items],wanted=changed?0:historyLength.current;while(active&&items.length<wanted&&items.length<r.history.total){const page=await api({action:"history",id:selected,offset:items.length,kind:"communication"});if(!page.items.length)break;items.push(...page.items);}if(active){setDetail(r.entity);setHistoryItems(items);setHistoryTotal(r.history.total);}}).catch(e=>{if(active)setDetailError(e.message);}).finally(()=>{if(active)setDetailLoading(false);});}return()=>{active=false};},[selected,selectedVersion,liveTick]);
   useEffect(()=>{let active=true;setSearchIds(null);setSearchError("");if(!query.trim())return;const t=setTimeout(()=>api({action:"search",query}).then(r=>{if(active)setSearchIds(r.ids);}).catch(e=>{if(active)setSearchError(e.message||"Suche nicht verfügbar.");}),200);return()=>{active=false;clearTimeout(t);};},[query,data?.loadedAt]);
   async function moreHistory(){if(historyPaging.current)return;const identity=historyIdentity.current;historyPaging.current=true;try{const r=await api({action:"history",id:selected,offset:historyItems.length,kind:"communication"});if(historyIdentity.current===identity){setHistoryItems(v=>[...v,...r.items.filter((x:any)=>!v.some(i=>i.ereignis_id===x.ereignis_id))]);setHistoryTotal(r.total);}}catch(e:any){setToast(e.message);}finally{historyPaging.current=false;}}
   function saved(updated?:Entity){if(updated){setDetail(current=>selected===updated.id?updated:current);setData(current=>current?{...current,entities:current.entities.map(e=>e.id===updated.id?updated:e)}:current);}return refresh(true);}
