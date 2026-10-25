@@ -1,3 +1,10 @@
+## Unreleased · extension 0.4.16
+
+Rebuild the CRM and reload the extension in `chrome://extensions`. No database change.
+
+- Ticking **Include quoted history** now also checks the earlier emails in the thread for contacts and phone numbers. Numbers of people already in the email header appear as removable "new" chips. Other authors appear unticked with "From quoted history", their found numbers and an add-contact button; colleagues are left out. Unticking removes them again.
+- The Gmail inbox list shows a small **✓ CRM** mark on conversations that are already in StageForce. Only Gmail ids are sent to the CRM and only a yes or no comes back, so no client names are put into the Gmail page. Results are cached, so an inbox page costs at most one request per minute.
+
 ## Unreleased · Live updates
 
 Rebuild the CRM and refresh its browser tab. No database change.

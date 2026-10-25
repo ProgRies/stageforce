@@ -80,3 +80,36 @@ test('lookup offers the selected organisation\'s two most recent contacts for em
   assert.equal(saved.saved,true);assert.equal(db.prepare('SELECT contact_id FROM activity_contacts').get().contact_id,out.suggested[0].contactId);
  }finally{db.close();}
 });
+test('quoted history yields each earlier author with their signature numbers',()=>{
+ const found=globalThis.stageForceExtract.quotedContacts('Passt, danke.\n\nAm Mo., 20. Okt. 2026 um 10:00 Uhr schrieb Pat Test <pat@client.test>:\n> Anbei das Angebot.\n> Viele Grüße\n> Pat Test\n> Tel. 030 1234567\n\nOn Fri, Oct 17, 2026 at 9:00 AM Sam Other <sam@client.test> wrote:\n> Please call me back.\n> Sam Other\n> Mobile 0171 7654321');
+ const by=Object.fromEntries(found.map(f=>[f.email,f]));
+ assert.equal(by['pat@client.test'].name,'Pat Test');assert.deepEqual(by['pat@client.test'].phones,['030 1234567']);
+ assert.equal(by['sam@client.test'].name,'Sam Other');assert.deepEqual(by['sam@client.test'].phones,['0171 7654321']);
+ assert.deepEqual(globalThis.stageForceExtract.quotedContacts('Nur eine Antwort ohne Verlauf.'),[]);
+});
+test('lookup checks quoted authors but leaves out colleagues and header addresses',async()=>{
+ const {db,user,action}=await setup();const previous=process.env.INTERNAL_DOMAINS;process.env.INTERNAL_DOMAINS='stage.bio';
+ try{
+  const org=createOrg(db,user,'Client'),other=createOrg(db,user,'Other');addContact(db,org.id,{name:'Pat Test',e_mails:['pat@client.test'],telefone:['+49 30 1234567']});addContact(db,other.id,{name:'Kim',e_mails:['kim@else.test']});
+  const out=action({action:'lookup',mailbox,from:{name:'Max',email:'max@client.test'},recipients:[{email:mailbox,name:''}],organisationId:org.id,quoted:[{email:'Pat@Client.test',name:'Pat'},{email:'kim@else.test',name:'Kim'},{email:'new@client.test',name:'Neu'},{email:'billing@stage.bio',name:'Billing'},{email:'max@client.test',name:'Max'},{email:mailbox,name:'Alex'}]});
+  const by=Object.fromEntries(out.quoted.map(q=>[q.email,q]));
+  assert.deepEqual(Object.keys(by).sort(),['kim@else.test','new@client.test','pat@client.test']);
+  assert.equal(by['pat@client.test'].known,true);assert.deepEqual(by['pat@client.test'].phones,['+49 30 1234567']);
+  assert.equal(by['kim@else.test'].known,false);assert.deepEqual(by['kim@else.test'].crm.organisations.map(o=>o.name),['Other']);
+  assert.equal(by['new@client.test'].crm,null);
+  assert.equal(action({action:'lookup',mailbox,from:{name:'Max',email:'max@client.test'},recipients:[]}).quoted,undefined);
+  assert.throws(()=>action({action:'lookup',mailbox,from:{name:'Max',email:'max@client.test'},recipients:[],quoted:[{email:'not-an-address'}]}),/quoted/);
+  assert.throws(()=>action({action:'lookup',mailbox,from:{name:'Max',email:'max@client.test'},recipients:[],quoted:Array(31).fill({email:'a@b.test'})}),/Invalid/);
+ }finally{if(previous===undefined)delete process.env.INTERNAL_DOMAINS;else process.env.INTERNAL_DOMAINS=previous;db.close();}
+});
+test('inbox status says only which of the given conversations are saved, for the own mailbox',async()=>{
+ const {db,action}=await setup();try{
+  const thread='thread-f:1780000000000000009';
+  action({action:'save',confirmed:true,requestId:randomUUID(),mailbox,gmailThreadId:thread,gmailMessageId:'18c9',from:{name:'Pat',email:'pat@client.test'},recipients:[{email:mailbox,name:''}],originalSubject:'Offer',subject:'Offer',body:'Hi',originalBody:'Hi',timestamp:'2026-10-20T09:00:00Z',timestampRaw:'',contactEmails:[],newOrganisation:'Client'});
+  assert.deepEqual(action({action:'threadStatus',mailbox,ids:['#'+thread,'thread-f:222','18c9','bb2']}).saved,[thread,'18c9']);
+  assert.deepEqual(Object.keys(action({action:'threadStatus',mailbox,ids:[thread]})),['saved']);
+  assert.throws(()=>action({action:'threadStatus',mailbox:'someone@else.test',ids:[thread]}),/mailbox/);
+  assert.throws(()=>action({action:'threadStatus',mailbox,ids:['bad id<>']}),/Invalid/);
+  assert.throws(()=>action({action:'threadStatus',mailbox,ids:Array(151).fill('x')}),/Invalid/);
+ }finally{db.close();}
+});

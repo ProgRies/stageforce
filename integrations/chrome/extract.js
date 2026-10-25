@@ -91,5 +91,28 @@
   }
   return String(text||'').trim();
  }
- globalThis.stageForceExtract={phones,attachments,normalize,contact,stripQuoted};
+ // Authors of the quoted messages below a reply, each with the phones from their own signature.
+ // Only explicit reply headers count ("Am … schrieb Name <a@b>:", "On … wrote:", "Von:/From:" + "Gesendet:/Sent:"), never addresses in prose.
+ const EMAIL=/[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+ function quotedHeader(lines,i){
+  const line=lines[i].replace(/^[>\s]+/,''),joined=(line+' '+(lines[i+1]||'').replace(/^[>\s]+/,'')).trim();
+  for(const [text,span] of [[line,1],[joined,2]]){
+   if(/^(?:Am|On)\s.{1,400}(?:schrieb|wrote).*:\s*$/i.test(text)){const e=EMAIL.exec(text);if(e){const before=text.slice(0,e.index).replace(/[<"(\[\s]+$/,'');return{email:e[0].toLowerCase(),name:before.split(/(?:\d{1,2}:\d{2}(?:\s?[AP]M)?|\bUhr\b|\bschrieb\b|\b\d{4}\b),?/i).pop().replace(/^[\s,"]+|[\s,"]+$/g,''),span};}}
+  }
+  const from=/^(?:From|Von):\s*(.+)$/i.exec(line);
+  if(from&&lines.slice(i+1,i+5).some(l=>/^[>\s]*(?:Sent|Date|Gesendet|Datum):\s*\S/i.test(l))){const e=EMAIL.exec(from[1]);if(e)return{email:e[0].toLowerCase(),name:from[1].slice(0,from[1].indexOf(e[0])).replace(/[<"\[(mailto:\s]+$/,'').replace(/^"|"$/g,'').trim(),span:1};}
+  return null;
+ }
+ function quotedContacts(text){
+  const lines=String(text||'').slice(0,200000).split('\n'),found=new Map();let current=null,segment=[];
+  const flush=()=>{if(!current)return;const phones=[];for(const l of signatureBlock(segment.join('\n')).split('\n'))phones.push(...linePhones(l));const prior=found.get(current.email);found.set(current.email,{email:current.email,name:prior?.name||current.name,phones:valid([...(prior?.phones||[]),...phones])});};
+  for(let i=0;i<lines.length;i++){
+   const header=quotedHeader(lines,i);
+   if(header){flush();current=header;segment=[];i+=header.span-1;continue;}
+   if(current&&!/^[>\s]*(?:To|An|Cc|Subject|Betreff|Sent|Gesendet|Date|Datum):/i.test(lines[i]))segment.push(lines[i].replace(/^[>\s]+/,''));
+   if(found.size>=30)break;
+  }
+  flush();return[...found.values()].slice(0,30);
+ }
+ globalThis.stageForceExtract={phones,attachments,normalize,contact,stripQuoted,quotedContacts};
 })();
