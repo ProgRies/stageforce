@@ -1,6 +1,8 @@
 import {readFileSync,writeFileSync} from 'node:fs';
 import {createInterface,emitKeypressEvents} from 'node:readline';
 import {openDB,backupDB} from './db.mjs';
+import {snapshotConfig,takeSnapshot,listSnapshots,latestHealthy,pruneSnapshots,streamSnapshot} from './snapshots.mjs';
+import {pipeline} from 'node:stream/promises';
 import {addUser,hashPassword} from './auth.mjs';
 import {migrateSnapshot} from './migrate.mjs';
 import {createOrg,save,addContact} from './crm.mjs';
@@ -15,6 +17,9 @@ const db=openDB();try{const [cmd,...args]=process.argv.slice(2);
  else if(cmd==='user:list')console.table(db.prepare('SELECT name,email,active FROM users').all());
  else if(cmd==='migrate'){if(!args[0])throw Error('migrate /path/to/snapshot.json [report.json]');const report=migrateSnapshot(db,JSON.parse(readFileSync(args[0],'utf8')));if(args[1])writeFileSync(args[1],JSON.stringify(report,null,2),{mode:0o600});console.log(JSON.stringify({...report,warnings:report.warnings.length},null,2));}
  else if(cmd==='backup'){if(!args[0])throw Error('backup /path/to/backup.sqlite');await backupDB(db,args[0]);console.log('Konsistente SQLite-Sicherung erstellt.');}
+ else if(cmd==='snapshot'){const {dir,keep}=snapshotConfig();const s=await takeSnapshot(db,dir);pruneSnapshots(dir,keep);console.log(s.path);}
+ else if(cmd==='snapshot:list')console.table(listSnapshots(snapshotConfig().dir).map(s=>({file:s.file,created_at:s.created_at,bytes:s.bytes,healthy:s.healthy!==false})));
+ else if(cmd==='snapshot:latest'){const age=args.indexOf('--max-age-hours'),s=latestHealthy(snapshotConfig().dir,{maxAgeHours:age<0?undefined:Number(args[age+1])});if(args.includes('--stdout'))await pipeline(streamSnapshot(s),process.stdout);else if(args.includes('--json'))console.log(JSON.stringify(s));else console.log(s.path);}
  else if(cmd==='demo'){if(db.prepare('SELECT count(*) AS n FROM organisations').get().n)throw Error('Demo benötigt eine leere Datenbank.');for(let i=1;i<=45;i++){const e=createOrg(db,null,`${i<=25?'Beispielstadt':'Beispielverein'} ${String(i).padStart(2,'0')} · DEMO`);db.prepare('UPDATE organisations SET status=?,phase=?,last_contact=?,summary=? WHERE id=?').run(i<=25?'Kunde':'Lead',i<=25?'Gewonnen':i<=35?'Im Gespräch':'Unbearbeitet','2025-01-15','Fiktiver Datensatz zum Testen. Keine echte Organisation.',e.id);addContact(db,e.id,{name:'Demo Kontakt',e_mails:[`kontakt${i}@example.invalid`],telefone:['+49 000 000000']},true);}const {reindex}=await import('./db.mjs');for(const r of db.prepare('SELECT id FROM organisations').all())reindex(db,r.id);console.log('45 fiktive Organisationen erstellt.');}
- else{console.log('Befehle: user:add EMAIL "NAME", user:password EMAIL, user:disable EMAIL, user:list, migrate SNAPSHOT [REPORT], backup FILE, demo');}
+ else{console.log('Befehle: user:add EMAIL "NAME", user:password EMAIL, user:disable EMAIL, user:list, migrate SNAPSHOT [REPORT], backup FILE, snapshot, snapshot:list, snapshot:latest [--stdout|--json] [--max-age-hours N], demo');}
 }catch(e){console.error(e.message);process.exitCode=1;}finally{db.close();}

@@ -14,6 +14,8 @@ assert.equal(crm.labels['traefik.docker.network'], config.networks['reverse-prox
 assert.equal(config.networks['reverse-proxy'].external, true);
 assert.ok(crm.volumes.some(v => v.type === 'volume' && v.source === 'storage' && v.target === '/app/data'));
 assert.equal(crm.read_only, true);
+assert.equal(crm.environment.SNAPSHOT_INTERVAL_HOURS, '6');
+assert.equal(crm.environment.SNAPSHOT_KEEP, '28');
 assert.ok(crm.healthcheck.test.includes('node'));
 assert.equal(crm.logging.options['max-size'], '10m');
 console.log('Production Compose checks passed.');

@@ -26,6 +26,9 @@ services:
       PORT: "3000"
       DATA_DIR: /app/data
       APP_URL: https://${CRM_HOST:?Set CRM_HOST in .env}
+      # Verified SQLite snapshots in /app/data/snapshots; see docs/deployment.md#backups-and-restore.
+      SNAPSHOT_INTERVAL_HOURS: ${SNAPSHOT_INTERVAL_HOURS:-6}
+      SNAPSHOT_KEEP: ${SNAPSHOT_KEEP:-28}
     volumes:
       - storage:/app/data
     read_only: true

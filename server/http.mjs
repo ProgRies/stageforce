@@ -3,6 +3,7 @@ import {readFile} from 'node:fs/promises';
 import {resolve,extname} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {openDB} from './db.mjs';
+import {scheduleSnapshots} from './snapshots.mjs';
 import {getSession,verifyPassword,createSession,limited,publicUser} from './auth.mjs';
 import {Problem,listData,entity,history,search,save,createOrg,contactSave,linkSave,stageImport,importPreview,confirmImport,timelinePosition} from './crm.mjs';
 import {inspectCSV,csvRecords,stageFastbill,fastbillBatches,fastbillRows,fastbillPreview,decideFastbill,deleteFastbillBatch,fetchFastbillPage} from './fastbill.mjs';
@@ -97,4 +98,4 @@ export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:300
  }catch(e){if(e instanceof SyntaxError)return json(res,400,{status:'invalid',message:'Ungültige Eingabe.'});if(!(e instanceof Problem))console.error('Request failed:',e.code||e.name);if(!res.headersSent)json(res,e.http||500,{status:e.code||'error',message:e instanceof Problem?e.message:'Die Anfrage konnte nicht verarbeitet werden.'});else res.end();}});
  server.requestTimeout=30000;server.headersTimeout=15000;const cleanup=setInterval(()=>{db.prepare('DELETE FROM email_imports WHERE expires_at<?').run(Date.now());db.prepare('DELETE FROM sessions WHERE expires_at<?').run(Date.now());},60000);cleanup.unref();server.on('close',()=>clearInterval(cleanup));return server;
 }
-if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){process.umask(0o077);const db=openDB();const server=makeServer(db);server.listen(Number(process.env.PORT||3000),process.env.HOST||'0.0.0.0',()=>console.log('Stage Force listening on port '+(process.env.PORT||3000)));for(const signal of ['SIGTERM','SIGINT'])process.on(signal,()=>server.close(()=>{db.close();process.exit(0);}));}
+if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){process.umask(0o077);const db=openDB();const server=makeServer(db),stopSnapshots=scheduleSnapshots(db);server.listen(Number(process.env.PORT||3000),process.env.HOST||'0.0.0.0',()=>console.log('Stage Force listening on port '+(process.env.PORT||3000)));for(const signal of ['SIGTERM','SIGINT'])process.on(signal,()=>server.close(()=>{stopSnapshots();db.close();process.exit(0);}));}
