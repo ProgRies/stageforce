@@ -42,7 +42,7 @@ does not work, and the CRM also rejects requests whose origin differs from `APP_
 
 ### Quickest: iPhone Simulator on the Mac (no setup)
 
-1. Start the CRM as usual (`docker compose up -d --build`) and install Xcode from the App Store.
+1. Start the CRM as usual (`docker compose -f compose.local.yaml up -d --build`) and install Xcode from the App Store.
 2. Open **Xcode → Open Developer Tool → Simulator**, choose an iPhone, open Safari and go to `http://localhost:3000/m/`.
    The simulator shares the Mac's network, and `localhost` counts as secure, so everything works including
    **Teilen → Zum Home-Bildschirm**.
@@ -66,7 +66,7 @@ real iPhone; a real phone call during the flow does not.
 3. Restart the CRM with that address as its origin:
 
    ```sh
-   LOCAL_APP_URL=https://<mac-name>.<tailnet>.ts.net docker compose up -d
+   LOCAL_APP_URL=https://<mac-name>.<tailnet>.ts.net docker compose -f compose.local.yaml up -d
    ```
 
    Compose still binds port 3000 to `127.0.0.1`; Tailscale forwards to it, so the CRM is not reachable from your Wi-Fi
@@ -76,9 +76,9 @@ real iPhone; a real phone call during the flow does not.
    your local account and authenticator code. Now take a real call and log it from the app.
 5. Debug the phone from the Mac: on the iPhone **Settings → Apps → Safari → Advanced → Web Inspector** on, connect it by
    cable once, then **Mac Safari → Develop → <your iPhone>**.
-6. Back to normal: `docker compose up -d` (without `LOCAL_APP_URL`) and `tailscale serve reset`.
+6. Back to normal: `docker compose -f compose.local.yaml up -d` (without `LOCAL_APP_URL`) and `tailscale serve reset`.
 
-After code changes, rebuild with `docker compose up -d --build` (keep `LOCAL_APP_URL=…` in front when testing on the
+After code changes, rebuild with `docker compose -f compose.local.yaml up -d --build` (keep `LOCAL_APP_URL=…` in front when testing on the
 phone) then close the app in the app switcher and open it again; the service worker always fetches the page fresh.
 
 A quick tunnel such as `cloudflared tunnel --url http://localhost:3000` also gives HTTPS, but it puts your local CRM on a

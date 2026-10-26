@@ -1,32 +1,34 @@
-# StageForce · 0.3.10-local
+# StageForce · 0.3.12
 
-Two parts: **StageForce**, the web interface and internal API for SQLite, and the **Chrome extension**, which imports selected Gmail emails. Everything in this package is for local development. Nothing has been published or deployed.
+Two parts: **StageForce**, the web interface and internal API for SQLite, and the **Chrome extension**, which imports selected Gmail emails. This page covers local development on your Mac. For the server, see [Deployment](docs/deployment.md).
 
 ## Start
 
 With Docker Desktop running, open a terminal in this folder:
 
 ```sh
-docker compose up -d --build
-docker compose exec crm node server/cli.mjs user:add you@example.com "Your Name"
+docker compose -f compose.local.yaml up -d --build
+docker compose -f compose.local.yaml exec crm node server/cli.mjs user:add you@example.com "Your Name"
 ```
 
 Use the Gmail address you will import from. Choose a password of at least 12 characters at the hidden prompt. Open http://localhost:3000 and sign in. Your database starts empty and persists across rebuilds.
 
 Every account needs an authenticator app (Google Authenticator, Microsoft Authenticator, 1Password, …). On the first sign-in, StageForce shows a QR code after the password; scan it, enter the six-digit code, and store the ten recovery codes it shows once. Later sign-ins ask for the current code. Without it, the login does not complete.
 
-`compose.yaml` builds the local source and binds to localhost. Never run `down -v` unless you intend to delete your local database.
+`compose.local.yaml` builds the local source and binds to localhost. `compose.yaml` is the production file for the server and pulls a published image; do not use it on your Mac. Never run `down -v` unless you intend to delete your local database.
+
+Tip: to keep typing plain `docker compose …` locally, put `COMPOSE_FILE=compose.local.yaml` into a `.env` file in this folder (it is ignored by Git). Never copy that `.env` to the server.
 
 ## Reset your local database
 
 Rebuilding the image keeps your data: the database lives in the Docker volume, not in the image. To start over with an empty database:
 
 ```sh
-docker compose exec crm node server/cli.mjs backup /app/data/backups/before-reset.sqlite   # optional
-docker compose cp crm:/app/data/backups/before-reset.sqlite ./before-reset.sqlite          # optional, keeps the backup outside the volume
-docker compose down -v
-docker compose up -d --build
-docker compose exec crm node server/cli.mjs user:add you@example.com "Your Name"
+docker compose -f compose.local.yaml exec crm node server/cli.mjs backup /app/data/backups/before-reset.sqlite   # optional
+docker compose -f compose.local.yaml cp crm:/app/data/backups/before-reset.sqlite ./before-reset.sqlite          # optional, keeps the backup outside the volume
+docker compose -f compose.local.yaml down -v
+docker compose -f compose.local.yaml up -d --build
+docker compose -f compose.local.yaml exec crm node server/cli.mjs user:add you@example.com "Your Name"
 ```
 
 Then create a new key in StageForce settings and reconnect the browser extension. The old key no longer exists.
@@ -58,10 +60,10 @@ npm run build
 APP_URL=http://localhost:3000 node server/http.mjs
 ```
 
-After source edits, rebuild Docker with `docker compose up -d --build`. For extension edits, click Reload in `chrome://extensions` and refresh Gmail.
+After source edits, rebuild Docker with `docker compose -f compose.local.yaml up -d --build`. For extension edits, click Reload in `chrome://extensions` and refresh Gmail.
 
-The database is at schema 9 (personal call lists; see [Schema](docs/schema.md)). Existing CRM data and credentials are preserved on upgrade. Back up the database before upgrading; older versions cannot open schema 9. The extension is v0.4.15; CRM version is 0.3.10-local.
+The database is at schema 13 (see [Schema](docs/schema.md)). Existing CRM data and credentials are preserved on upgrade. Back up the database before upgrading; older versions cannot open a newer schema. The extension is v0.4.20; CRM version is 0.3.12.
 
-[Future hosting and backups](docs/deployment.md) · [Schema](docs/schema.md) · [Release notes](docs/release-notes.md)
+[Server deployment, snapshots and accounts](docs/deployment.md) · [Schema](docs/schema.md) · [Release notes](docs/release-notes.md)
 
 See [Update instructions and feature details](docs/update-local.md) for this release.

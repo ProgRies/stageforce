@@ -91,7 +91,8 @@ export function buildQueue(entities:Entity[], count=30, staleDays=90, customerSh
   const recency=(a:Entity,b:Entity)=>(contactAge(b,today)??-1)-(contactAge(a,today)??-1)||text(a,1).localeCompare(text(b,1),"de");
   const out:QueueItem[]=[],used=new Set<string>();
   const take=(list:Entity[],limit:number,kind:QueueItem['kind'],reason:(e:Entity)=>string)=>{let added=0;for(const e of list){if(out.length>=max||added>=limit)break;if(used.has(e.id))continue;used.add(e.id);out.push({id:e.id,kind,reason:reason(e)});added++;}};
-  take(eligible.filter(overdue).sort((a,b)=>dateISO(a.values[17]).localeCompare(dateISO(b.values[17]))),Math.ceil(max*.25),"followup",e=>`Wiedervorlage ${formatDate(e.values[17])}`);
+  // Due callbacks always come first and are never capped.
+  take(eligible.filter(overdue).sort((a,b)=>dateISO(a.values[17]).localeCompare(dateISO(b.values[17]))),max,"followup",e=>`Wiedervorlage ${formatDate(e.values[17])}`);
   const target=Math.round(max*Math.min(.9,Math.max(.1,customerShare))),already=out.filter(q=>customer(eligible.find(e=>e.id===q.id)!)).length;
   const neglected=eligible.filter(e=>customer(e)&&(contactAge(e,today)===null||(contactAge(e,today)??0)>=staleDays)).sort(recency);
   take(neglected,Math.max(0,target-already),"customer",e=>contactAge(e,today)===null?"Kunde · Kontakt unbekannt":`Kunde · ${contactAge(e,today)} Tage ohne Kontakt`);

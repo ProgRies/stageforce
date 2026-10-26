@@ -1,5 +1,7 @@
 import {emitKeypressEvents} from 'node:readline';
 import {openDB,backupDB} from './db.mjs';
+import {snapshotConfig,takeSnapshot,listSnapshots,latestHealthy,pruneSnapshots,streamSnapshot} from './snapshots.mjs';
+import {pipeline} from 'node:stream/promises';
 import {addUser,hashPassword} from './auth.mjs';
 import {createOrg,addContact} from './crm.mjs';
 import {resetMfa} from './mfa.mjs';
@@ -18,5 +20,8 @@ const db=openDB();try{const [cmd,...args]=process.argv.slice(2).filter(a=>!a.sta
  else if(cmd==='user:list')console.table(db.prepare("SELECT u.name,u.email,u.active,CASE WHEN m.user_id IS NULL THEN 'ausstehend' ELSE 'aktiv' END AS mfa,(SELECT count(*) FROM mfa_recovery_codes r WHERE r.user_id=u.id AND r.used_at IS NULL) AS recovery_codes FROM users u LEFT JOIN user_mfa m ON m.user_id=u.id").all());
  else if(cmd==='security:log')console.table(eventLog(db,args[0],Number(args[1])||50).map(e=>({zeit:new Date(e.at).toLocaleString('de-DE'),konto:e.email,ereignis:e.event,ip:e.ip,info:e.detail})));
  else if(cmd==='backup'){if(!args[0])throw Error('backup /path/to/backup.sqlite');await backupDB(db,args[0]);console.log('Konsistente SQLite-Sicherung erstellt.');}
- else{console.log('Befehle: user:add EMAIL "NAME" [--temporary], user:password EMAIL [--temporary], user:disable EMAIL, user:mfa-reset EMAIL, user:list, security:log [EMAIL] [ANZAHL], backup FILE');}
+ else if(cmd==='snapshot'){const {dir,keep}=snapshotConfig();const s=await takeSnapshot(db,dir);pruneSnapshots(dir,keep);console.log(s.path);}
+ else if(cmd==='snapshot:list')console.table(listSnapshots(snapshotConfig().dir).map(s=>({file:s.file,created_at:s.created_at,bytes:s.bytes,healthy:s.healthy!==false})));
+ else if(cmd==='snapshot:latest'){const flags=process.argv,age=flags.indexOf('--max-age-hours'),s=latestHealthy(snapshotConfig().dir,{maxAgeHours:age<0?undefined:Number(flags[age+1])});if(flags.includes('--stdout'))await pipeline(streamSnapshot(s),process.stdout);else if(flags.includes('--json'))console.log(JSON.stringify(s));else console.log(s.path);}
+ else{console.log('Befehle: user:add EMAIL "NAME" [--temporary], user:password EMAIL [--temporary], user:disable EMAIL, user:mfa-reset EMAIL, user:list, security:log [EMAIL] [ANZAHL], backup FILE, snapshot, snapshot:list, snapshot:latest [--stdout|--json] [--max-age-hours N]');}
 }catch(e){console.error(e.message);process.exitCode=1;}finally{db.close();}

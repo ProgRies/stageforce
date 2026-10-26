@@ -8,6 +8,7 @@ import {readFile} from 'node:fs/promises';
 import {resolve,extname} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {openDB} from './db.mjs';
+import {scheduleSnapshots} from './snapshots.mjs';
 import {getSession,verifyPassword,createSession,limited,publicUser,mobileSessions,revokeMobileSession,changePassword} from './auth.mjs';
 import {startChallenge,challengeUser,completeChallenge,confirmCode} from './mfa.mjs';
 import {clientIP,logEvent,failuresSinceLastLogin,recentEvents,pruneEvents} from './security.mjs';
@@ -161,4 +162,4 @@ export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:300
  // Open live streams would otherwise keep close() waiting forever.
  const close=server.close.bind(server);server.close=cb=>{live.close();return close(cb);};server.live=live;return server;
 }
-if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){process.umask(0o077);const db=openDB();const server=makeServer(db);server.listen(Number(process.env.PORT||3000),process.env.HOST||'0.0.0.0',()=>console.log('Stage Force listening on port '+(process.env.PORT||3000)));for(const signal of ['SIGTERM','SIGINT'])process.on(signal,()=>server.close(()=>{db.close();process.exit(0);}));}
+if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){process.umask(0o077);const db=openDB();const server=makeServer(db),stopSnapshots=scheduleSnapshots(db);server.listen(Number(process.env.PORT||3000),process.env.HOST||'0.0.0.0',()=>console.log('Stage Force listening on port '+(process.env.PORT||3000)));for(const signal of ['SIGTERM','SIGINT'])process.on(signal,()=>server.close(()=>{stopSnapshots();db.close();process.exit(0);}));}

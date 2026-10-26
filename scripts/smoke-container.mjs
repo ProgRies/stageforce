@@ -18,6 +18,7 @@ try{
   r=await post('/api/login/mfa',{code:code(secret,used++)},challenge);if(!r.ok)throw Error('MFA failed');const session=await r.json();return{csrf:session.data.csrf,cookie:r.headers.getSetCookie().find(c=>c.startsWith('stage_session=')).split(';')[0]};};
  const crm=async(auth,body)=>(await fetch(base+'/api/crm',{method:'POST',headers:{Origin:'https://crm.example.test','Content-Type':'application/json','X-CSRF-Token':auth.csrf,Cookie:auth.cookie},body:JSON.stringify(body)})).json();
  await crm(await login(),{action:'create',name:'Persistence check'});
+ docker(['exec',name,'node','server/cli.mjs','snapshot']);const streamed=execFileSync('docker',['exec',name,'node','server/cli.mjs','snapshot:latest','--stdout','--max-age-hours','1'],{stdio:['ignore','pipe','pipe']});if(streamed.subarray(0,16).toString()!=='SQLite format 3\0')throw Error('Snapshot stream is not a SQLite database');
  docker(['restart',name]);
  // Docker may assign a new ephemeral host port when the container restarts.
  base=address();

@@ -1,4 +1,14 @@
-## Unreleased · Phone app for logging calls
+# StageForce 0.3.12 · first server release of the 0.3 line
+
+This release brings everything built on `local-development` (two-factor sign-in, live updates, call lists and call card, meetings, map, phone app, browser extension 0.4.20, security hardening) onto `main` together with the automatic snapshots, and publishes it as `ghcr.io/progries/stageforce:0.3.12`.
+
+- **Server:** `compose.yaml` is the production file again (pinned image, Traefik, read-only root, `storage` volume). Set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.12` in the server's `.env`. New settings with safe defaults: `TRUST_PROXY`, `INTERNAL_DOMAINS`, `SNAPSHOT_INTERVAL_HOURS`, `SNAPSHOT_KEEP`. See [deployment.md](deployment.md).
+- **Your Mac:** local development moved to `compose.local.yaml`: `docker compose -f compose.local.yaml up -d --build`. The Compose project and the `demo-storage` volume stay the same, so local data is kept.
+- **Snapshots:** the server takes a verified SQLite snapshot every 6 hours and keeps 28. `cli.mjs snapshot:latest --stdout` hands the newest healthy one to a backup tool.
+- **Passwords:** users change their own password under Einstellungen → Passwort ändern (current password, no e-mail). `user:add … --temporary` and `user:password … --temporary` make the admin's password a starting password that must be replaced at first sign-in.
+- **Keeping an existing 0.1.x server database** (instead of the planned reset): startup migrates it to schema 13. Every user must set up an authenticator app at the next sign-in. Back up first; 0.1.x cannot open the migrated database. Old Gmail add-on keys no longer work; colleagues use the browser extension instead.
+
+## 0.3.12 · Phone app for logging calls
 
 Rebuild the CRM. On start the CRM adds columns to sessions and calls (session kind, label, last use; call direction); no data is changed. Then install the app on the iPhone as described in docs/mobile-app.md.
 
@@ -8,7 +18,7 @@ Rebuild the CRM. On start the CRM adds columns to sessions and calls (session ki
 - The phone signs in once with password and code and then stays signed in for 90 days from its last use. Einstellungen → Handy-App lists signed-in phones and signs them out.
 - The desktop page, its styles and its call card are unchanged.
 
-## Unreleased · extension 0.4.20
+## 0.3.12 · extension 0.4.20
 
 Rebuild the CRM and reload the extension in `chrome://extensions`. No data change; the CRM adds a database index on start.
 
@@ -17,7 +27,7 @@ Rebuild the CRM and reload the extension in `chrome://extensions`. No data chang
 - Dates with spelled-out months ("Mo., 20. Okt. 2026, 10:00", "Mon, Oct 20, 2026, 10:00 AM") are now read too, which also prefills the date for English Gmail.
 - Limits: matching needs both Gmail accounts to show the same time zone, and a subject edited before saving is not matched.
 
-## Unreleased · Security hardening
+## 0.3.12 · Security hardening
 
 Rebuild the CRM. The CRM adds one table on start (security events); no data is changed. Production: pin `CRM_IMAGE` to an exact version and keep `TRUST_PROXY=1` behind Traefik (see docs/deployment.md).
 
@@ -26,7 +36,7 @@ Rebuild the CRM. The CRM adds one table on start (security events); no data is c
 - Sign-ins, wrong passwords and codes, recovery-code use, MFA and key changes are recorded for 90 days. Einstellungen → Anmeldeaktivität shows your own; `cli.mjs security:log` shows everyone's. After signing in you are warned about wrong passwords or codes since your previous sign-in.
 - Releases no longer publish a `latest` image tag; servers run the exact version they name.
 
-## Unreleased · Call card only where you called · extension 0.4.19
+## 0.3.12 · Call card only where you called · extension 0.4.19
 
 Rebuild the CRM and reload the extension. No database change.
 
@@ -35,7 +45,7 @@ Rebuild the CRM and reload the extension. No database change.
 - Starting a call quietly drops an older open call that has no note (a closed tab, a test call). An older call with a note is still shown so it can be saved or discarded first.
 - Closing the floating window puts the card back into the page collapsed.
 
-## Unreleased · Floating call card · extension 0.4.18
+## 0.3.12 · Floating call card · extension 0.4.18
 
 Rebuild the CRM and reload the extension in `chrome://extensions`, then refresh Gmail. The CRM adds one table on start (draft notes of running calls); no data is changed.
 
@@ -46,7 +56,7 @@ Rebuild the CRM and reload the extension in `chrome://extensions`, then refresh 
 - One call at a time: while a call is open, call buttons are disabled; starting a second call elsewhere shows the open one instead.
 - Where the floating window is not available (other browsers, or Chrome refuses it), the card stays fixed in the top-right corner of the page.
 
-## Unreleased · Map pins
+## 0.3.12 · Map pins
 
 Pin organisations on a map. Rebuild the CRM. The CRM adds one table on start (map pins); no data is changed.
 
@@ -55,7 +65,7 @@ Pin organisations on a map. Rebuild the CRM. The CRM adds one table on start (ma
 - Map tiles and the place search run through the CRM server. Browsers never contact the map provider, and only the typed search text leaves the server (see deployment notes).
 - Pin changes are kept in the change log and reach colleagues' open tabs live.
 
-## Unreleased · Upcoming meetings
+## 0.3.12 · Upcoming meetings
 
 Plan meetings ahead and see what is coming up. Rebuild the CRM. The CRM adds one table on start (cancelled meetings); no data is changed.
 
@@ -65,7 +75,7 @@ Plan meetings ahead and see what is coming up. Rebuild the CRM. The CRM adds one
 - The pencil on a meeting now also changes its date and marks it "Abgesagt" (shown struck through). Cancellation emails saved through the extension set the same mark.
 - A planned meeting counts as the last contact once its day has come, unless it was cancelled.
 
-## Unreleased · extension 0.4.17
+## 0.3.12 · extension 0.4.17
 
 Log any email as a meeting. Reload the extension and refresh Gmail; rebuild the CRM. No database migration is required.
 
@@ -74,14 +84,14 @@ Log any email as a meeting. Reload the extension and refresh Gmail; rebuild the 
 - Several emails about one meeting (invite, acceptance, reminder, booking confirmation) stay one entry: an email belongs to a meeting with the same join link or title, or else to a meeting of that organisation on the same day at the same time. The popup then says "Meeting on … already logged" and stays unticked; ticking only adds the email's contacts. Updated invitations and cancellations still move or mark the entry.
 - Declines and counter-proposals are still ignored. A booking-tool link in a signature alone does not tick the box.
 
-## Unreleased · extension 0.4.16
+## 0.3.12 · extension 0.4.16
 
 Rebuild the CRM and reload the extension in `chrome://extensions`. No database change.
 
 - Ticking **Include quoted history** now also checks the earlier emails in the thread for contacts and phone numbers. Numbers of people already in the email header appear as removable "new" chips. Other authors appear unticked with "From quoted history", their found numbers and an add-contact button; colleagues are left out. Unticking removes them again.
 - The Gmail inbox list shows a small **✓ CRM** mark on conversations that are already in StageForce. Only Gmail ids are sent to the CRM and only a yes or no comes back, so no client names are put into the Gmail page. Results are cached, so an inbox page costs at most one request per minute.
 
-## Unreleased · Two-factor sign-in
+## 0.3.12 · Two-factor sign-in
 
 Rebuild the CRM. The database moves to schema 10 on start. Everyone is signed out once and every browser-extension key is revoked, because neither was confirmed with a second factor.
 
@@ -93,7 +103,7 @@ Rebuild the CRM. The database moves to schema 10 on start. Everyone is signed ou
 - After signing in again, create a new key in settings and paste it into the browser extension.
 - Admin: `user:mfa-reset EMAIL` removes a lost authenticator, ends that user's sessions and revokes their extension key; the next sign-in sets up a new app. `user:list` shows who has set it up.
 
-## Unreleased · Live updates
+## 0.3.12 · Live updates
 
 Rebuild the CRM and refresh its browser tab. No database change.
 
@@ -102,7 +112,7 @@ Rebuild the CRM and refresh its browser tab. No database change.
 - Changes made with the command-line tool show up within about two seconds.
 - Behind a reverse proxy, `/api/live` must not be buffered; see the deployment notes.
 
-## Unreleased · CRM
+## 0.3.12 · CRM
 
 Rebuild the CRM. The database moves to schema 9 on start (personal call lists); no data is changed.
 
@@ -113,7 +123,7 @@ Rebuild the CRM. The database moves to schema 9 on start (personal call lists); 
 - The in-app tour covers status and ownership, meetings, call results and Prüfen. Started from Anrufe or Prüfen, it switches to Organisationen and opens an organisation first.
 - Cleanup: removed the unused full-page organisation editor, the old note types (E-Mail, Telefonat, Anrufversuch) from the note API, an unused helper and about 200 unused CSS selectors. Removed the demo-data command; see the README for resetting the local database.
 
-## Unreleased · FastBill click to add
+## 0.3.12 · FastBill click to add
 
 Rebuild the CRM and refresh its browser tab. No database change.
 
@@ -124,7 +134,7 @@ Rebuild the CRM and refresh its browser tab. No database change.
 - A new organisation from FastBill without an email address shows up in Prüfen.
 - Removed the one-time spreadsheet migration (`npm run cli migrate`). It could add every organisation at once, bypassing the review queue, and it was only usable on an empty CRM.
 
-## Unreleased · extension 0.4.15
+## 0.3.12 · extension 0.4.15
 
 Meetings from video-call invitations. Rebuild the CRM, reload the extension and refresh Gmail. The CRM adds one table on start (meeting references); no data is changed.
 
@@ -132,7 +142,7 @@ Meetings from video-call invitations. Rebuild the CRM, reload the extension and 
 - Invitations with a join link or a date are ticked by default; a loose mention ("per Google Meet?") is offered unticked. Accept/decline replies are ignored.
 - An updated invitation for the same meeting (same join link) moves the existing entry instead of adding a second one; a cancellation marks it "Abgesagt". Meetings in the future do not change the last contact date.
 
-## Unreleased · extension 0.4.14
+## 0.3.12 · extension 0.4.14
 
 Email conversations and company addresses. Rebuild the CRM, reload the extension and refresh Gmail. The CRM adds two tables on start (conversation references and full original texts); no data is changed.
 
@@ -142,7 +152,7 @@ Email conversations and company addresses. Rebuild the CRM, reload the extension
 - `INTERNAL_DOMAINS` (e.g. `stage.bio,jaimo-solutions.com`) marks company domains: aliases like billing@ are never suggested as client contacts, and mail sent from them is filed as sent. The popup takes the direction from the CRM.
 - German phone numbers are stored as +49 (030 1234567 becomes +49 30 1234567; 00 becomes +). Other numbers keep their spelling. Duplicate checks treat both spellings as the same number.
 
-## Unreleased · extension 0.4.13
+## 0.3.12 · extension 0.4.13
 
 Better contact and phone extraction in the Gmail popup. Reload the extension and refresh Gmail; rebuild the CRM for the role field. No database migration is required.
 

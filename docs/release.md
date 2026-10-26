@@ -2,7 +2,7 @@
 
 Canonical repository: https://github.com/ProgRies/stageforce.
 
-On `local-development`, `compose.yaml` builds the local source for testing. The production Compose file that pulls the pinned `ghcr.io/progries/stageforce:<version>` image lives on `main`; see [deployment.md](deployment.md) for server setup.
+`compose.local.yaml` builds the local source for testing. `compose.yaml` is the production file that pulls the pinned `ghcr.io/progries/stageforce:<version>` image; see [deployment.md](deployment.md) for server setup. Set `CRM_IMAGE` in `.env.example` to the version being released; CI checks that it matches `package.json`.
 
 Keep the private initial-data archive in a completely separate location. No customer rows, email exports, database files or passwords belong in Git or the Docker build context.
 

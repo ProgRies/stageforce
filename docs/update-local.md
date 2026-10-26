@@ -7,16 +7,16 @@ Keep the same StageForce directory and Compose project so Docker reuses your dat
 1. With the existing container running, back up SQLite and copy the backup to your Mac:
 
    ```sh
-   docker compose exec crm node server/cli.mjs backup /app/data/before-update.sqlite
-   docker compose cp crm:/app/data/before-update.sqlite ./before-update.sqlite
+   docker compose -f compose.local.yaml exec crm node server/cli.mjs backup /app/data/before-update.sqlite
+   docker compose -f compose.local.yaml cp crm:/app/data/before-update.sqlite ./before-update.sqlite
    ```
 
-2. In your existing repository on `local-development`, run `git pull --ff-only`. Preserve your `.env`, local backups and data. Do not delete the Docker volume or use `docker compose down -v`.
+2. In your existing repository on `local-development`, run `git pull --ff-only`. Preserve your `.env`, local backups and data. Do not delete the Docker volume or use `docker compose -f compose.local.yaml down -v`.
 3. From your existing StageForce directory:
 
    ```sh
-   docker compose up -d --build
-   docker compose logs --tail=30 crm
+   docker compose -f compose.local.yaml up -d --build
+   docker compose -f compose.local.yaml logs --tail=30 crm
    ```
 
 4. Open http://localhost:3000 and refresh. Existing users, API keys and data remain. Schema 9 migrates automatically.

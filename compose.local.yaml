@@ -1,0 +1,27 @@
+# Local development: builds this source and binds to localhost only. Never use this file on a public server.
+# Use it with: docker compose -f compose.local.yaml up -d --build
+services:
+  crm:
+    image: stageforce:local
+    build: .
+    restart: unless-stopped
+    init: true
+    environment:
+      NODE_ENV: development
+      HOST: 0.0.0.0
+      PORT: "3000"
+      DATA_DIR: /app/data
+      # The address you open the CRM at. Testing the phone app on a real iPhone: set LOCAL_APP_URL to your
+      # Tailscale HTTPS address (docs/mobile-app.md). The port stays on 127.0.0.1 either way.
+      APP_URL: ${LOCAL_APP_URL:-http://localhost:3000}
+      # Company domains whose addresses (aliases included) count as colleagues, not clients.
+      INTERNAL_DOMAINS: stage.bio,jaimo-solutions.com
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - demo-storage:/app/data
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+volumes:
+  demo-storage:
