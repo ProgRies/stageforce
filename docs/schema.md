@@ -45,7 +45,7 @@ Adds `extension_keys` (one hashed, revocable, expiring credential per user). Rem
 
 ## Schema 7: durable identity and calls
 
-`extension_message_refs` maps mailbox plus stable Gmail identifier to a stored message. `call_attempts` records the click timestamp, dialled number, user, organisation/contact and optional source message. Save links it to one activity; cancel deletes the pending row. Existing data is preserved. Timed calls sort by original click time alongside email timestamps. Calls do not imply successful contact.
+`extension_message_refs` maps mailbox plus stable Gmail identifier to a stored message. `call_attempts` records the click timestamp, dialled number, user, organisation/contact and optional source message. Save links it to one activity; cancel deletes the pending row. `call_drafts` keeps the note of a call that is still open (one row per unsaved attempt, removed on save or discard), so the floating call card can be resumed in another tab, the CRM or Gmail. Existing data is preserved. Timed calls sort by original click time alongside email timestamps. Calls do not imply successful contact.
 
 ## Schema 8: appearance
 

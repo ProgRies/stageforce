@@ -1,3 +1,14 @@
+## Unreleased · Floating call card · extension 0.4.18
+
+Rebuild the CRM and reload the extension in `chrome://extensions`, then refresh Gmail. The CRM adds one table on start (draft notes of running calls); no data is changed.
+
+- A started call now lives in its own small window that floats above every tab, site and app (Chrome's Picture-in-Picture window). Move it to the top-right corner once; Chrome remembers the spot. It has the note field, "Wähl-App erneut öffnen", the five results, minimise and discard.
+- The CRM and the Gmail popup use the same card. A call started in Gmail no longer keeps the popup open, and switching organisations in the CRM during a call no longer asks "Ungespeicherte Eingaben verwerfen?". Calling is also possible while a note is being written.
+- Opening the dial app no longer triggers Chrome's "Leave site? Changes you made may not be saved" prompt.
+- The note is saved as you type. Closing the floating window puts the card back into the top-right corner of the page; closing the tab keeps the call open, and the CRM (any tab) or the Gmail popup shows it again, collapsed, until it is saved or discarded. Calls left unsaved for more than 12 hours are treated as abandoned.
+- One call at a time: while a call is open, call buttons are disabled; starting a second call elsewhere shows the open one instead.
+- Where the floating window is not available (other browsers, or Chrome refuses it), the card stays fixed in the top-right corner of the page.
+
 ## Unreleased · Map pins
 
 Pin organisations on a map. Rebuild the CRM. The CRM adds one table on start (map pins); no data is changed.

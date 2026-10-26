@@ -31,7 +31,7 @@ Use the same hostname for CRM login and extension pairing. Each colleague needs 
 - Clicking it reads that single loaded message into memory.
 - Opening the popup sends sender/visible-recipient addresses and names plus mailbox address to the configured CRM for matching. Organisation searches send the typed search text. No email body is sent yet; these lookups do not create CRM records.
 - Save sends the reviewed message text, subject, timestamp, envelope, selected contacts, chosen organisation and optional linked organisation. The unedited loaded body is also transmitted to compute a duplicate fingerprint, but the reviewed body is what is retained in `messages`.
-- Starting a call saves the chosen organisation/contact/number first; Save then records call notes and the original click time. Cancellation removes the pending call preparation and preserves the organisation/contact.
+- Starting a call saves the chosen organisation/contact/number first. The note and the result are then taken in the floating call card (shared with the CRM), which stays above every tab and app in a Chrome Picture-in-Picture window; the popup can be closed meanwhile. Save records the note, the result and the original click time. Discarding removes the pending call preparation and preserves the organisation/contact. One call per user is open at a time; its note is kept on the server while it runs.
 - No attachment bytes are sent. No external AI, analytics, email delivery or Google OAuth is used. The extension does not send, draft, forward, delete, label or mark messages in Gmail.
 - All active CRM colleagues can read the saved content. The application currently has shared team access, not per-organisation permissions.
 
