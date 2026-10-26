@@ -1,3 +1,11 @@
+# StageForce 0.3.13 · map layer fix
+
+Publishes `ghcr.io/progries/stageforce:0.3.13`. Set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.13` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. No database change; the schema stays at 13.
+
+- The map preview and the full map now stay below menus, dropdowns and dialogs instead of covering them. Everything that floats uses one layer scale.
+- New `scripts/backup-to-nas.sh`: a host cron job that copies the latest healthy snapshot to a NAS. See [deployment.md](deployment.md).
+- Documentation rewritten to describe the current app; new [user guide](user-guide.md). The in-app tour now covers the call card, map pins and the new settings.
+
 # StageForce 0.3.12 · first server release of the 0.3 line
 
 This release brings everything built on `local-development` (two-factor sign-in, live updates, call lists and call card, meetings, map, phone app, browser extension 0.4.20, security hardening) onto `main` together with the automatic snapshots, and publishes it as `ghcr.io/progries/stageforce:0.3.12`.
