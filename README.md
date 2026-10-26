@@ -78,7 +78,7 @@ APP_URL=http://localhost:3000 node server/http.mjs
 
 After changing the extension, click its reload button in `chrome://extensions` and reload Gmail.
 
-Work happens on the `local-development` branch. `main` is what gets published: a version change merged into `main` builds and publishes `ghcr.io/progries/stageforce:<version>` (see [Releases](docs/release.md)).
+All work happens on `main`. Each change gets a short-lived branch and a pull request into `main`; test it locally with `compose.local.yaml`. Merging a change does not touch the server. Only a version change merged into `main` builds and publishes `ghcr.io/progries/stageforce:<version>` (see [Releases](docs/release.md)).
 
 Current versions: CRM 0.3.13, extension 0.4.20, database schema 13. Startup migrates older databases automatically; back up first, because older versions cannot open a newer schema.
 
