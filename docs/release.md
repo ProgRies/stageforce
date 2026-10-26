@@ -21,8 +21,8 @@ Every push to `main` and every pull request runs `.github/workflows/ci.yml`: tes
 
 The workflow **Build and publish** (`.github/workflows/release.yml`) runs when a push to `main` changes `package.json`, the release workflow or the container smoke test. It can also be started by hand (Actions → Build and publish → Run workflow on `main`) or by pushing a tag such as `v0.3.13` that matches `package.json`.
 
-It tests the code and the container, publishes amd64 and arm64 images as `ghcr.io/progries/stageforce:<version>` and creates the GitHub release `v<version>`. It uses the repository's workflow token; no server credentials or customer data are involved. A green CI check alone does not publish anything.
+It tests the code and the container, publishes amd64 and arm64 images as `ghcr.io/progries/stageforce:<version>` and `:latest`, and creates the GitHub release `v<version>`. If the version in `package.json` is already released (for example after a change to the workflow itself), nothing is rebuilt; the run only points `:latest` at that version. It uses the repository's workflow token; no server credentials or customer data are involved. A green CI check alone does not publish anything.
 
-Only the exact version tag is published; there is no `latest`. Nothing updates the server on its own: the administrator sets `CRM_IMAGE` to the new version in the server's `.env` and runs `docker compose pull` and `docker compose up -d` (see [Updates](deployment.md#updates)). Never republish an existing version; use a new one.
+`:latest` always follows the newest release and is meant for quick tests. The server still pins the exact version, so a release never reaches it by accident. Nothing updates the server on its own: the administrator sets `CRM_IMAGE` to the new version in the server's `.env` and runs `docker compose pull` and `docker compose up -d` (see [Updates](deployment.md#updates)). Never republish an existing version; use a new one.
 
 If the package is private, the server needs `docker login ghcr.io` with a token that has `read:packages`.
