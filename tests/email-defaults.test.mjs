@@ -113,3 +113,21 @@ test('inbox status says only which of the given conversations are saved, for the
   assert.throws(()=>action({action:'threadStatus',mailbox,ids:Array(151).fill('x')}),/Invalid/);
  }finally{db.close();}
 });
+test('an email a colleague saved is recognised in another mailbox by sender, minute, subject and a shared recipient',async()=>{
+ const {db,user,action}=await setup();try{
+  const colleague=await addUser(db,'sam@team.test','Sam','long-password-1234');const sam=db.prepare('SELECT * FROM users WHERE id=?').get(colleague),samAction=b=>extensionAction(db,sam,b,'http://localhost:3000');
+  const base={from:{name:'Pat',email:'pat@client.test'},recipients:[{email:mailbox,name:''},{email:'sam@team.test',name:''}]};
+  const saved=action({action:'save',confirmed:true,requestId:randomUUID(),mailbox,gmailThreadId:'thread-f:1',gmailMessageId:'a1',...base,originalSubject:'Angebot Bühne',subject:'Angebot Bühne',body:'Hi',originalBody:'Hi',timestamp:'2026-10-20T08:00:00.000Z',timestampRaw:'20.10.2026, 10:00',contactEmails:[],newOrganisation:'Client'});
+  const status=b=>samAction({action:'messageStatus',mailbox:'sam@team.test',gmailMessageId:'b7',...base,...b});
+  assert.equal(status({subject:'Angebot  bühne',sentAt:'2026-10-20T08:01:00.000Z'}).saved,false);
+  assert.equal(status({subject:'Anderes Thema',sentAt:'2026-10-20T08:00:30.000Z'}).saved,false);
+  assert.equal(status({subject:'Angebot Bühne',sentAt:'2026-10-20T08:00:00.000Z',recipients:[{email:'other@client.test',name:''}]}).saved,false);
+  const detail=status({subject:'AW: Angebot Bühne',sentAt:'2026-10-20T08:00:00.000Z',detail:true});
+  assert.equal(detail.saved,true);assert.equal(detail.organisation.id,saved.organisation.id);assert.deepEqual(detail.savedBy,['Alex']);
+  assert.equal(samAction({action:'messageStatus',mailbox:'sam@team.test',gmailMessageId:'b7'}).saved,true,'the copy is linked to the saved email');
+  const rows=samAction({action:'threadStatus',mailbox:'sam@team.test',ids:['thread-f:9','thread-f:8'],rows:[{id:'thread-f:9',from:['pat@client.test'],sentAt:'2026-10-20T08:00:00.000Z',subject:'Re: Angebot Bühne'},{id:'thread-f:8',from:['pat@client.test'],sentAt:'2026-10-20T09:00:00.000Z',subject:'Angebot Bühne'}]});
+  assert.deepEqual(rows.saved,['thread-f:9']);
+  assert.throws(()=>samAction({action:'threadStatus',mailbox:'sam@team.test',ids:[],rows:[{id:'bad id<>',from:[]}]}),/Invalid/);
+  assert.equal(db.prepare('SELECT count(*) AS n FROM messages').get().n,1);
+ }finally{db.close();}
+});
