@@ -60,7 +60,7 @@
 @container(max-width:560px){.organisation-overview{display:flex;flex-direction:column;gap:26px}.organisation-sidebar{width:100%;border-left:0;border-top:1px solid var(--line);padding:24px 0 0}.communication-column{width:100%}.inline-field-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
 @container(max-width:340px){.inline-field-grid{grid-template-columns:1fr}}
 
-.guided-tour{position:fixed;inset:0;z-index:2000;isolation:isolate}.tour-blocker{position:absolute;inset:0}.tour-shade{position:fixed;background:#101b3566;pointer-events:none}
+.guided-tour{position:fixed;inset:0;z-index:var(--layer-tour);isolation:isolate}.tour-blocker{position:absolute;inset:0}.tour-shade{position:fixed;background:#101b3566;pointer-events:none}
 .tour-spotlight{position:fixed;border:2px solid #b1b9ff;border-radius:15px;box-shadow:0 0 0 3px #8e91e32e;pointer-events:none}
 .tour-card{position:fixed;padding:20px 22px;border:1px solid #dbe0f4;border-radius:20px;background:#f8faff;color:#25324a;box-shadow:0 18px 70px #070c3538;max-height:calc(100dvh - 32px);overflow:auto}
 .tour-card header,.tour-card footer{display:flex;align-items:center;justify-content:space-between;gap:15px}.tour-card header{margin:-8px -8px 8px 0}.tour-card small{color:#778299;font-size:12px;font-variant-numeric:tabular-nums}.tour-card h2{font-size:19px;letter-spacing:-.25px;font-weight:600;line-height:1.45}.tour-card p{font-size:14px;line-height:1.75;color:#62708a;margin:10px 0 22px}.tour-card .text-button{font-size:12px;gap:6px}
@@ -174,7 +174,7 @@
 .quick-call .sf-phone-number span{min-width:0;overflow:hidden;text-overflow:ellipsis;overflow-wrap:normal}
 .quick-call .sf-phone-number>svg,.quick-call .sf-phone-number>img{flex-shrink:0}
 .quick-call .sf-phone-number:hover:not(:disabled){background:#f7f5ff;border-color:#8d77bd}
-.extract-contact-action{position:fixed;z-index:10000;display:flex;align-items:center;gap:8px;padding:10px 14px;border:1px solid #aa97df;border-radius:10px;background:#fff;color:#43306d;box-shadow:0 4px 16px #18122f26;cursor:pointer;font:600 13px system-ui;max-width:calc(100vw - 24px)}
+.extract-contact-action{position:fixed;z-index:var(--layer-selection);display:flex;align-items:center;gap:8px;padding:10px 14px;border:1px solid #aa97df;border-radius:10px;background:#fff;color:#43306d;box-shadow:0 4px 16px #18122f26;cursor:pointer;font:600 13px system-ui;max-width:calc(100vw - 24px)}
 .extract-contact-action:focus-visible{outline:3px solid var(--action);outline-offset:2px}
 .extract-contact-action:disabled{cursor:default;color:#677086}
 @keyframes contact-expand{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
@@ -257,10 +257,10 @@
 .quick-call{position:relative}
 /* Optional map pin per organisation: a small preview in the sidebar, the full map in a dialog. */
 .organisation-map{margin-bottom:18px;display:grid;gap:6px}
-.map-preview{position:relative;height:150px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--surface-input,#fff)}
+.map-preview{position:relative;isolation:isolate;height:150px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--surface-input,#fff)}
 .map-preview-open{display:block;width:100%;height:100%;padding:0;cursor:pointer}.map-preview-open>div{width:100%;height:100%;pointer-events:none}
 .map-preview-open:focus-visible{outline:2px solid var(--action);outline-offset:-2px}
-.map-zoom{position:absolute;top:8px;right:8px;z-index:500;display:grid;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--surface-panel);box-shadow:0 2px 8px #1b1f4a26}
+.map-zoom{position:absolute;top:8px;right:8px;z-index:1;display:grid;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--surface-panel);box-shadow:0 2px 8px #1b1f4a26}
 .map-zoom button{display:grid;place-items:center;width:28px;height:28px;cursor:pointer;color:var(--ink)}.map-zoom button+button{border-top:1px solid var(--line)}.map-zoom button:hover{background:var(--surface-accent,#eee9fb)}.map-zoom button:focus-visible{outline:2px solid var(--action);outline-offset:-2px}
 .map-credit{font-size:9px;color:var(--muted);text-align:right}
 .map-actions{display:flex;flex-wrap:wrap;gap:4px 14px}.map-actions .text-button{margin-top:0;display:inline-flex;align-items:center;gap:6px;font-size:12px}
@@ -271,9 +271,9 @@
 .map-dialog[open]{display:flex}.map-dialog::backdrop{background:#05091980}
 .map-dialog>header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}.map-dialog h2{font-size:18px}.map-dialog header small{color:var(--muted);font-size:12px}
 .map-search{position:relative;display:flex;align-items:center;gap:8px}.map-search .searchbox{flex:1;min-height:42px;margin:0}.map-search>.button{min-height:42px;padding:0 16px}.map-search input{width:100%}
-.map-results{position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:1000;list-style:none;margin:0;padding:6px;border:1px solid var(--line);border-radius:12px;background:var(--surface-panel);box-shadow:0 12px 40px #1b1f4a40}
+.map-results{position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:var(--layer-popover);list-style:none;margin:0;padding:6px;border:1px solid var(--line);border-radius:12px;background:var(--surface-panel);box-shadow:0 12px 40px #1b1f4a40}
 .map-results li{font-size:13px}.map-results li.muted{padding:8px 10px}.map-results button{display:block;width:100%;text-align:left;padding:8px 10px;border-radius:8px;cursor:pointer;color:var(--ink);line-height:1.4}.map-results button:hover,.map-results button:focus-visible{background:var(--surface-accent,#eee9fb)}
-.map-canvas{position:relative;z-index:0;flex:1;min-height:200px;border-radius:14px;overflow:hidden;border:1px solid var(--line);background:#dfe3ea}
+.map-canvas{position:relative;isolation:isolate;flex:1;min-height:200px;border-radius:14px;overflow:hidden;border:1px solid var(--line);background:#dfe3ea}
 .map-dialog>footer{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}.map-dialog>footer p{flex:1;min-width:180px;font-size:12px;margin:0}
 .map-label{display:grid;gap:3px;font:inherit;max-width:240px}.map-label strong{font-size:13px;font-weight:600}.map-label small{font-size:11px;color:#5b6577}.map-label .button{margin-top:6px;justify-self:start}
 .map-dialog .leaflet-container,.organisation-map .leaflet-container{font-family:inherit}
