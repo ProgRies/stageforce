@@ -69,11 +69,10 @@
 /* A fresh login is quiet; only an interrupted session needs a small notice. */
 .login-card .login-notice{display:flex;align-items:center;gap:8px;margin:16px 0 0;padding:0;font-size:13px;line-height:1.5;color:var(--muted)}
 .login-card .login-error{margin:16px 0 0;padding:10px 12px;font-size:13px;line-height:1.5;border-radius:10px}
-.sf-phone{width:100%;margin:7px 0}.sf-phone-number{display:flex;align-items:center;gap:8px;width:100%;min-height:40px;border:1px solid #c9c9e0;border-radius:10px;padding:7px 10px;background:#fff;color:#29334b;color-scheme:light;font-size:13px;line-height:20px;text-align:left;cursor:pointer}.sf-phone-number:hover:not(:disabled){background:#f7f5ff;border-color:#8d77bd}.sf-phone-number>img{flex-shrink:0}.sf-phone-number span{flex:1;overflow-wrap:anywhere}.sf-phone-number:disabled{cursor:default;opacity:.65}.sf-call-note{padding:10px;border:1px solid var(--line);border-radius:10px}.sf-call-note>div{display:flex;align-items:center;justify-content:space-between}.sf-call-note textarea{width:100%;margin:8px 0;min-height:85px}.sf-call-note>div button{background:transparent;border:0;color:inherit;cursor:pointer}.sf-call-note>a{display:block;font-size:12px;margin-bottom:10px}
-.sf-call-note textarea{font:inherit;font-size:14px;line-height:1.5;border:1px solid var(--line);border-radius:9px;padding:10px;color:inherit;background:var(--surface-input)}
+.sf-phone{width:100%;margin:7px 0}.sf-phone-number{display:flex;align-items:center;gap:8px;width:100%;min-height:40px;border:1px solid #c9c9e0;border-radius:10px;padding:7px 10px;background:#fff;color:#29334b;color-scheme:light;font-size:13px;line-height:20px;text-align:left;cursor:pointer}.sf-phone-number:hover:not(:disabled){background:#f7f5ff;border-color:#8d77bd}.sf-phone-number>img{flex-shrink:0}.sf-phone-number span{flex:1;overflow-wrap:anywhere}.sf-phone-number:disabled{cursor:default;opacity:.65}
 
 .inline-note{border:1px solid var(--line);border-radius:18px;padding:20px;margin-bottom:24px;background:var(--surface-panel)}
-.inline-note header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}.inline-note h2{font-size:18px}.inline-note fieldset{border:0;padding:0;display:flex;flex-wrap:wrap;gap:12px;min-width:0}.inline-note textarea{width:100%;min-height:120px;resize:vertical}.inline-note input,.inline-note textarea{font:inherit;color:var(--ink);background:var(--surface-input);border:1px solid var(--line);border-radius:10px;padding:12px}.inline-note .button{margin-left:auto}.sf-call-note{background:var(--surface-panel);color:var(--ink)}.sf-call-note a{color:var(--action)}
+.inline-note header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}.inline-note h2{font-size:18px}.inline-note fieldset{border:0;padding:0;display:flex;flex-wrap:wrap;gap:12px;min-width:0}.inline-note textarea{width:100%;min-height:120px;resize:vertical}.inline-note input,.inline-note textarea{font:inherit;color:var(--ink);background:var(--surface-input);border:1px solid var(--line);border-radius:10px;padding:12px}.inline-note .button{margin-left:auto}
 
 @media(min-width:1101px){
  .sidebar .brand{gap:8px;padding:2px 8px 25px}
@@ -175,7 +174,6 @@
 .quick-call .sf-phone-number span{min-width:0;overflow:hidden;text-overflow:ellipsis;overflow-wrap:normal}
 .quick-call .sf-phone-number>svg,.quick-call .sf-phone-number>img{flex-shrink:0}
 .quick-call .sf-phone-number:hover:not(:disabled){background:#f7f5ff;border-color:#8d77bd}
-.quick-call .sf-call-note{margin-top:8px;background:var(--surface-panel)}
 .extract-contact-action{position:fixed;z-index:10000;display:flex;align-items:center;gap:8px;padding:10px 14px;border:1px solid #aa97df;border-radius:10px;background:#fff;color:#43306d;box-shadow:0 4px 16px #18122f26;cursor:pointer;font:600 13px system-ui;max-width:calc(100vw - 24px)}
 .extract-contact-action:focus-visible{outline:3px solid var(--action);outline-offset:2px}
 .extract-contact-action:disabled{cursor:default;color:#677086}
@@ -214,7 +212,6 @@
 }
 .communication-event.meeting{--event-accent:#1f7a5c;background:linear-gradient(125deg,#effaf5,#dcf2e8);border-color:#9fd3bd}.communication-event.meeting .communication-icon{color:#1f7a5c;background:#dcf2e8;border-color:#9fd3bd}
 [data-theme="dark"] .communication-event.meeting{--event-accent:#9be3c4;background:linear-gradient(130deg,#203f36,#1b2f2b);border-color:#3f7a66}[data-theme="dark"] .communication-event.meeting .communication-icon{color:#9be3c4;background:#203f36;border-color:#3f7a66}
-.sf-call-note>.call-outcomes{display:grid;grid-template-columns:1fr 1fr;gap:6px}.sf-call-note>.call-outcomes .button:last-child{grid-column:span 2}.sf-call-note>.call-later{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-start}.sf-call-note>.call-outcomes .button,.sf-call-note>.call-later .button{flex:1 1 auto;min-width:0;min-height:34px;padding:7px 6px;font-size:13px;white-space:normal;margin:0}.call-later input{flex:1 1 140px;font:inherit;font-size:14px;color:inherit;background:var(--surface-input);border:1px solid var(--line);border-radius:9px;padding:6px 10px}
 .inline-note .note-kind{display:flex;gap:6px}.inline-note .note-kind .filter{min-height:30px}
 .review-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 14px;padding:12px 14px;border:1px solid #ddc28d;border-radius:12px;background:#fff9ea;color:#5d3f10}.review-bar p{flex:1;margin:0;white-space:pre-line}.review-bar .button{flex:0 0 auto;margin:0}
 [data-theme="dark"] .review-bar{background:#302b25;border-color:#806844;color:#f4d394}
@@ -256,5 +253,4 @@
 [data-theme="dark"] .upcoming-meeting svg{color:#9be3c4}
 [data-theme="dark"] .meeting-badge.cancelled{color:#f0b8aa;background:#4a2a24}
 /* During a live call the call card floats above the timeline instead of pushing into it; everything else stays usable. */
-.quick-call{position:relative}.quick-call .sf-call-note{position:absolute;top:100%;right:0;z-index:30;width:280px;max-width:calc(100vw - 32px);margin-top:8px;border-color:#8d77bd;box-shadow:0 18px 50px #1b1f4a40,0 2px 8px #1b1f4a1f}
-[data-theme="dark"] .quick-call .sf-call-note{border-color:#7a64b0;box-shadow:0 18px 50px #00000080,0 2px 8px #0000004d}
+.quick-call{position:relative}

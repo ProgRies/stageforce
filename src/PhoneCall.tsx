@@ -1,15 +1,10 @@
-import {useEffect,useRef,useState} from 'react';
-import {Phone,X} from 'lucide-react';
-import {api} from './api';
-import {CALL_OUTCOMES,BOOKING_URL,addDays,todayBerlin,type CallOutcome} from './domain';
-type Props={title?:string;organisationId:string;contactId:string;number:string;disabled?:boolean;onSaved:()=>void;onPending?:(value:boolean)=>void;onBusy?:(value:boolean)=>void};
-export default function PhoneCall({title,organisationId,contactId,number,disabled,onSaved,onPending,onBusy}:Props){
- const [call,setCall]=useState<any>(null),[notes,setNotes]=useState(''),[later,setLater]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
- const attempt=useRef<{requestId:string;startedAt:string}|null>(null),lock=useRef(false),dialLink=useRef<HTMLAnchorElement>(null);
- useEffect(()=>{onPending?.(!!call||busy);},[call,busy,onPending]);
- useEffect(()=>{onBusy?.(busy);},[busy,onBusy]);
- async function start(){if(lock.current||call)return;lock.current=true;setBusy(true);setError('');attempt.current??={requestId:crypto.randomUUID(),startedAt:new Date().toISOString()};try{const r=await api({action:'callPrepare',organisationId,contactId,phone:number,...attempt.current});setCall(r);setNotes('');if(dialLink.current){dialLink.current.href='tel:'+r.dial;dialLink.current.click();}}catch(e:any){setError(e.message);}finally{lock.current=false;setBusy(false);}}
- async function cancel(){if(lock.current)return;lock.current=true;setBusy(true);try{await api({action:'callCancel',callId:call.callId});setCall(null);setNotes('');setError('');attempt.current=null;}catch(e:any){setError(e.message);}finally{lock.current=false;setBusy(false);}}
- async function save(outcome:CallOutcome){if(lock.current)return;if(outcome==='meeting')window.open(BOOKING_URL,'_blank','noopener');lock.current=true;setBusy(true);setError('');try{await api({action:'callSave',callId:call.callId,notes,outcome,callbackDate:outcome==='callback'?later:undefined});setCall(null);setNotes('');setLater('');attempt.current=null;onSaved();}catch(e:any){setError(e.message);}finally{lock.current=false;setBusy(false);}}
- return <div className="sf-phone"><button type="button" className="sf-phone-number" title={title} disabled={disabled||busy||!!call} onClick={start}><Phone size={16}/><span>{number}</span><img src="/assets/stageforce-icon.svg" alt="StageForce" width="23" height="23"/></button><a ref={dialLink} hidden aria-hidden="true"/>{call&&<div className="sf-call-note"><div><small>Anruf gestartet · {new Date(attempt.current!.startedAt).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}</small><button type="button" aria-label="Anrufnotiz verwerfen" disabled={busy} onClick={cancel}><X size={16}/></button></div><textarea autoFocus rows={3} placeholder="Gesprächsnotiz · optional" value={notes} disabled={busy} onChange={e=>setNotes(e.target.value)}/><a href={'tel:'+call.dial}>Falls nötig: Wähl-App öffnen</a>{later?<div className="call-later"><input type="date" aria-label="Wann erneut anrufen" min={todayBerlin()} value={later} disabled={busy} onChange={e=>setLater(e.target.value)}/><button type="button" className="button secondary" disabled={busy} onClick={()=>setLater('')}>Zurück</button><button type="button" className="button primary" disabled={busy||!later} onClick={()=>save('callback')}>Speichern</button></div>:<div className="call-outcomes" role="group" aria-label="Ergebnis des Anrufs">{(Object.keys(CALL_OUTCOMES) as CallOutcome[]).map(o=><button type="button" key={o} className={`button ${o==='meeting'?'primary':'secondary'}`} disabled={busy} title={o==='meeting'?'Öffnet den Terminkalender':CALL_OUTCOMES[o].next} onClick={()=>o==='callback'?setLater(addDays(todayBerlin(),1)):save(o)}>{CALL_OUTCOMES[o].label}</button>)}</div>}</div>}{error&&<p className="save-error" role="alert">{error}</p>}</div>;
+import {useState} from 'react';
+import {Phone} from 'lucide-react';
+import {useCall} from './CallDock';
+type Props={title?:string;organisationId:string;contactId:string;number:string;disabled?:boolean};
+// Starts a call; the note and the result are taken in the floating call card, not here.
+export default function PhoneCall({title,organisationId,contactId,number,disabled}:Props){
+ const {active,start}=useCall(),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ async function call(){if(busy||active)return;setBusy(true);setError('');try{await start({organisationId,contactId,number});}catch(e:any){setError(e.message);}finally{setBusy(false);}}
+ return <div className="sf-phone"><button type="button" className="sf-phone-number" title={active?'Ein Anruf läuft noch · oben rechts speichern oder verwerfen':title} disabled={disabled||busy||!!active} onClick={call}><Phone size={16}/><span>{number}</span><img src="/assets/stageforce-icon.svg" alt="StageForce" width="23" height="23"/></button>{error&&<p className="save-error" role="alert">{error}</p>}</div>;
 }

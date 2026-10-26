@@ -1,5 +1,5 @@
 import {uid,now,transaction,reindex} from './db.mjs';
-import {formatPhone,CALL_OUTCOMES,addDays,validDate,todayBerlin} from '../src/domain.ts';
+import {formatPhone,CALL_OUTCOMES,BOOKING_URL,addDays,validDate,todayBerlin} from '../src/domain.ts';
 import {claimOnCall} from './leads.mjs';
 import {Problem,getOrg,contacts,createOrg,addContact,audit,addActivity,assertVersion} from './crm.mjs';
 const field=(v,max=1000)=>{if(typeof v!=='string'||v.length>max||v.includes('\0'))throw new Problem('Invalid field.');return v.trim();};
@@ -14,7 +14,9 @@ export function mergePhones(db,user,orgId,contact,phones){
 export function prepareCall(db,user,b,{participant=null}={}){
  const requestId=field(b.requestId,36);if(!/^[a-f0-9-]{36}$/.test(requestId))throw new Problem('Invalid request ID.');
  return transaction(db,()=>{
- const prior=db.prepare('SELECT * FROM call_attempts WHERE id=?').get(requestId);if(prior){if(prior.user_id!==user.id)throw new Problem('Call not found.',404);return result(prior);}
+ const prior=db.prepare('SELECT * FROM call_attempts WHERE id=?').get(requestId);if(prior){if(prior.user_id!==user.id)throw new Problem('Call not found.',404);return callView(db,prior);}
+ // One call at a time: the floating call card belongs to the user, not to the page that started it.
+ if(openAttempt(db,user))throw new Problem('Another call is still open. Save or discard it first.',409);
  const phone=field(b.phone,100),dial=dialNumber(phone),startedAt=field(b.startedAt,50);
  if(!/^\d{4}-\d{2}-\d{2}T.*Z$/.test(startedAt)||!Number.isFinite(Date.parse(startedAt))||Date.parse(startedAt)>Date.now()+300000)throw new Problem('Check call time.');
  let id=b.organisationId;
@@ -25,9 +27,19 @@ export function prepareCall(db,user,b,{participant=null}={}){
  if(!contact||!contact.telefone.some(p=>{try{return dialNumber(p)===dial;}catch{return false;}}))throw new Problem('Save this contact and phone number under the organisation before calling.');
  const source=b.messageId||null;if(source&&!db.prepare('SELECT 1 FROM activities WHERE message_id=? AND organisation_id=?').get(source,id))throw new Problem('Email does not belong to this organisation.');
  const row={id:requestId,user_id:user.id,organisation_id:id,contact_id:contact.id,phone,started_at:new Date(startedAt).toISOString(),source_message_id:source};
- db.prepare('INSERT INTO call_attempts VALUES(?,?,?,?,?,?,?,NULL)').run(row.id,row.user_id,id,contact.id,phone,row.started_at,source);reindex(db,id);return result(row);
+ db.prepare('INSERT INTO call_attempts VALUES(?,?,?,?,?,?,?,NULL)').run(row.id,row.user_id,id,contact.id,phone,row.started_at,source);reindex(db,id);return callView(db,row);
  });
- function result(r){const o=getOrg(db,r.organisation_id);return{callId:r.id,organisation:{id:o.id,name:o.name,version:String(o.version)},contact:contacts(db,o.id).find(c=>c.id===r.contact_id),dial:dialNumber(r.phone)};}
+}
+// Everything the call card needs to show or resume a call, including the result buttons, so the CRM and the extension render the same card.
+const OUTCOMES=Object.entries(CALL_OUTCOMES).map(([key,o])=>({key,label:o.label,next:o.next}));
+function callView(db,r){const o=getOrg(db,r.organisation_id);return{callId:r.id,organisation:{id:o.id,name:o.name,version:String(o.version)},contact:contacts(db,o.id).find(c=>c.id===r.contact_id),phone:r.phone,dial:dialNumber(r.phone),startedAt:r.started_at,notes:db.prepare('SELECT notes FROM call_drafts WHERE call_id=?').get(r.id)?.notes||'',outcomes:OUTCOMES,bookingUrl:BOOKING_URL};}
+// An unsaved call from the last twelve hours is still open; older attempts were abandoned and are left alone.
+const openAttempt=(db,user)=>db.prepare('SELECT * FROM call_attempts WHERE user_id=? AND activity_id IS NULL AND started_at>? ORDER BY started_at DESC LIMIT 1').get(user.id,new Date(Date.now()-12*3600000).toISOString());
+export function openCall(db,user){const row=openAttempt(db,user);return{call:row?callView(db,row):null};}
+// The note is kept while the call runs, so a closed tab or window loses nothing and another surface can resume it.
+export function draftCall(db,user,b){
+ const call=db.prepare('SELECT * FROM call_attempts WHERE id=? AND user_id=?').get(field(b.callId,36),user.id);if(!call)throw new Problem('Call not found.',404);if(call.activity_id)return{saved:false,closed:true};
+ db.prepare('INSERT INTO call_drafts VALUES(?,?,?) ON CONFLICT(call_id) DO UPDATE SET notes=excluded.notes,updated_at=excluded.updated_at').run(call.id,field(b.notes,12000),now());return{saved:true};
 }
 export function saveCall(db,user,b){return transaction(db,()=>{
  const call=db.prepare('SELECT * FROM call_attempts WHERE id=? AND user_id=?').get(field(b.callId,36),user.id);if(!call)throw new Problem('Call not found.',404);if(call.activity_id)return{saved:true,duplicate:true,organisation:{id:call.organisation_id,version:String(getOrg(db,call.organisation_id).version)}};
@@ -36,7 +48,7 @@ export function saveCall(db,user,b){return transaction(db,()=>{
  let due=null;if(outcome){due=b.outcome==='callback'&&b.callbackDate?field(b.callbackDate,10):addDays(todayBerlin(),outcome.days);if(!validDate(due)||due<todayBerlin())throw new Problem('Check the call-back date.');}
  const aid=addActivity(db,call.organisation_id,user,{type:outcome?'Anruf · '+outcome.label:'Anruf gestartet',text:note||(outcome?outcome.label:'Anruf gestartet · keine Notiz'),date,contacted:!!outcome?.contacted});
  if(outcome)applyOutcome(db,user,call.organisation_id,outcome,due);
- db.prepare('INSERT INTO activity_contacts VALUES(?,?)').run(aid,call.contact_id);db.prepare('UPDATE call_attempts SET activity_id=? WHERE id=?').run(aid,call.id);
+ db.prepare('INSERT INTO activity_contacts VALUES(?,?)').run(aid,call.contact_id);db.prepare('UPDATE call_attempts SET activity_id=? WHERE id=?').run(aid,call.id);db.prepare('DELETE FROM call_drafts WHERE call_id=?').run(call.id);
  audit(db,call.organisation_id,user,'call',{activityId:aid,outcome:b.outcome??null,due,contactId:call.contact_id,phone:call.phone,startedAt:call.started_at,sourceMessageId:call.source_message_id});
  claimOnCall(db,user,call.organisation_id);
  db.prepare('UPDATE organisations SET version=version+1,updated_at=? WHERE id=?').run(now(),call.organisation_id);reindex(db,call.organisation_id);return{saved:true,organisation:{id:call.organisation_id,version:String(getOrg(db,call.organisation_id).version)}};

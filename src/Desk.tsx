@@ -5,6 +5,7 @@ import OrganisationView from "./OrganisationView";
 import CreateOrganisation from "./CreateOrganisation";
 import SystemSettings from "./SystemSettings";
 import GuidedTour from "./GuidedTour";
+import {CallProvider} from "./CallDock";
 
 import {useEffect,useMemo,useRef,useState} from "react";
 import {PanelLeftClose,PanelLeftOpen,LogOut,Search,Users,Phone,ArrowUpRight,RefreshCw,ChevronRight,ChevronDown,Check,Plus,CalendarCheck,SlidersHorizontal,AlertCircle,Mail,X,LoaderCircle, CircleHelp} from "lucide-react";
@@ -43,8 +44,8 @@ export default function Desk({user}:{user:User}){
    const hold=(ids:string[],all:boolean,by:string[])=>{const l=live.current;l.held=true;l.all||=all;ids.forEach(id=>l.ids.add(id));by.forEach(id=>l.by.add(id));if(liveState.current.busy){if(!all&&ids.includes(liveState.current.selected)&&by.some(id=>id!==user?.id))setToast("Diese Organisation wurde gerade von jemand anderem geändert");return;}applyLive();};
    const connect=()=>{if(stopped)return;source=new EventSource("/api/live");
     // After a reconnect, changes made while the stream was down are unknown, so everything reloads once.
-    source.addEventListener("ready",()=>{if(!first)hold([],true,[]);first=false;});
-    source.addEventListener("change",e=>{try{const d=JSON.parse((e as MessageEvent).data);hold(d.ids||[],!!d.all,d.by||[]);}catch{}});
+    source.addEventListener("ready",()=>{if(!first){hold([],true,[]);window.dispatchEvent(new Event("stageforce-live"));}first=false;});
+    source.addEventListener("change",e=>{window.dispatchEvent(new Event("stageforce-live"));try{const d=JSON.parse((e as MessageEvent).data);hold(d.ids||[],!!d.all,d.by||[]);}catch{}});
     source.addEventListener("expired",()=>{stopped=true;source?.close();window.dispatchEvent(new Event("session-expired"));});
     // The browser retries on its own after a dropped connection; a refused one (e.g. 503) needs a manual retry.
     source.onerror=()=>{if(source?.readyState===EventSource.CLOSED){source.close();retry=setTimeout(connect,15000);}};};
@@ -87,8 +88,9 @@ export default function Desk({user}:{user:User}){
   const warn=entity?findings.get(entity.id)||[]:[];
   const links=entity?(data?.links||[]).filter(l=>l.a===entity.id||l.b===entity.id):[];
   const eligibleCount=eligibleFor(entities,user?.id||"").filter(e=>callable(e)).length;
-  async function callSaved(){await refresh(true);if(mode==="calls"&&selectedQueue){setDone(prev=>[...new Set([...prev,selected])]);const next=pending.find(q=>q.id!==selected);setSelected(next?.id||'');}else{const r=await api({action:"detail",id:selected,historyKind:"communication"});setDetail(r.entity);setHistoryItems(r.history.items);setHistoryTotal(r.history.total);}setToast('Anruf gespeichert');}
-  return <div className="app-shell">
+  // The call card reports which organisation the call belonged to; that may no longer be the one on screen.
+  async function callSaved(id:string){await refresh(true);if(mode==="calls"&&queue.some(q=>q.id===id)){setDone(prev=>[...new Set([...prev,id])]);if(id===selected){const next=pending.find(q=>q.id!==id);setSelected(next?.id||'');}}else if(id===selected){const r=await api({action:"detail",id,historyKind:"communication"});setDetail(r.entity);setHistoryItems(r.history.items);setHistoryTotal(r.history.total);}setToast('Anruf gespeichert');}
+  return <CallProvider onSaved={callSaved} onOpen={id=>{pick(id);}}><div className="app-shell">
     <aside className={`sidebar glass ${navCollapsed?"is-collapsed":""}`}>
       <div className="brand"><div className="stage-mark" aria-label="StageForce" role="img"><i/><i/><i/></div><span className="brand-name">Stage <span>Force</span></span></div>
       <nav><button data-tour="organisations" title="Organisationen" aria-label="Organisationen" className={mode==="orgs"&&!reviewOnly?"nav-item active":"nav-item"} onClick={async()=>{setMode("orgs");setReviewOnly(false);}}><Users size={19}/><span className="nav-label">Organisationen</span></button><button data-tour="calls" title="Anrufe" aria-label="Anrufe" className={mode==="calls"?"nav-item active":"nav-item"} onClick={()=>setMode("calls")}><Phone size={19}/><span className="nav-label">Anrufe</span>{queue.length>0&&<small>{pending.length}</small>}</button><button data-tour="review" title="Prüfen" aria-label="Prüfen" className={reviewOnly&&mode==="orgs"?"nav-item active":"nav-item"} onClick={async()=>{if(!await leaveInline())return;setMode("orgs");setReviewOnly(true);if(!findings.has(selected))setSelected(review[0]?.id||"");}}><AlertCircle size={19}/><span className="nav-label">Prüfen</span><small className="amber-count">{review.length||""}</small></button><button data-tour="imports" title="Importe" aria-label="Importe" className="nav-item" onClick={async()=>{if(saving||!await leaveInline())return;setImportsOpen(true);}}><Mail size={19}/><span className="nav-label">Importe</span></button></nav>
@@ -111,7 +113,7 @@ export default function Desk({user}:{user:User}){
         </section>
         <section className="detail-pane glass" ref={detailRef}>
           {entity&&warn.length>0&&<div className="review-bar" role="status"><AlertCircle size={18}/><p>{warn.join("\n")}</p><button className="button secondary" disabled={saving||inlineSaving||inlinePending} onClick={reviewDone}><Check size={16}/>Erledigt</button></div>}
-          {detailError&&<p className="save-error">{detailError}</p>}{detailLoading&&<p className="muted">Details werden geladen …</p>}{entity?<OrganisationView key={entity.id+":"+viewEpoch} accountEmail={user?.email||""} users={data?.users||[]} onPendingChange={setInlinePending} onBusyChange={setInlineSaving} entity={entity} entities={entities} links={links} history={historyItems} historyTotal={historyTotal} loading={detailLoading} onMore={moreHistory} onPick={pick} onSaved={saved} onActivitySaved={activitySaved} onCallSaved={callSaved} onRemoved={removed} callReason={mode==="calls"?selectedQueue?.reason:undefined} onSkip={skip}/>:<div className="detail-empty"><div className="empty-art"><Users size={44} strokeWidth={1.1}/></div><h2>{mode==="calls"?"Ein Gespräch nach dem anderen.":"Alles beginnt mit einem Kontakt."}</h2><p>{mode==="calls"?"Erstelle deine Tagesliste und starte links mit dem ersten Anruf.":"Suche eine Organisation oder wähle sie links aus."}</p></div>}
+          {detailError&&<p className="save-error">{detailError}</p>}{detailLoading&&<p className="muted">Details werden geladen …</p>}{entity?<OrganisationView key={entity.id+":"+viewEpoch} accountEmail={user?.email||""} users={data?.users||[]} onPendingChange={setInlinePending} onBusyChange={setInlineSaving} entity={entity} entities={entities} links={links} history={historyItems} historyTotal={historyTotal} loading={detailLoading} onMore={moreHistory} onPick={pick} onSaved={saved} onActivitySaved={activitySaved} onRemoved={removed} callReason={mode==="calls"?selectedQueue?.reason:undefined} onSkip={skip}/>:<div className="detail-empty"><div className="empty-art"><Users size={44} strokeWidth={1.1}/></div><h2>{mode==="calls"?"Ein Gespräch nach dem anderen.":"Alles beginnt mit einem Kontakt."}</h2><p>{mode==="calls"?"Erstelle deine Tagesliste und starte links mit dem ersten Anruf.":"Suche eine Organisation oder wähle sie links aus."}</p></div>}
         </section>
       </div>
     </div>
@@ -120,5 +122,5 @@ export default function Desk({user}:{user:User}){
     {importsOpen&&<ImportHub accountEmail={user?.email||""} entities={entities} initialImportId={initialImportId} onClose={closeImports} onSaved={async(id)=>{await refresh();setSelected(id);setToast("Import übernommen");}}/>}
     {tour&&<GuidedTour onClose={()=>setTour(false)}/>}
     {toast&&<div className="toast" role="status"><Check size={16}/>{toast}</div>}
-  </div>;
+  </div></CallProvider>;
 }

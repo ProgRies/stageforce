@@ -1,7 +1,7 @@
 import {contactName,formatPhone} from '../src/domain.ts';
 import {appearance} from './appearance.mjs';
 import {detectMeeting,logMeeting,manualMeeting,findMeeting,meetingText} from './meetings.mjs';
-import {prepareCall,saveCall,cancelCall,mergePhones,dialNumber} from './calls.mjs';
+import {prepareCall,saveCall,cancelCall,openCall,draftCall,mergePhones,dialNumber} from './calls.mjs';
 import {randomBytes,createHash} from 'node:crypto';
 import {hashToken,limited,email} from './auth.mjs';
 import {transaction,now} from './db.mjs';
@@ -89,6 +89,8 @@ export function extensionAction(db,user,b,origin){
  if(b.action==='meeting')return{meeting:meetingIn(db,b)};
  if(b.action==='callCancel')return cancelCall(db,user,b);
  if(b.action==='callSave')return saveCall(db,user,b);
+ if(b.action==='callOpen')return openCall(db,user);
+ if(b.action==='callDraft')return draftCall(db,user,b);
  if(b.action==='search'){
   const q=field(b.query,300);if(q.length<2)return{items:[]};
   return{items:db.prepare('SELECT id,name,version FROM organisations WHERE instr(lower(name),lower(?))>0 ORDER BY name COLLATE NOCASE LIMIT 20').all(q).map(brief)};

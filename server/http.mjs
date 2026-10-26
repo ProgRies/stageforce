@@ -1,5 +1,5 @@
 import {appearance,saveAppearance} from './appearance.mjs';
-import {prepareCall,saveCall,cancelCall} from './calls.mjs';
+import {prepareCall,saveCall,cancelCall,openCall,draftCall} from './calls.mjs';
 import {reserveQueue} from './leads.mjs';
 import {extensionStatus,extensionCreate,extensionRevoke,authorizeExtension,extensionAction} from './extension.mjs';
 import {createServer} from 'node:http';
@@ -15,7 +15,7 @@ import {parseEmail} from './email.mjs';
 import {deleteOrganisation,mergeOrganisations} from './lifecycle.mjs';
 import {liveHub} from './live.mjs';
 // Actions that only read, or only touch the caller's own settings and staging, are not announced to other tabs.
-const quiet=new Set(['appearanceSave','extensionStatus','extensionCreate','extensionRevoke','load','detail','history','search','imports','importPreview','importPosition','importDelete','message','check','messageStatus','threadStatus','meeting','lookup']);
+const quiet=new Set(['appearanceSave','extensionStatus','extensionCreate','extensionRevoke','load','detail','history','search','imports','importPreview','importPosition','importDelete','message','check','messageStatus','threadStatus','meeting','lookup','callOpen','callDraft']);
 const touched=(b,data)=>[b.id,b.other,b.into,b.organisationId,data?.entity?.id,data?.organisation?.id,data?.deleted];
 export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:3000',staticDir=resolve('dist')}={}){
  const url=new URL(origin);if(url.origin!==origin.replace(/\/$/,''))throw Error('APP_URL must be an origin without a path.');origin=url.origin;const secure=url.protocol==='https:';if(process.env.NODE_ENV==='production'&&!secure)throw Error('Production APP_URL must use HTTPS.');let parsing=0;const live=liveHub(db);
@@ -94,6 +94,8 @@ export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:300
    case 'callPrepare':data=prepareCall(db,session,b);break;
    case 'callCancel':data=cancelCall(db,session,b);break;
    case 'callSave':data=saveCall(db,session,b);break;
+   case 'callOpen':data=openCall(db,session);break;
+   case 'callDraft':data=draftCall(db,session,b);break;
    case 'queueReserve':data=reserveQueue(db,session,b);break;
    case 'activitySave':data=activitySave(db,session,b);break;
    case 'contact':data=contactSave(db,session,b);break;
