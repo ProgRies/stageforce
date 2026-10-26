@@ -2,7 +2,7 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import {useEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
-import {MapPin,X,Search,Check,Trash2} from 'lucide-react';
+import {MapPin,X,Search,Check,Trash2,Plus,Minus} from 'lucide-react';
 import {api} from './api';
 import {useConfirm} from './ConfirmDialog';
 import {text,organisationSubtitle,type Entity,type MapPin as Pin} from './domain';
@@ -18,11 +18,11 @@ function baseMap(node:HTMLElement,options:L.MapOptions={}){const map=L.map(node,
 
 export default function OrganisationMap({entity,entities,disabled,onSaved,onPick,onDirtyChange,onBusyChange}:Props){
  const [open,setOpen]=useState<null|'view'|'edit'>(null);
- const preview=useRef<HTMLDivElement>(null),others=entities.filter(e=>e.location&&e.id!==entity.id);
- useEffect(()=>{if(!entity.location||!preview.current)return;const map=baseMap(preview.current,{zoomControl:false,attributionControl:false,dragging:false,scrollWheelZoom:false,doubleClickZoom:false,boxZoom:false,keyboard:false,touchZoom:false}).setView(entity.location,12);
-  for(const e of others)L.marker(e.location!,{icon:icon(false),interactive:false,keyboard:false}).addTo(map);L.marker(entity.location,{icon:icon(true),interactive:false,keyboard:false}).addTo(map);return()=>{map.remove();};},[entity.location?.lat,entity.location?.lng,others.map(e=>e.id+e.location!.lat+e.location!.lng).join()]);
+ const preview=useRef<HTMLDivElement>(null),previewMap=useRef<L.Map|null>(null),others=entities.filter(e=>e.location&&e.id!==entity.id);
+ useEffect(()=>{if(!entity.location||!preview.current)return;const map=baseMap(preview.current,{zoomControl:false,attributionControl:false,dragging:false,scrollWheelZoom:false,doubleClickZoom:false,boxZoom:false,keyboard:false,touchZoom:false}).setView(entity.location,12);previewMap.current=map;
+  for(const e of others)L.marker(e.location!,{icon:icon(false),interactive:false,keyboard:false}).addTo(map);L.marker(entity.location,{icon:icon(true),interactive:false,keyboard:false}).addTo(map);return()=>{map.remove();previewMap.current=null;};},[entity.location?.lat,entity.location?.lng,others.map(e=>e.id+e.location!.lat+e.location!.lng).join()]);
  return <section className="organisation-map" aria-label="Standort">
-  {entity.location&&<><button type="button" className="map-preview" aria-label="Karte öffnen" disabled={disabled} onClick={()=>setOpen('view')}><div ref={preview}/></button><small className="map-credit">© OpenStreetMap</small></>}
+  {entity.location&&<><div className="map-preview"><button type="button" className="map-preview-open" aria-label="Karte öffnen" disabled={disabled} onClick={()=>setOpen('view')}><div ref={preview}/></button><div className="map-zoom"><button type="button" aria-label="Vergrößern" onClick={()=>previewMap.current?.zoomIn()}><Plus size={14}/></button><button type="button" aria-label="Verkleinern" onClick={()=>previewMap.current?.zoomOut()}><Minus size={14}/></button></div></div><small className="map-credit">© OpenStreetMap</small></>}
   <div className="map-actions">{entity.location?<><button type="button" className="text-button" disabled={disabled} onClick={()=>setOpen('view')}><MapPin size={14}/>Karte</button><button type="button" className="text-button" disabled={disabled} onClick={()=>setOpen('edit')}>Pin ändern</button></>:<button type="button" className="text-button" disabled={disabled} onClick={()=>setOpen('edit')}><MapPin size={14}/>Pin auf Karte setzen</button>}</div>
   {open&&<MapDialog entity={entity} others={others} startEditing={open==='edit'} onClose={()=>setOpen(null)} onSaved={onSaved} onPick={onPick} onDirtyChange={onDirtyChange} onBusyChange={onBusyChange}/>}
  </section>;
