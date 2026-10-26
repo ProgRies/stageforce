@@ -1,68 +1,65 @@
-# StageForce: local CRM and Chrome extension
+# Browser extension for Gmail
 
-There are two user-facing parts: StageForce (web UI, API and SQLite in one container), and the browser extension. Gmail remains your mailbox. The extension calls the CRM API; it never opens or shares the SQLite file.
+The Chrome extension in `integrations/chrome` (version 0.4.20) connects Gmail to the CRM. It adds an **Add to StageForce** button to every opened email, saves the emails, contacts and meetings you confirm, and starts calls. Gmail stays your mailbox: the extension only acts when you click, and it talks to the CRM's API with your personal key. It needs no Google sign-in.
 
-## Start locally
+## Install and connect
 
-From the project folder, with Docker Desktop running:
+1. Open `chrome://extensions`, turn on Developer mode, click **Load unpacked** and select the `integrations/chrome` folder (the one with `manifest.json`). Pin the StageForce icon if you like.
+2. In the CRM: gear → **Browser-Erweiterung verbinden** → **Schlüssel erstellen**. Confirm with a fresh code from your authenticator app and copy the key. It is shown only once.
+3. Click the extension's toolbar icon. Enter the CRM address (`https://stageforce.jaimo.me` on the server, `http://localhost:3000` locally) and the key, click **Connect** and allow access to that address.
+4. Reload Gmail.
 
-```sh
-docker compose -f compose.local.yaml up -d --build
-docker compose -f compose.local.yaml exec crm node server/cli.mjs user:add you@example.com "Your Name"
-```
+Each colleague uses their own CRM account and key. The Gmail account must have the same address as the CRM account. Keys expire after 90 days; replacing or revoking a key in the CRM disconnects the extension immediately, as do a password reset, an authenticator reset or disabling the account. A key only works against the CRM that issued it, so a local key does not work on the server.
 
-Use the exact email address of the Gmail account you will import from. Choose a password of at least 12 characters at the hidden prompt. Open http://localhost:3000 and sign in. The database starts empty and persists in the Docker volume. Do not run `down -v` unless you intend to delete it. Existing production data is not downloaded or included.
+To update the extension, replace the folder (for example with `git pull`), click the reload button in `chrome://extensions` and reload Gmail.
 
-After editing source code, rebuild with the first command. The database survives rebuilds.
+## Saving an email
 
-## Pair your extension
+Open an email and click **Add to StageForce** next to its date. The popup shows:
 
-1. Open `chrome://extensions`, enable Developer mode, choose **Load unpacked**, and select `integrations/chrome` (the folder with `manifest.json`).
-2. In StageForce, open the gear → **Browser-Erweiterung verbinden** → **Schlüssel erstellen**. Copy the personal key, which is shown only once.
-3. Click the extension's toolbar icon (pin it if useful). Enter `http://localhost:3000` and the key. Click **Connect** and grant access to that CRM host.
-4. Refresh Gmail. Open a received message and click **Add to StageForce**, next to its timestamp.
-5. Check the prefilled organisation, contacts, time and text; click **Save & Continue**. It closes the popup and leaves you in Gmail. **Save & Open** opens the organisation in StageForce.
+- **Organisation**: prefilled when the sender's address clearly belongs to one organisation, or when another email of the same Gmail conversation was saved before. Otherwise search for it, or type a new name to create it on save.
+- **Contacts**: the people in the email header. External participants are ticked; colleagues (addresses on the company domains, aliases included) are never offered as client contacts. Phone numbers from the sender's signature appear as removable "new" chips.
+- **Date and direction**: read from Gmail. The CRM decides whether it was sent or received.
+- **Text**: the reply without its quoted history. **Include quoted history** keeps the full text for this email and also offers people and numbers from the earlier emails in the thread.
+- **Other messages of the conversation** that are opened in Gmail and not yet in the CRM, ticked, so one save stores them all. Collapsed messages Gmail has never loaded cannot be read; use Gmail's "Expand all" first.
 
-Use the same hostname for CRM login and extension pairing. Each colleague needs their own CRM user and key. In the current version the Gmail account address must equal the CRM user's address. If Gmail's account label cannot be detected, the popup requires you to enter/confirm it under Message details. Multiple aliases are not automatically trusted or inferred.
+**Save & Continue** saves and closes the popup. **Save & Open** also opens the organisation in the CRM. Ctrl/Cmd+Enter is Save & Continue.
+
+To add a person from the email body, select their details and choose **Extract contact**. The pencil on a contact edits its name and numbers; **Save contact** writes to the organisation right away, independent of saving the email.
+
+### Already saved
+
+An email that is in the CRM shows **Already in StageForce** instead. This also works for emails a colleague saved from their own mailbox: the copy is matched by sender, subject, the minute it was sent and a shared recipient, and the popup names who saved it. Opening a saved email shows the stored version; contacts can still be edited and calls started.
+
+In the inbox list, a small **✓ CRM** mark shows conversations whose latest email is already in the CRM.
+
+### Meetings
+
+The popup always offers **Also log as meeting** with a date and time. It is ticked automatically for video-call invitations (Zoom, Teams, Google Meet, Webex, GoTo, Whereby, Jitsi, Skype) and for calendar or booking confirmations such as "Akzeptiert:", "Terminbestätigung" or Calendly's "New Event:". Several emails about the same meeting stay one timeline entry; an updated invitation moves it and a cancellation marks it **Abgesagt**. Declines and counter-proposals are ignored.
+
+## Calling from Gmail
+
+Every contact phone number in the popup starts a call. The organisation and contact are saved first (a new organisation needs a name), then the calling app opens and the popup closes. The note and the result go into the same floating call card as in the CRM; see [Calls](user-guide.md#calls).
 
 ## What is sent, and when
 
-- The button checks the mailbox and Gmail message identifier against the CRM. For older/unrecognized messages it reads the loaded text locally to compute a SHA-256 fallback fingerprint; only that digest is transmitted during the check.
-- Clicking it reads that single loaded message into memory.
-- Opening the popup sends sender/visible-recipient addresses and names plus mailbox address to the configured CRM for matching. Organisation searches send the typed search text. No email body is sent yet; these lookups do not create CRM records.
-- Save sends the reviewed message text, subject, timestamp, envelope, selected contacts, chosen organisation and optional linked organisation. The unedited loaded body is also transmitted to compute a duplicate fingerprint, but the reviewed body is what is retained in `messages`.
-- Starting a call saves the chosen organisation/contact/number first. The note and the result are then taken in the floating call card (shared with the CRM), which stays above every tab and app in a Chrome Picture-in-Picture window; the popup can be closed meanwhile. Save records the note, the result and the original click time. Discarding removes the pending call preparation and preserves the organisation/contact. One call per user is open at a time; its note is kept on the server while it runs.
-- No attachment bytes are sent. No external AI, analytics, email delivery or Google OAuth is used. The extension does not send, draft, forward, delete, label or mark messages in Gmail.
-- All active CRM colleagues can read the saved content. The application currently has shared team access, not per-organisation permissions.
+- **Showing the button** sends the mailbox and Gmail's message id (and, for older saves, a SHA-256 fingerprint of the message) to check whether it is already saved. The inbox mark sends the latest email's sender, time and subject per conversation. Only yes or no comes back, so no client names enter the Gmail page.
+- **Opening the popup** sends the header addresses and names for matching. Organisation searches send what you type. No email text leaves the browser yet, and nothing is stored.
+- **Save** sends the reviewed text, subject, time, participants, chosen organisation and contacts, attachment names and sizes (never the files) and the full loaded text, which the CRM keeps beside the stored reply.
+- **A call** sends the chosen organisation, contact and number, then the note as you type it.
 
-## Connection protections
+The extension never sends, drafts, forwards, deletes, labels or marks emails, and uses no external AI or analytics. Everything saved is visible to all active colleagues in the CRM.
 
-The extension uses its background worker for network requests. Only its own options page can set the CRM address/key. Gmail content scripts can ask for fixed matching, saved-message, import and call operations, not arbitrary URLs. The worker rejects redirects and omits browser cookies.
+## Security
 
-Credentials are random 256-bit, account-specific bearer tokens, stored only as hashes on the server. They expire after 90 days; replacing or revoking a key invalidates it immediately. Password reset and account disabling revoke keys too. One active key per user is supported; rotating it means reconnecting that user's devices.
+- Network requests go through the extension's background worker. Only the extension's own settings page can set the CRM address and key. Gmail's page can ask only for fixed operations (matching, saving, calls), never arbitrary URLs. Redirects are refused and no browser cookies are sent.
+- Plain HTTP is allowed only for `localhost` and `127.0.0.1`; every other address must be HTTPS.
+- The key is a random 256-bit token, stored on the server only as a hash. In Chrome it sits in `chrome.storage.local`, is not synced and is never visible to Gmail's page. Someone with access to your computer profile could still copy it, so use disk encryption and your own browser profile.
+- The key cannot reach the rest of the CRM API, account settings or FastBill. It can only match, save confirmed emails and contacts, edit contacts of the selected organisation and handle its own user's calls.
 
-The extension stores its key in the local browser profile using `chrome.storage.local`, restricted to trusted extension contexts. It does not use Chrome Sync and does not expose the key to Gmail's content script. This is access isolation, not encrypted secret storage: someone controlling the device/profile can steal the key. Use OS disk encryption and locked, individual browser profiles.
+## Limits
 
-The extension key cannot access generic CRM routes, account administration or FastBill. It can read matching information and the stored message identified by an opened Gmail message, create confirmed imports/contacts/organisation links, explicitly edit contacts under the selected organisation, and prepare/save/cancel its user’s calls. Web-session mutations still require session cookies, exact Origin and CSRF checks. Website-origin requests to the extension endpoint are rejected; bearer authorization is required even if an Origin header is absent. No wildcard CORS is enabled.
-
-## Local and later hosted use
-
-Local HTTP is permitted only for `localhost`/`127.0.0.1`; Compose binds port 3000 to your computer's loopback interface. The API key is still required. Do not expose the development configuration on a LAN or public interface.
-
-For shared hosted use, run the same CRM service behind HTTPS with a valid certificate, correct `APP_URL`, persistent local disk and backups. Each extension is paired with that HTTPS origin and the colleague's key from that CRM. Never log Authorization headers or request bodies at the reverse proxy. Protect backups and the server disk with encryption and restricted access: SQLite itself is not encrypted by this application. This is TLS transport to your server, not end-to-end encryption against your server administrators.
-
-## Matching and extraction limits
-
-A unique exact external contact-address match is preselected. Shared-address ambiguity and domain-only suggestions require your choice. A single existing linked organisation is prefilled; new relationships are never guessed from an email domain.
-
-Automatic contact suggestions are drawn from loaded headers. To add a contact from the body, highlight one person’s details and choose Extract contact, then review and save. Selection parsing is local; contact saving sends only the reviewed name, email, phone numbers and organisation context. The contact pencil also edits names and phone numbers on saved messages. Gmail DOM selectors are undocumented. Collapsed headers may omit recipients and To/Cc roles are not reliably distinguished; expand the header and reopen when needed. Quoted text already loaded in the message is included, but unloaded messages and attachment contents are not.
-
-ISO timestamps and explicit numeric German timestamps are parsed. Numeric Gmail times use the browser's timezone; unsupported/relative formats require manual confirmation. The time field exposes the browser timezone and original timestamp in its tooltip. Check timezone and daylight-saving ambiguity when importing historical email.
-
-Retries use a request ID; repeated extension imports use mailbox-scoped Gmail identifiers with a content-fingerprint fallback. This is not a verified RFC Message-ID, so differently rendered copies and prior .eml imports can evade duplicate detection. Review unfamiliar duplicates before saving.
-
-## Validation
-
-72 automated tests pass, including key hashing, expiry, rotation/revocation, account and request isolation, CSRF boundaries, conservative matching, rollback, duplicate saves, migration and dates. A Chromium Gmail-like fixture also passed prefill, header-only lookup, HTTP save into SQLite, date preservation, duplicate save and Save & Open; desktop/mobile layouts were inspected. The fixture mocks Chrome messaging; it does not validate the installed extension’s host-permission prompts. A real Gmail test and Docker start on your computer remain necessary; fixtures cannot guarantee Google's live markup or your browser/network policies.
-
-For the current saved-message, phone, attachment-reference and call workflow, see [the local update guide](update-local.md).
+- Gmail's page structure is undocumented and can change. Collapsed headers may hide recipients; expand them and reopen the popup.
+- Dates in ISO, German numeric and spelled-out formats ("Mo., 20. Okt. 2026, 10:00", "Mon, Oct 20, 2026, 10:00 AM") are read in the browser's time zone. Other formats need a manual date.
+- Recognising a colleague's copy needs both Gmail accounts in the same time zone and an unchanged subject.
+- Duplicate detection uses Gmail ids and a content fingerprint, not the RFC Message-ID, so an email saved earlier via an .eml upload may not be recognised.

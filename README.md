@@ -1,8 +1,14 @@
 # StageForce · 0.3.12
 
-Two parts: **StageForce**, the web interface and internal API for SQLite, and the **Chrome extension**, which imports selected Gmail emails. This page covers local development on your Mac. For the server, see [Deployment](docs/deployment.md).
+StageForce is our internal CRM for Stage clients. It has three parts that share one SQLite database:
 
-## Start
+- **The CRM** at `/`: organisations, contacts, the communication timeline, call lists, meetings, map pins, the Prüfen list and FastBill imports. Every open tab updates live when a colleague saves something.
+- **The Chrome extension** in `integrations/chrome`: adds an **Add to StageForce** button to Gmail, so you save selected emails, contacts and meetings to the right organisation, and starts calls from Gmail.
+- **The phone app** at `/m/`: a small iPhone web app for logging a call while it is still running.
+
+Every account signs in with a password and an authenticator app. On the server, the CRM takes verified database snapshots on its own.
+
+## Run it locally
 
 With Docker Desktop running, open a terminal in this folder:
 
@@ -11,46 +17,56 @@ docker compose -f compose.local.yaml up -d --build
 docker compose -f compose.local.yaml exec crm node server/cli.mjs user:add you@example.com "Your Name"
 ```
 
-Use the Gmail address you will import from. Choose a password of at least 12 characters at the hidden prompt. Open http://localhost:3000 and sign in. Your database starts empty and persists across rebuilds.
+Use the Gmail address you will save emails from. Choose a password of at least 12 characters at the hidden prompt. Open http://localhost:3000 and sign in. On the first sign-in, scan the QR code with an authenticator app (Google Authenticator, Microsoft Authenticator, 1Password, …), enter the six-digit code and store the ten recovery codes, which are shown only once. Later sign-ins ask for the current code.
 
-Every account needs an authenticator app (Google Authenticator, Microsoft Authenticator, 1Password, …). On the first sign-in, StageForce shows a QR code after the password; scan it, enter the six-digit code, and store the ten recovery codes it shows once. Later sign-ins ask for the current code. Without it, the login does not complete.
+The database starts empty and lives in the Docker volume, so it survives rebuilds. After changing source code, run the first command again.
 
-`compose.local.yaml` builds the local source and binds to localhost. `compose.yaml` is the production file for the server and pulls a published image; do not use it on your Mac. Never run `down -v` unless you intend to delete your local database.
+There are two Compose files:
 
-Tip: to keep typing plain `docker compose …` locally, put `COMPOSE_FILE=compose.local.yaml` into a `.env` file in this folder (it is ignored by Git). Never copy that `.env` to the server.
+| File | Use |
+| --- | --- |
+| `compose.local.yaml` | Your computer. Builds this source and binds to `127.0.0.1:3000` only. |
+| `compose.yaml` | The server. Pulls a published, pinned image and runs behind Traefik. See [deployment](docs/deployment.md). Do not use it locally. |
 
-## Reset your local database
+To type plain `docker compose …` locally, put `COMPOSE_FILE=compose.local.yaml` into a `.env` file in this folder (Git ignores it). Never copy that `.env` to the server.
 
-Rebuilding the image keeps your data: the database lives in the Docker volume, not in the image. To start over with an empty database:
+### Start over with an empty local database
 
 ```sh
 docker compose -f compose.local.yaml exec crm node server/cli.mjs backup /app/data/backups/before-reset.sqlite   # optional
-docker compose -f compose.local.yaml cp crm:/app/data/backups/before-reset.sqlite ./before-reset.sqlite          # optional, keeps the backup outside the volume
+docker compose -f compose.local.yaml cp crm:/app/data/backups/before-reset.sqlite ./before-reset.sqlite          # optional, keeps a copy outside the volume
 docker compose -f compose.local.yaml down -v
 docker compose -f compose.local.yaml up -d --build
 docker compose -f compose.local.yaml exec crm node server/cli.mjs user:add you@example.com "Your Name"
 ```
 
-Then create a new key in StageForce settings and reconnect the browser extension. The old key no longer exists.
+`down -v` deletes the volume with the database. Use it only when you mean to. Afterwards, create a new extension key in the CRM and reconnect the extension.
 
-## Connect Gmail
+## Connect the Chrome extension
 
-1. Open `chrome://extensions`, enable Developer mode, and **Load unpacked** → `integrations/chrome`.
-2. In StageForce: gear → **Browser-Erweiterung verbinden** → **Schlüssel erstellen**.
-3. Click the extension toolbar icon. Enter `http://localhost:3000` and your personal key; click **Connect**.
-4. Refresh Gmail. Open an email → **Add to StageForce** → **Save & Continue**.
+1. Open `chrome://extensions`, turn on Developer mode, click **Load unpacked** and pick `integrations/chrome`.
+2. In the CRM: gear → **Browser-Erweiterung verbinden** → **Schlüssel erstellen**. Confirm with a fresh authenticator code and copy the key.
+3. Click the extension's toolbar icon, enter the CRM address (`http://localhost:3000` locally) and the key, then click **Connect**.
+4. Reload Gmail, open an email and click **Add to StageForce**.
 
-A clear existing contact match is prefilled. Ambiguous matches and new organisations require your choice. **Save & Open** opens that organisation in the CRM. Each colleague uses their own account/key. The former Gmail add-on is removed.
+Details: [Browser extension](docs/extension-setup.md).
 
-[Detailed setup, security and extraction limits](docs/extension-setup.md)
+## Documentation
 
-## CRM features retained
-
-Organisation/contact editing, search, communication history with notes and meetings, follow-ups, personal call lists with one-tap call results, the Prüfen handoff list, FastBill imports and the optional .eml file importer. The browser extension uses the same database; it does not need the file importer. No real CRM snapshot, mailbox contents, passwords or connection keys are included.
+| Page | For |
+| --- | --- |
+| [User guide](docs/user-guide.md) | Working in the CRM: organisations, timeline, calls and the call card, call lists, meetings, map, Prüfen, settings |
+| [Browser extension](docs/extension-setup.md) | Installing, pairing, saving emails and meetings from Gmail, what is sent |
+| [Phone app](docs/mobile-app.md) | Installing `/m/` on an iPhone and testing it from your Mac |
+| [FastBill import](docs/fastbill-import.md) | Adding FastBill customers one row at a time |
+| [Deployment](docs/deployment.md) | Server setup, accounts, two-factor resets, snapshots, backups and updates |
+| [Releases](docs/release.md) | How an image is published |
+| [Database](docs/schema.md) | Tables and schema version |
+| [Release notes](docs/release-notes.md) | What changed in each version |
 
 ## Development
 
-Requires Node 24.14+ within the 24.x line if running without Docker:
+Without Docker you need Node 24.14 or newer within the 24.x line:
 
 ```sh
 npm ci --ignore-scripts
@@ -60,10 +76,10 @@ npm run build
 APP_URL=http://localhost:3000 node server/http.mjs
 ```
 
-After source edits, rebuild Docker with `docker compose -f compose.local.yaml up -d --build`. For extension edits, click Reload in `chrome://extensions` and refresh Gmail.
+After changing the extension, click its reload button in `chrome://extensions` and reload Gmail.
 
-The database is at schema 13 (see [Schema](docs/schema.md)). Existing CRM data and credentials are preserved on upgrade. Back up the database before upgrading; older versions cannot open a newer schema. The extension is v0.4.20; CRM version is 0.3.12.
+Work happens on the `local-development` branch. `main` is what gets published: a version change merged into `main` builds and publishes `ghcr.io/progries/stageforce:<version>` (see [Releases](docs/release.md)).
 
-[Server deployment, snapshots and accounts](docs/deployment.md) · [Schema](docs/schema.md) · [Release notes](docs/release-notes.md)
+Current versions: CRM 0.3.12, extension 0.4.20, database schema 13. Startup migrates older databases automatically; back up first, because older versions cannot open a newer schema.
 
-See [Update instructions and feature details](docs/update-local.md) for this release.
+No real customer data, mailbox contents, passwords or keys belong in this repository.
