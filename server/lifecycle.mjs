@@ -22,7 +22,7 @@ export function deleteOrganisation(db,user,b){return transaction(db,()=>{
  for(const m of messages)db.prepare('DELETE FROM messages WHERE id=?').run(m);
  db.prepare('DELETE FROM organisation_contacts WHERE organisation_id=?').run(id);
  for(const c of own)db.prepare('DELETE FROM contacts WHERE id=?').run(c);
- for(const table of ['followups','review_issues','requests','migration_archive','audit_log','fastbill_decisions','fastbill_mappings'])db.prepare(`DELETE FROM ${table} WHERE organisation_id=?`).run(id);
+ for(const table of ['followups','review_issues','requests','migration_archive','audit_log','fastbill_decisions','fastbill_mappings','organisation_locations'])db.prepare(`DELETE FROM ${table} WHERE organisation_id=?`).run(id);
  db.prepare("UPDATE fastbill_rows SET organisation_id=NULL,status='pending',note='' WHERE organisation_id=?").run(id);
  db.prepare('DELETE FROM organisation_links WHERE a=? OR b=?').run(id,id);
  db.prepare('DELETE FROM search_docs WHERE organisation_id=?').run(id);
@@ -57,6 +57,7 @@ export function mergeOrganisations(db,user,b){return transaction(db,()=>{
  const summary=[into.summary,from.summary].map(s=>s.trim()).filter(Boolean).filter((s,i,all)=>all.indexOf(s)===i).join('\n\n');
  const lastContact=[into.last_contact,from.last_contact].filter(Boolean).sort().pop()||null;
  db.prepare('UPDATE organisations SET type=?,fastbill_url=?,city=?,state=?,website=?,size=?,size_unit=?,owner=?,summary=?,last_contact=? WHERE id=?').run(fill('type','Unklar'),fill('fastbill_url'),fill('city'),fill('state'),fill('website'),into.size??from.size,fill('size_unit'),fill('owner'),summary,lastContact,target);
+ db.prepare('INSERT OR IGNORE INTO organisation_locations SELECT ?,lat,lng,updated_at FROM organisation_locations WHERE organisation_id=?').run(target,source);
  db.prepare('DELETE FROM search_docs WHERE organisation_id=?').run(source);
  db.prepare('DELETE FROM organisations WHERE id=?').run(source);
  audit(db,target,user,'organisation_merge',{from:{id:source,name:from.name},followupClosed:!!(openSource&&openTarget)});

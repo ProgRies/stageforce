@@ -14,11 +14,12 @@ import {inspectCSV,csvRecords,stageFastbill,fastbillBatches,fastbillRows,fastbil
 import {parseEmail} from './email.mjs';
 import {deleteOrganisation,mergeOrganisations} from './lifecycle.mjs';
 import {liveHub} from './live.mjs';
+import {locationSave,mapService} from './map.mjs';
 // Actions that only read, or only touch the caller's own settings and staging, are not announced to other tabs.
-const quiet=new Set(['appearanceSave','extensionStatus','extensionCreate','extensionRevoke','load','detail','history','search','imports','importPreview','importPosition','importDelete','message','check','messageStatus','threadStatus','meeting','lookup','callOpen','callDraft']);
+const quiet=new Set(['appearanceSave','extensionStatus','extensionCreate','extensionRevoke','load','detail','history','search','imports','importPreview','importPosition','importDelete','message','check','messageStatus','threadStatus','meeting','lookup','callOpen','callDraft','mapSearch']);
 const touched=(b,data)=>[b.id,b.other,b.into,b.organisationId,data?.entity?.id,data?.organisation?.id,data?.deleted];
-export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:3000',staticDir=resolve('dist')}={}){
- const url=new URL(origin);if(url.origin!==origin.replace(/\/$/,''))throw Error('APP_URL must be an origin without a path.');origin=url.origin;const secure=url.protocol==='https:';if(process.env.NODE_ENV==='production'&&!secure)throw Error('Production APP_URL must use HTTPS.');let parsing=0;const live=liveHub(db);
+export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:3000',staticDir=resolve('dist'),map}={}){
+ const url=new URL(origin);if(url.origin!==origin.replace(/\/$/,''))throw Error('APP_URL must be an origin without a path.');origin=url.origin;const secure=url.protocol==='https:';if(process.env.NODE_ENV==='production'&&!secure)throw Error('Production APP_URL must use HTTPS.');let parsing=0;const live=liveHub(db);map??=mapService({agent:`StageForce CRM (${origin})`});
  const json=(res,status,data)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(JSON.stringify(data));};
  const success=(res,data)=>json(res,200,{status:'success',data});
  const body=async(req,max=1024*1024)=>{const buffers=[];let size=0;for await(const chunk of req){size+=chunk.length;if(size>max)throw new Problem('Datei/Eingabe ist zu groß.',413);buffers.push(chunk);}return Buffer.concat(buffers);};
@@ -54,6 +55,7 @@ export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:300
  if(path.startsWith('/api/')){
   const session=getSession(db,req);if(!session)throw new Problem('Bitte anmelden.',401,'unauthorized');
   if(req.method==='GET'&&path==='/api/live'){if(req.headers.origin&&req.headers.origin!==origin)throw new Problem('Unzulässiger Ursprung.',403,'forbidden');return live.open(req,res,session);}
+  if(req.method==='GET'&&path.startsWith('/api/map/tile/')){const m=path.match(/^\/api\/map\/tile\/(\d{1,2})\/(\d{1,7})\/(\d{1,7})\.png$/);if(!m)throw new Problem('Nicht gefunden.',404,'not_found');const bytes=await map.tile(+m[1],+m[2],+m[3]);res.writeHead(200,{'Content-Type':'image/png','Cache-Control':'private, max-age=86400'});return res.end(bytes);}
   if(req.method==='GET'&&path==='/api/session')return success(res,{user:publicUser(session),csrf:session.csrf,appearance:appearance(db,session)});
   if(req.method!=='POST')throw new Problem('Methode nicht erlaubt.',405);
   if(req.headers['x-csrf-token']!==session.csrf)throw new Problem('Sicherheitsprüfung fehlgeschlagen. Bitte neu anmelden.',403,'forbidden');
@@ -100,6 +102,8 @@ export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:300
    case 'activitySave':data=activitySave(db,session,b);break;
    case 'contact':data=contactSave(db,session,b);break;
    case 'link':data=linkSave(db,session,b);break;
+   case 'locationSave':data=locationSave(db,session,b);break;
+   case 'mapSearch':if(limited(db,'map-search:'+session.id,30,60000))throw new Problem('Bitte kurz warten.',429);data={items:await map.search(b.query)};break;
    case 'reviewDone':data=reviewDone(db,session,b);break;
    case 'organisationDelete':data=deleteOrganisation(db,session,b);break;
    case 'organisationMerge':data=mergeOrganisations(db,session,b);break;

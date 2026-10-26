@@ -1,6 +1,6 @@
 # Database and migration
 
-`server/schema.sql` is the executable schema. Tables use foreign keys and stable text IDs. `PRAGMA user_version` tracks the schema version; future application versions must introduce an explicit versioned migration before changing a deployed database. An older binary refuses a newer schema. Current version: 9. Version 3 added FastBill import tables; version 4 added `activity_contacts`; version 6 replaces legacy integration credentials. Startup applies these additive changes in a transaction and preserves existing CRM data. Back up before upgrading. Older binaries refuse newer databases; rollback requires restoring the pre-upgrade backup.
+`server/schema.sql` is the executable schema. Tables use foreign keys and stable text IDs. `PRAGMA user_version` tracks the schema version; future application versions must introduce an explicit versioned migration before changing a deployed database. An older binary refuses a newer schema. Current version: 11. Version 11 added `organisation_locations`. Version 3 added FastBill import tables; version 4 added `activity_contacts`; version 6 replaces legacy integration credentials. Startup applies these additive changes in a transaction and preserves existing CRM data. Back up before upgrading. Older binaries refuse newer databases; rollback requires restoring the pre-upgrade backup.
 
 | Table | Purpose / relationship |
 | --- | --- |
@@ -15,6 +15,7 @@
 | messages | Approved text, subject, participants, sent timestamp, direction, attachment metadata and unique deduplication key |
 | message_sources | Mailbox owner and optional original URL; multiple colleagues may reference one message |
 | followups | Next action and due date; at most one current follow-up per organisation in v0.1 |
+| organisation_locations | Optional map pin (latitude/longitude) per organisation; kept on merge when the target has none, removed with the organisation |
 | organisation_links | One relationship per sorted organisation-ID pair, with a free-text note |
 | review_issues | Open/resolved review text; missing-phone/FastBill checks are additionally computed |
 | source_references | Original provenance attached to an organisation, contact or activity |

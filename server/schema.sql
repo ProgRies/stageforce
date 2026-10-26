@@ -60,3 +60,6 @@ CREATE TABLE IF NOT EXISTS call_reservations(organisation_id TEXT NOT NULL REFER
 CREATE TABLE IF NOT EXISTS user_mfa(user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,secret TEXT NOT NULL,last_step INTEGER NOT NULL DEFAULT 0,enabled_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS mfa_recovery_codes(user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,code_hash TEXT NOT NULL,used_at INTEGER,PRIMARY KEY(user_id,code_hash));
 CREATE TABLE IF NOT EXISTS login_challenges(token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,setup_secret TEXT,attempts INTEGER NOT NULL DEFAULT 0,expires_at INTEGER NOT NULL);
+
+-- Version 11: an optional map pin per organisation.
+CREATE TABLE IF NOT EXISTS organisation_locations(organisation_id TEXT PRIMARY KEY REFERENCES organisations(id) ON DELETE CASCADE,lat REAL NOT NULL CHECK(lat BETWEEN -90 AND 90),lng REAL NOT NULL CHECK(lng BETWEEN -180 AND 180),updated_at TEXT NOT NULL);
