@@ -84,15 +84,16 @@ export function contactAge(e: Entity, today=todayBerlin()): number | null { cons
 export function contactLabel(e: Entity) { const days=contactAge(e);return days===null?"Kontakt unbekannt":days===0?"Heute kontaktiert":days===1?"Gestern kontaktiert":`Vor ${days} Tagen`; }
 export type QueueItem = {id:string; reason:string; kind:"followup"|"customer"|"warm"|"cold"};
 export function buildQueue(entities:Entity[], count=30, staleDays=90, customerShare=.6, today=todayBerlin()):QueueItem[] {
-  const max=Math.max(1,Math.min(100,Math.floor(count)));const eligible=entities.filter(e=>phone(e)&&text(e,9)!=="Ehemaliger Kunde"&&!["Verloren","Aktuell kein Bedarf"].includes(text(e,10)));
+  const max=Math.max(1,Math.min(100,Math.floor(count)));const active=entities.filter(e=>text(e,9)!=="Ehemaliger Kunde"&&!["Verloren","Aktuell kein Bedarf"].includes(text(e,10))),eligible=active.filter(e=>phone(e));
   const customer=(e:Entity)=>text(e,9)==="Kunde";
   const cold=(e:Entity)=>!customer(e)&&["Unbearbeitet","Kontaktaufnahme","Unklar",""].includes(text(e,10));
   const overdue=(e:Entity)=>{const d=dateISO(e.values[17]);return d&&d<=today;};
   const recency=(a:Entity,b:Entity)=>(contactAge(b,today)??-1)-(contactAge(a,today)??-1)||text(a,1).localeCompare(text(b,1),"de");
   const out:QueueItem[]=[],used=new Set<string>();
   const take=(list:Entity[],limit:number,kind:QueueItem['kind'],reason:(e:Entity)=>string)=>{let added=0;for(const e of list){if(out.length>=max||added>=limit)break;if(used.has(e.id))continue;used.add(e.id);out.push({id:e.id,kind,reason:reason(e)});added++;}};
-  take(eligible.filter(overdue).sort((a,b)=>dateISO(a.values[17]).localeCompare(dateISO(b.values[17]))),Math.ceil(max*.25),"followup",e=>`Wiedervorlage ${formatDate(e.values[17])}`);
-  const target=Math.round(max*Math.min(.9,Math.max(.1,customerShare))),already=out.filter(q=>customer(eligible.find(e=>e.id===q.id)!)).length;
+  // Due callbacks always come first and are never capped; without a number they still show so the callback is not lost.
+  take(active.filter(overdue).sort((a,b)=>dateISO(a.values[17]).localeCompare(dateISO(b.values[17]))),max,"followup",e=>`Wiedervorlage ${formatDate(e.values[17])}${phone(e)?"":" · keine Nummer"}`);
+  const target=Math.round(max*Math.min(.9,Math.max(.1,customerShare))),already=out.filter(q=>customer(active.find(e=>e.id===q.id)!)).length;
   const neglected=eligible.filter(e=>customer(e)&&(contactAge(e,today)===null||(contactAge(e,today)??0)>=staleDays)).sort(recency);
   take(neglected,Math.max(0,target-already),"customer",e=>contactAge(e,today)===null?"Kunde · Kontakt unbekannt":`Kunde · ${contactAge(e,today)} Tage ohne Kontakt`);
   const warm=eligible.filter(e=>!customer(e)&&!cold(e)).sort((a,b)=>{const ranks:Record<string,number>={"Angebot":0,"Testphase":1,"Termin vereinbart":2,"Im Gespräch":3};return (ranks[text(a,10)]??9)-(ranks[text(b,10)]??9)||recency(a,b);});
