@@ -82,6 +82,7 @@ The container runs as the unprivileged `node` user (UID 1000). Every write (data
 | Suspicious sign-ins | `… security:log [EMAIL] [COUNT]` |
 | Are snapshots running | `… snapshot:list`, or `docker compose exec crm cat /app/data/snapshots/last-run.json` |
 | Backup before an update | `… backup /app/data/backups/before-update.sqlite` |
+| Did last night's NAS copy work | `tail /var/log/stageforce-backup.log` on the host (see [Copying snapshots to the NAS](#copying-snapshots-to-the-nas)) |
 
 `…` stands for `docker compose exec crm node server/cli.mjs`. Details follow below.
 
@@ -154,6 +155,52 @@ docker compose exec -T crm node server/cli.mjs snapshot:latest --stdout --max-ag
 ```
 
 To restore, decrypt with `age -d -i key.txt stageforce-....sqlite.age > known-good.sqlite` on a trusted machine and follow the restore steps below. Only the public key is on the server, so a compromised server cannot read older encrypted backups. If your backup tool already encrypts (restic, Borg), pipe the `--stdout` output into it instead.
+
+### Copying snapshots to the NAS
+
+`scripts/backup-to-nas.sh` runs on the Docker host. It fetches the latest healthy snapshot, can encrypt it with age, and copies it to the NAS with rsync over SSH. It also deletes copies on the NAS that are older than `NAS_KEEP_DAYS`. If anything fails, it exits non-zero and logs one line with the reason. Copies are named `stageforce-<UTC time>.sqlite[.age]`, each with a `.sha256` file next to it.
+
+**One-time setup on the host** (as a user that may run `docker`, e.g. root):
+
+1. Install `rsync` (and `age` if you want encryption) on the host. The NAS needs SSH and rsync enabled. On Synology, that's Control Panel → Terminal & SNMP → SSH, plus File Services → rsync.
+2. Create a NAS user with write access to a backup folder only, e.g. `/volume1/backups/stageforce`.
+3. Create a dedicated SSH key without a passphrase and add it to that user on the NAS:
+
+   ```sh
+   ssh-keygen -t ed25519 -N '' -f /root/.ssh/stageforce-nas -C stageforce-backup
+   ssh-copy-id -i /root/.ssh/stageforce-nas.pub stageforce@nas.local
+   ssh -i /root/.ssh/stageforce-nas stageforce@nas.local true   # must succeed without a prompt
+   ```
+
+4. Write the configuration to `/etc/stageforce-backup.env` (mode 600):
+
+   ```sh
+   NAS_TARGET=stageforce@nas.local:/volume1/backups/stageforce
+   SSH_KEY=/root/.ssh/stageforce-nas
+   DEPLOY_DIR=/srv/stageforce            # folder with compose.yaml and .env
+   NAS_KEEP_DAYS=30                      # 0 = never delete on the NAS
+   MAX_AGE_HOURS=12                      # fail if snapshots have stopped
+   # AGE_RECIPIENTS=/etc/stageforce-backup.age-recipients   # file with age public key(s); enables encryption
+   ```
+
+5. Do a test run, then check the NAS folder:
+
+   ```sh
+   BACKUP_CONFIG=/etc/stageforce-backup.env /srv/stageforce/scripts/backup-to-nas.sh
+   ```
+
+**Cron** (`crontab -e` as the same user). This runs nightly at 02:30 and appends to a log file:
+
+```cron
+PATH=/usr/local/bin:/usr/bin:/bin
+30 2 * * * BACKUP_CONFIG=/etc/stageforce-backup.env /srv/stageforce/scripts/backup-to-nas.sh >>/var/log/stageforce-backup.log 2>&1
+```
+
+A failed run ends with a line containing `FAILED`. To be told about failures, leave out the log redirect so cron mails the output, or have your monitoring check that the newest file on the NAS is less than a day old. With snapshots every 6 hours, running the script more often (e.g. `30 */6 * * *`) gives a newer off-site copy at the cost of more files on the NAS.
+
+**How it stays safe:** the CLI only hands out a snapshot that passes its hash and integrity check. The script also checks the SQLite header before sending. rsync writes to a temporary name and renames only when the copy is complete. Old copies on the NAS are deleted only after this run's copy has arrived there, so a broken upload never empties the folder. A copy waits in `STAGING_DIR` (default `/var/backups/stageforce`, mode 700) only until the next run. With `AGE_RECIPIENTS` set, only the encrypted file is kept there and sent, and the NAS cannot read the backups without the private key. Keep that key off the server, e.g. in a password manager.
+
+**Restore from the NAS:** copy a file back to the host and check it with `sha256sum -c <file>.sha256`. If it's encrypted, decrypt it with `age -d -i key.txt`. Then follow the stopped-instance restore below.
 
 ### Manual backup and restore
 
