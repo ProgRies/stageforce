@@ -2,7 +2,7 @@
 
 Canonical repository: https://github.com/ProgRies/stageforce.
 
-Development happens on `local-development` and is tested with `compose.local.yaml`. A release is a merge into `main` that raises the version in `package.json`. The server only ever runs a published, pinned image through `compose.yaml`; see [deployment.md](deployment.md).
+All work goes into `main` through short-lived branches and pull requests, tested locally with `compose.local.yaml`. A release is a merge into `main` that raises the version in `package.json`; other merges publish nothing. The server only ever runs a published, pinned image through `compose.yaml`; see [deployment.md](deployment.md).
 
 ## Before a release
 
