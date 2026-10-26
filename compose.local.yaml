@@ -1,7 +1,8 @@
-# Isolated local demo. Never use this configuration on a public server.
+# Local development: builds this source and binds to localhost only. Never use this file on a public server.
+# Use it with: docker compose -f compose.local.yaml up -d --build
 services:
   crm:
-    image: stageforce:0.1.12
+    image: stageforce:local
     build: .
     restart: unless-stopped
     init: true
@@ -10,7 +11,11 @@ services:
       HOST: 0.0.0.0
       PORT: "3000"
       DATA_DIR: /app/data
-      APP_URL: http://localhost:3000
+      # The address you open the CRM at. Testing the phone app on a real iPhone: set LOCAL_APP_URL to your
+      # Tailscale HTTPS address (docs/mobile-app.md). The port stays on 127.0.0.1 either way.
+      APP_URL: ${LOCAL_APP_URL:-http://localhost:3000}
+      # Company domains whose addresses (aliases included) count as colleagues, not clients.
+      INTERNAL_DOMAINS: stage.bio,jaimo-solutions.com
     ports:
       - "127.0.0.1:3000:3000"
     volumes:

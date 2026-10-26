@@ -7,8 +7,9 @@ import {openDB} from '../server/db.mjs';
 import {createOrg,addContact,contacts,entity,history,save,stageImport,importPreview,confirmImport,timelinePosition,addActivity} from '../server/crm.mjs';
 import {parseEmail} from '../server/email.mjs';
 import {createSession} from '../server/auth.mjs';
+import {enableMfa,newSecret} from '../server/mfa.mjs';
 import {makeServer} from '../server/http.mjs';
-function setup(){const db=openDB(':memory:');for(const name of['alex','bea'])db.prepare('INSERT INTO users VALUES(?,?,?,?,1,?)').run(name,name+'@our-team.test',name,'unused','2026-01-01');return{db,user:{id:'alex',email:'alex@our-team.test'}};}
+function setup(){const db=openDB(':memory:');for(const name of['alex','bea'])db.prepare('INSERT INTO users(id,email,name,password_hash,active,created_at) VALUES(?,?,?,?,1,?)').run(name,name+'@our-team.test',name,'unused','2026-01-01');enableMfa(db,'alex',newSecret());return{db,user:{id:'alex',email:'alex@our-team.test'}};}
 async function mail({sender='Pat Test <pat@customer.test>',to='alex@our-team.test',cc='',date='Tue, 13 Oct 2026 10:00:00 +0200',id='one',body='Agreed.'}={}){return parseEmail(Buffer.from(`From: ${sender}\r\nTo: ${to}\r\nCc: ${cc}\r\nMessage-ID: <${id}@example.test>\r\nDate: ${date}\r\nSubject: Message ${id}\r\n\r\n${body}`),'alex@our-team.test');}
 const confirm=(p,org,extra={})=>({importId:p.id,id:org.id,version:org.version,date:'2026-10-13',body:p.cleaned,...extra});
 
@@ -78,7 +79,7 @@ test('duplicate email cannot create another organisation or rewrite previous con
 
 test('new customers require explicit paying status; draft/contact-date overrides are refused in email imports',async()=>{const{db,user}=setup();try{
  const p=stageImport(db,user,await mail());const b={importId:p.id,newOrganisation:{name:'Paying customer',status:'Kunde'},date:'2026-10-13'};assert.throws(()=>confirmImport(db,user,{...b,fields:{15:'2026-10-14'}}),/Nur Status/);const r=confirmImport(db,user,b);assert.equal(r.entity.values[9],'Kunde');assert.equal(r.entity.values[15],'2026-10-13');
- const failed=save(db,user,{id:r.entity.id,version:r.entity.version,requestId:'missed',fields:{},note:{type:'Anrufversuch',text:'Telefonisch nicht erreicht.',date:'2026-10-14',contacted:true}});assert.equal(failed.entity.values[15],'2026-10-13');assert.equal(history(db,r.entity.id,0,'communication').items[0].art,'Anrufversuch');
+ const failed=save(db,user,{id:r.entity.id,version:r.entity.version,requestId:'missed',fields:{},note:{type:'Notiz',text:'Telefonisch nicht erreicht.',date:'2026-10-14',contacted:true}});assert.equal(failed.entity.values[15],'2026-10-13');assert.equal(history(db,r.entity.id,0,'communication').items[0].art,'Notiz');
  }finally{db.close();}});
 
 test('wizard HTTP endpoint returns position and persists selected contacts via authenticated routes',async()=>{const{db,user}=setup();const org=createOrg(db,user,'Customer'),p=stageImport(db,user,await mail()),session=createSession(db,user),server=makeServer(db,{origin:'http://localhost:3000'});await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port;try{
@@ -89,7 +90,7 @@ test('wizard HTTP endpoint returns position and persists selected contacts via a
  }finally{await new Promise(r=>server.close(r));db.close();}});
 
 test('schema 3 upgrade preserves existing messages and contacts without inventing associations',()=>{const dir=mkdtempSync(join(tmpdir(),'stage-wizard-'));let db=openDB(join(dir,'crm.sqlite'));try{
- const org=createOrg(db,null,'Example');addContact(db,org.id,{name:'Existing'});db.exec('DROP TABLE activity_contacts; DELETE FROM schema_versions WHERE version=4; PRAGMA user_version=3');db.close();db=openDB(join(dir,'crm.sqlite'));assert.equal(db.prepare('PRAGMA user_version').get().user_version,5);assert.equal(contacts(db,org.id).length,1);assert.equal(db.prepare('SELECT count(*) n FROM activity_contacts').get().n,0);
+ const org=createOrg(db,null,'Example');addContact(db,org.id,{name:'Existing'});db.exec('DROP TABLE activity_contacts; DELETE FROM schema_versions WHERE version=4; PRAGMA user_version=3');db.close();db=openDB(join(dir,'crm.sqlite'));assert.equal(db.prepare('PRAGMA user_version').get().user_version,13);assert.equal(contacts(db,org.id).length,1);assert.equal(db.prepare('SELECT count(*) n FROM activity_contacts').get().n,0);
  }finally{db.close();rmSync(dir,{recursive:true,force:true});}});
 
 test('duplicate source without a Date header offers the previously reviewed date and direction',async()=>{const{db,user}=setup();try{

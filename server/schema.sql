@@ -1,6 +1,6 @@
 PRAGMA foreign_keys = ON;
 CREATE TABLE IF NOT EXISTS schema_versions(version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,email TEXT NOT NULL UNIQUE COLLATE NOCASE,name TEXT NOT NULL,password_hash TEXT NOT NULL,active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1)),created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,email TEXT NOT NULL UNIQUE COLLATE NOCASE,name TEXT NOT NULL,password_hash TEXT NOT NULL,active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1)),created_at TEXT NOT NULL,must_change_password INTEGER NOT NULL DEFAULT 0 CHECK(must_change_password IN (0,1)));
 CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,csrf TEXT NOT NULL,expires_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS login_limits(key TEXT PRIMARY KEY,count INTEGER NOT NULL,reset_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS organisations(
@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS review_issues(id TEXT PRIMARY KEY,organisation_id TEX
 CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY,dedupe_key TEXT NOT NULL UNIQUE,rfc_message_id TEXT,subject TEXT NOT NULL DEFAULT '',sender_json TEXT NOT NULL,recipients_json TEXT NOT NULL,sent_at TEXT,direction TEXT NOT NULL CHECK(direction IN ('incoming','outgoing')),body TEXT NOT NULL,attachments_json TEXT NOT NULL DEFAULT '[]');
 CREATE TABLE IF NOT EXISTS message_sources(message_id TEXT NOT NULL REFERENCES messages(id),user_id TEXT NOT NULL REFERENCES users(id),mailbox TEXT NOT NULL,source_url TEXT NOT NULL DEFAULT '',PRIMARY KEY(message_id,user_id,mailbox));
 CREATE TABLE IF NOT EXISTS activities(id TEXT PRIMARY KEY,organisation_id TEXT NOT NULL REFERENCES organisations(id),kind TEXT NOT NULL,occurred_on TEXT,created_at TEXT NOT NULL,author_id TEXT REFERENCES users(id),author_label TEXT,body TEXT NOT NULL DEFAULT '',is_contact INTEGER NOT NULL DEFAULT 0 CHECK(is_contact IN (0,1)),message_id TEXT REFERENCES messages(id),legacy_json TEXT);
+CREATE INDEX IF NOT EXISTS messages_sent ON messages(sent_at);
 CREATE INDEX IF NOT EXISTS activities_org_date ON activities(organisation_id,occurred_on DESC,created_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS activity_message ON activities(message_id) WHERE message_id IS NOT NULL;
 CREATE TABLE IF NOT EXISTS source_references(id TEXT PRIMARY KEY,organisation_id TEXT NOT NULL REFERENCES organisations(id),activity_id TEXT REFERENCES activities(id),contact_id TEXT REFERENCES contacts(id),payload_json TEXT NOT NULL);
@@ -30,7 +31,6 @@ CREATE TABLE IF NOT EXISTS migration_archive(id TEXT PRIMARY KEY,organisation_id
 CREATE VIRTUAL TABLE IF NOT EXISTS search_docs USING fts5(organisation_id UNINDEXED,content,tokenize='unicode61 remove_diacritics 2');
 INSERT OR IGNORE INTO schema_versions VALUES(1,datetime('now'));
 
-CREATE TABLE IF NOT EXISTS gmail_keys(user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,token_hash TEXT NOT NULL UNIQUE,created_at INTEGER NOT NULL,expires_at INTEGER NOT NULL,last_used_at INTEGER);
 INSERT OR IGNORE INTO schema_versions VALUES(2,datetime('now'));
 
 CREATE TABLE IF NOT EXISTS fastbill_batches(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),scope TEXT NOT NULL,label TEXT NOT NULL,created_at TEXT NOT NULL);
@@ -41,4 +41,31 @@ CREATE TABLE IF NOT EXISTS fastbill_mappings(scope TEXT NOT NULL,source_key TEXT
 INSERT OR IGNORE INTO schema_versions VALUES(3,datetime('now'));
 
 CREATE TABLE IF NOT EXISTS activity_contacts(activity_id TEXT NOT NULL REFERENCES activities(id) ON DELETE CASCADE,contact_id TEXT NOT NULL REFERENCES contacts(id),PRIMARY KEY(activity_id,contact_id));
+CREATE TABLE IF NOT EXISTS meeting_refs(activity_id TEXT PRIMARY KEY REFERENCES activities(id) ON DELETE CASCADE,meeting_key TEXT NOT NULL,message_id TEXT REFERENCES messages(id) ON DELETE SET NULL,join_url TEXT NOT NULL DEFAULT '');
+CREATE INDEX IF NOT EXISTS meeting_refs_key ON meeting_refs(meeting_key);
+CREATE TABLE IF NOT EXISTS meeting_status(activity_id TEXT PRIMARY KEY REFERENCES activities(id) ON DELETE CASCADE,cancelled_at TEXT NOT NULL);
 INSERT OR IGNORE INTO schema_versions VALUES(4,datetime('now'));
+
+CREATE TABLE IF NOT EXISTS extension_keys(user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,token_hash TEXT NOT NULL UNIQUE,created_at INTEGER NOT NULL,expires_at INTEGER NOT NULL,last_used_at INTEGER);
+
+
+CREATE TABLE IF NOT EXISTS extension_message_refs(mailbox TEXT NOT NULL,gmail_id TEXT NOT NULL,message_id TEXT NOT NULL REFERENCES messages(id),PRIMARY KEY(mailbox,gmail_id));
+CREATE TABLE IF NOT EXISTS message_originals(message_id TEXT PRIMARY KEY REFERENCES messages(id) ON DELETE CASCADE,body TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS extension_thread_refs(mailbox TEXT NOT NULL,thread_id TEXT NOT NULL,message_id TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,PRIMARY KEY(mailbox,thread_id,message_id));
+CREATE TABLE IF NOT EXISTS call_attempts(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),organisation_id TEXT NOT NULL REFERENCES organisations(id),contact_id TEXT NOT NULL REFERENCES contacts(id),phone TEXT NOT NULL,started_at TEXT NOT NULL,source_message_id TEXT REFERENCES messages(id),activity_id TEXT UNIQUE REFERENCES activities(id));
+CREATE TABLE IF NOT EXISTS call_drafts(call_id TEXT PRIMARY KEY REFERENCES call_attempts(id) ON DELETE CASCADE,notes TEXT NOT NULL,updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS user_appearance(user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,mode TEXT NOT NULL CHECK(mode IN ('light','dark','system')));
+CREATE TABLE IF NOT EXISTS call_reservations(organisation_id TEXT NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,day TEXT NOT NULL,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,PRIMARY KEY(organisation_id,day));
+
+-- Version 10: second factor. A session row only exists after a correct authenticator or recovery code.
+CREATE TABLE IF NOT EXISTS user_mfa(user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,secret TEXT NOT NULL,last_step INTEGER NOT NULL DEFAULT 0,enabled_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS mfa_recovery_codes(user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,code_hash TEXT NOT NULL,used_at INTEGER,PRIMARY KEY(user_id,code_hash));
+CREATE TABLE IF NOT EXISTS login_challenges(token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,setup_secret TEXT,attempts INTEGER NOT NULL DEFAULT 0,expires_at INTEGER NOT NULL);
+
+-- Version 11: an optional map pin per organisation.
+CREATE TABLE IF NOT EXISTS organisation_locations(organisation_id TEXT PRIMARY KEY REFERENCES organisations(id) ON DELETE CASCADE,lat REAL NOT NULL CHECK(lat BETWEEN -90 AND 90),lng REAL NOT NULL CHECK(lng BETWEEN -180 AND 180),updated_at TEXT NOT NULL);
+
+-- Version 12: security events (sign-ins, wrong passwords and codes, MFA and browser-key changes), kept 90 days.
+CREATE TABLE IF NOT EXISTS security_events(id INTEGER PRIMARY KEY,at INTEGER NOT NULL,user_id TEXT REFERENCES users(id) ON DELETE CASCADE,email TEXT NOT NULL DEFAULT '',ip TEXT NOT NULL DEFAULT '',event TEXT NOT NULL,detail TEXT NOT NULL DEFAULT '');
+CREATE INDEX IF NOT EXISTS security_events_user ON security_events(user_id,at);
+CREATE INDEX IF NOT EXISTS security_events_at ON security_events(at);

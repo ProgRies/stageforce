@@ -1,11 +1,11 @@
-# Production deployment behind the same Traefik as Glass Board.
-# Pulls the published image; no source build or host Node installation required.
-# See docs/deployment.md for first deployment, accounts and data transfer.
+# Production deployment behind the existing Traefik. Pulls the pinned published image;
+# no source build or host Node installation required. Local development: compose.local.yaml.
+# See docs/deployment.md for first deployment, accounts, snapshots and updates.
 # docker compose pull
 # docker compose up -d
 services:
   crm:
-    image: ${CRM_IMAGE:-ghcr.io/progries/stageforce:latest}
+    image: ${CRM_IMAGE:?Set CRM_IMAGE in .env to an exact release, e.g. ghcr.io/progries/stageforce:0.3.12}
     restart: unless-stopped
     init: true
     stop_grace_period: 30s
@@ -26,7 +26,11 @@ services:
       PORT: "3000"
       DATA_DIR: /app/data
       APP_URL: https://${CRM_HOST:?Set CRM_HOST in .env}
-      # Verified SQLite snapshots in /app/data/snapshots; see docs/deployment.md#backups-and-restore.
+      # Traefik appends the client address to X-Forwarded-For; sign-in limits count per client address.
+      TRUST_PROXY: ${TRUST_PROXY:-1}
+      # Company domains whose addresses (aliases included) count as colleagues, not clients.
+      INTERNAL_DOMAINS: ${INTERNAL_DOMAINS:-stage.bio,jaimo-solutions.com}
+      # Verified SQLite snapshots in /app/data/snapshots; see docs/deployment.md#automatic-snapshots.
       SNAPSHOT_INTERVAL_HOURS: ${SNAPSHOT_INTERVAL_HOURS:-6}
       SNAPSHOT_KEEP: ${SNAPSHOT_KEEP:-28}
     volumes:

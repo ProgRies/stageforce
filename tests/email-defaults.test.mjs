@@ -1,0 +1,133 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+import {openDB} from '../server/db.mjs';
+import {addUser} from '../server/auth.mjs';
+import {createOrg,addContact,getOrg,contacts} from '../server/crm.mjs';
+import {extensionAction} from '../server/extension.mjs';
+import {dialNumber} from '../server/calls.mjs';
+import {formatPhone} from '../src/domain.ts';
+import '../integrations/chrome/extract.js';
+const mailbox='alex@team.test';
+async function setup(){const db=openDB(':memory:');const id=await addUser(db,mailbox,'Alex','long-password-1234');const user=db.prepare('SELECT * FROM users WHERE id=?').get(id);return{db,user,action:b=>extensionAction(db,user,b,'http://localhost:3000')};}
+test('German numbers become international; foreign numbers keep their spelling',()=>{
+ assert.equal(formatPhone('030 1234567'),'+49 30 1234567');
+ assert.equal(formatPhone('0171/7654321'),'+49 171 7654321');
+ assert.equal(formatPhone('(030) 123 45 67'),'+49 30 123 45 67');
+ assert.equal(formatPhone('+49 (0)30 123 456-0'),'+49 30 123 456-0');
+ assert.equal(formatPhone('0041 44 123 45 67'),'+41 44 123 45 67');
+ assert.equal(formatPhone('+44 20 7946 0958'),'+44 20 7946 0958');
+ assert.equal(formatPhone('1234567'),'1234567');
+ assert.equal(dialNumber('030 1234567'),dialNumber('+49 (0)30 1234567'));
+});
+test('reply history is cut at Gmail, Outlook and German reply headers',()=>{
+ const strip=globalThis.stageForceExtract.stripQuoted;
+ assert.equal(strip('Danke, passt!\n\nAm 20.10.2026 um 10:00 schrieb Pat <pat@x.de>:\nalte Nachricht'),'Danke, passt!');
+ assert.equal(strip('Sounds good.\n\nFrom: Pat <pat@x.de>\nSent: Monday\nTo: Alex\nSubject: Re: Offer\n\nOld'),'Sounds good.');
+ assert.equal(strip('Gerne.\n-----Ursprüngliche Nachricht-----\nVon: Pat'),'Gerne.');
+ assert.equal(strip('Von: Pat kommt die Anfrage morgen.\nGrüße'),'Von: Pat kommt die Anfrage morgen.\nGrüße');
+});
+test('INTERNAL_DOMAINS treats company aliases as internal and their mail as sent',async()=>{
+ const {db,user,action}=await setup();const previous=process.env.INTERNAL_DOMAINS;process.env.INTERNAL_DOMAINS='stage.bio, @other-team.test';
+ try{
+  const org=createOrg(db,user,'Client');addContact(db,org.id,{name:'Pat',e_mails:['pat@client.test']});
+  const out=action({action:'lookup',mailbox,from:{name:'Billing',email:'billing@stage.bio'},recipients:[{email:'pat@client.test',name:'Pat'},{email:'support@other-team.test',name:''}]});
+  assert.equal(out.direction,'outgoing');assert.deepEqual(out.participants.map(p=>p.email),['pat@client.test']);assert.equal(out.organisation.id,org.id);
+  const incoming=action({action:'lookup',mailbox,from:{name:'Pat',email:'pat@client.test'},recipients:[{email:'contact@stage.bio',name:''}]});
+  assert.equal(incoming.direction,'incoming');assert.deepEqual(incoming.participants.map(p=>p.email),['pat@client.test']);
+ }finally{if(previous===undefined)delete process.env.INTERNAL_DOMAINS;else process.env.INTERNAL_DOMAINS=previous;db.close();}
+});
+test('extension contact saves store German numbers in international format without duplicates',async()=>{
+ const {db,user,action}=await setup();try{
+  const org=createOrg(db,user,'Client');const cid=addContact(db,org.id,{name:'Pat',e_mails:['pat@client.test'],telefone:['+49 30 1234567']});
+  action({action:'contactSave',confirmed:true,mailbox,organisationId:org.id,version:getOrg(db,org.id).version,email:'pat@client.test',name:'Pat',phones:['030 1234567','0171 7654321']});
+  assert.deepEqual(contacts(db,org.id).find(c=>c.id===cid).telefone,['+49 30 1234567','+49 171 7654321']);
+ }finally{db.close();}
+});
+test('old conversations can be saved in any order: shared organisation, date order and full text kept',async()=>{
+ const {db,user,action}=await setup();try{
+  const thread='thread-f:1780000000000000001';
+  const mail=(n,day,extra={})=>({action:'save',confirmed:true,requestId:randomUUID(),mailbox,gmailThreadId:thread,gmailMessageId:'m'+n,from:{name:'Pat',email:n%2?'pat@client.test':mailbox},recipients:[{email:n%2?mailbox:'pat@client.test',name:''}],originalSubject:'Offer',subject:'Offer',body:'Reply '+n,originalBody:'Reply '+n+'\n\nAm '+day+'.10.2024 schrieb Pat:\n> earlier',timestamp:`2024-10-${day}T09:00:00Z`,timestampRaw:'',sourceUrl:'https://mail.google.com/mail/u/0/#inbox/'+n,contactEmails:[],...extra});
+  const first=action(mail(6,16,{newOrganisation:'Client'}));const org=first.organisation;
+  const lookup=action({action:'lookup',mailbox,gmailThreadId:thread,from:{name:'Sam',email:'sam@another.test'},recipients:[{email:mailbox,name:''}]});
+  assert.equal(lookup.organisation.id,org.id);assert.equal(lookup.conversation,true);
+  let version=lookup.organisation.version;for(const [n,day] of [[2,12],[11,21],[1,11]])version=action(mail(n,day,{organisationId:org.id,version})).organisation.version;
+  assert.equal(action(mail(6,16,{organisationId:org.id,version})).duplicate,true);
+  const dates=db.prepare('SELECT m.sent_at FROM activities a JOIN messages m ON m.id=a.message_id WHERE a.organisation_id=? ORDER BY m.sent_at').all(org.id).map(r=>r.sent_at.slice(8,10));
+  assert.deepEqual(dates,['11','12','16','21']);
+  const stored=db.prepare("SELECT m.body,o.body AS original FROM messages m JOIN message_originals o ON o.message_id=m.id JOIN extension_message_refs r ON r.message_id=m.id WHERE r.gmail_id='m6'").get();
+  assert.equal(stored.body,'Reply 6');assert.match(stored.original,/schrieb Pat/);
+  const outgoing=db.prepare("SELECT m.direction FROM messages m JOIN extension_message_refs r ON r.message_id=m.id WHERE r.gmail_id='m2'").get();assert.equal(outgoing.direction,'outgoing');
+  assert.throws(()=>action({action:'lookup',mailbox,gmailThreadId:'bad thread<>',from:{name:'',email:'x@y.test'},recipients:[]}),/conversation/);
+ }finally{db.close();}
+});
+test('lookup names Gmail local-part names properly and says where an address is already stored',async()=>{
+ const {db,user,action}=await setup();try{
+  const worms=createOrg(db,user,'Stadt Worms'),other=createOrg(db,user,'Kreis Alzey');addContact(db,worms.id,{name:'Daniel Körbel',e_mails:['daniel.koerbel@worms.de']});addContact(db,other.id,{name:'',e_mails:['margaretha.mohr@worms.de']});
+  const out=action({action:'lookup',mailbox,from:{name:'margaretha.mohr',email:'margaretha.mohr@worms.de'},recipients:[{email:'daniel.koerbel@worms.de',name:'daniel.koerbel'},{email:'jf@internet-connect.de',name:'jf'},{email:mailbox,name:''}],organisationId:worms.id});
+  const by=Object.fromEntries(out.participants.map(p=>[p.email,p]));
+  assert.equal(by['margaretha.mohr@worms.de'].name,'Margaretha Mohr');assert.equal(by['margaretha.mohr@worms.de'].known,false);assert.deepEqual(by['margaretha.mohr@worms.de'].crm.organisations.map(o=>o.name),['Kreis Alzey']);
+  assert.equal(by['daniel.koerbel@worms.de'].name,'Daniel Körbel');assert.equal(by['daniel.koerbel@worms.de'].known,true);
+  assert.equal(by['jf@internet-connect.de'].name,'Jf');assert.equal(by['jf@internet-connect.de'].crm,null);
+ }finally{db.close();}
+});
+test('lookup offers the selected organisation\'s two most recent contacts for emails without client addresses',async()=>{
+ const {db,user,action}=await setup();try{
+  const org=createOrg(db,user,'Stadt Worms');for(const n of ['Anna','Ben','Cleo'])addContact(db,org.id,{name:n,e_mails:[n.toLowerCase()+'@worms.de']});
+  const out=action({action:'lookup',mailbox,from:{name:'Alex',email:mailbox},recipients:[{email:'colleague@team.test',name:''}],organisationId:org.id});
+  assert.equal(out.participants.length,0);assert.equal(out.suggested.length,2);assert.ok(out.suggested.every(s=>s.contactId&&s.known));
+  const saved=action({action:'save',confirmed:true,requestId:randomUUID(),mailbox,from:{name:'Alex',email:mailbox},recipients:[{email:'colleague@team.test',name:''}],gmailMessageId:'internal',originalSubject:'Intern',subject:'Intern',body:'Notiz',originalBody:'Notiz',timestamp:'2026-07-31T06:47:00Z',timestampRaw:'',contactEmails:[],extraContactIds:[out.suggested[0].contactId],organisationId:org.id,version:getOrg(db,org.id).version});
+  assert.equal(saved.saved,true);assert.equal(db.prepare('SELECT contact_id FROM activity_contacts').get().contact_id,out.suggested[0].contactId);
+ }finally{db.close();}
+});
+test('quoted history yields each earlier author with their signature numbers',()=>{
+ const found=globalThis.stageForceExtract.quotedContacts('Passt, danke.\n\nAm Mo., 20. Okt. 2026 um 10:00 Uhr schrieb Pat Test <pat@client.test>:\n> Anbei das Angebot.\n> Viele Grüße\n> Pat Test\n> Tel. 030 1234567\n\nOn Fri, Oct 17, 2026 at 9:00 AM Sam Other <sam@client.test> wrote:\n> Please call me back.\n> Sam Other\n> Mobile 0171 7654321');
+ const by=Object.fromEntries(found.map(f=>[f.email,f]));
+ assert.equal(by['pat@client.test'].name,'Pat Test');assert.deepEqual(by['pat@client.test'].phones,['030 1234567']);
+ assert.equal(by['sam@client.test'].name,'Sam Other');assert.deepEqual(by['sam@client.test'].phones,['0171 7654321']);
+ assert.deepEqual(globalThis.stageForceExtract.quotedContacts('Nur eine Antwort ohne Verlauf.'),[]);
+});
+test('lookup checks quoted authors but leaves out colleagues and header addresses',async()=>{
+ const {db,user,action}=await setup();const previous=process.env.INTERNAL_DOMAINS;process.env.INTERNAL_DOMAINS='stage.bio';
+ try{
+  const org=createOrg(db,user,'Client'),other=createOrg(db,user,'Other');addContact(db,org.id,{name:'Pat Test',e_mails:['pat@client.test'],telefone:['+49 30 1234567']});addContact(db,other.id,{name:'Kim',e_mails:['kim@else.test']});
+  const out=action({action:'lookup',mailbox,from:{name:'Max',email:'max@client.test'},recipients:[{email:mailbox,name:''}],organisationId:org.id,quoted:[{email:'Pat@Client.test',name:'Pat'},{email:'kim@else.test',name:'Kim'},{email:'new@client.test',name:'Neu'},{email:'billing@stage.bio',name:'Billing'},{email:'max@client.test',name:'Max'},{email:mailbox,name:'Alex'}]});
+  const by=Object.fromEntries(out.quoted.map(q=>[q.email,q]));
+  assert.deepEqual(Object.keys(by).sort(),['kim@else.test','new@client.test','pat@client.test']);
+  assert.equal(by['pat@client.test'].known,true);assert.deepEqual(by['pat@client.test'].phones,['+49 30 1234567']);
+  assert.equal(by['kim@else.test'].known,false);assert.deepEqual(by['kim@else.test'].crm.organisations.map(o=>o.name),['Other']);
+  assert.equal(by['new@client.test'].crm,null);
+  assert.equal(action({action:'lookup',mailbox,from:{name:'Max',email:'max@client.test'},recipients:[]}).quoted,undefined);
+  assert.throws(()=>action({action:'lookup',mailbox,from:{name:'Max',email:'max@client.test'},recipients:[],quoted:[{email:'not-an-address'}]}),/quoted/);
+  assert.throws(()=>action({action:'lookup',mailbox,from:{name:'Max',email:'max@client.test'},recipients:[],quoted:Array(31).fill({email:'a@b.test'})}),/Invalid/);
+ }finally{if(previous===undefined)delete process.env.INTERNAL_DOMAINS;else process.env.INTERNAL_DOMAINS=previous;db.close();}
+});
+test('inbox status says only which of the given conversations are saved, for the own mailbox',async()=>{
+ const {db,action}=await setup();try{
+  const thread='thread-f:1780000000000000009';
+  action({action:'save',confirmed:true,requestId:randomUUID(),mailbox,gmailThreadId:thread,gmailMessageId:'18c9',from:{name:'Pat',email:'pat@client.test'},recipients:[{email:mailbox,name:''}],originalSubject:'Offer',subject:'Offer',body:'Hi',originalBody:'Hi',timestamp:'2026-10-20T09:00:00Z',timestampRaw:'',contactEmails:[],newOrganisation:'Client'});
+  assert.deepEqual(action({action:'threadStatus',mailbox,ids:['#'+thread,'thread-f:222','18c9','bb2']}).saved,[thread,'18c9']);
+  assert.deepEqual(Object.keys(action({action:'threadStatus',mailbox,ids:[thread]})),['saved']);
+  assert.throws(()=>action({action:'threadStatus',mailbox:'someone@else.test',ids:[thread]}),/mailbox/);
+  assert.throws(()=>action({action:'threadStatus',mailbox,ids:['bad id<>']}),/Invalid/);
+  assert.throws(()=>action({action:'threadStatus',mailbox,ids:Array(151).fill('x')}),/Invalid/);
+ }finally{db.close();}
+});
+test('an email a colleague saved is recognised in another mailbox by sender, minute, subject and a shared recipient',async()=>{
+ const {db,user,action}=await setup();try{
+  const colleague=await addUser(db,'sam@team.test','Sam','long-password-1234');const sam=db.prepare('SELECT * FROM users WHERE id=?').get(colleague),samAction=b=>extensionAction(db,sam,b,'http://localhost:3000');
+  const base={from:{name:'Pat',email:'pat@client.test'},recipients:[{email:mailbox,name:''},{email:'sam@team.test',name:''}]};
+  const saved=action({action:'save',confirmed:true,requestId:randomUUID(),mailbox,gmailThreadId:'thread-f:1',gmailMessageId:'a1',...base,originalSubject:'Angebot Bühne',subject:'Angebot Bühne',body:'Hi',originalBody:'Hi',timestamp:'2026-10-20T08:00:00.000Z',timestampRaw:'20.10.2026, 10:00',contactEmails:[],newOrganisation:'Client'});
+  const status=b=>samAction({action:'messageStatus',mailbox:'sam@team.test',gmailMessageId:'b7',...base,...b});
+  assert.equal(status({subject:'Angebot  bühne',sentAt:'2026-10-20T08:01:00.000Z'}).saved,false);
+  assert.equal(status({subject:'Anderes Thema',sentAt:'2026-10-20T08:00:30.000Z'}).saved,false);
+  assert.equal(status({subject:'Angebot Bühne',sentAt:'2026-10-20T08:00:00.000Z',recipients:[{email:'other@client.test',name:''}]}).saved,false);
+  const detail=status({subject:'AW: Angebot Bühne',sentAt:'2026-10-20T08:00:00.000Z',detail:true});
+  assert.equal(detail.saved,true);assert.equal(detail.organisation.id,saved.organisation.id);assert.deepEqual(detail.savedBy,['Alex']);
+  assert.equal(samAction({action:'messageStatus',mailbox:'sam@team.test',gmailMessageId:'b7'}).saved,true,'the copy is linked to the saved email');
+  const rows=samAction({action:'threadStatus',mailbox:'sam@team.test',ids:['thread-f:9','thread-f:8'],rows:[{id:'thread-f:9',from:['pat@client.test'],sentAt:'2026-10-20T08:00:00.000Z',subject:'Re: Angebot Bühne'},{id:'thread-f:8',from:['pat@client.test'],sentAt:'2026-10-20T09:00:00.000Z',subject:'Angebot Bühne'}]});
+  assert.deepEqual(rows.saved,['thread-f:9']);
+  assert.throws(()=>samAction({action:'threadStatus',mailbox:'sam@team.test',ids:[],rows:[{id:'bad id<>',from:[]}]}),/Invalid/);
+  assert.equal(db.prepare('SELECT count(*) AS n FROM messages').get().n,1);
+ }finally{db.close();}
+});

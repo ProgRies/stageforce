@@ -1,16 +1,12 @@
-# Stage Force deployment
+# StageForce deployment
 
-## First production deployment (GHCR)
+`compose.yaml` is the production file: it pulls the pinned `ghcr.io/progries/stageforce:<version>` image, runs behind the existing Traefik and keeps SQLite in the Docker volume `storage`. It has health checks, bounded logs, graceful shutdown and a read-only root filesystem. It does not install Traefik or configure DNS. Run one CRM instance on local disk. For development on your Mac use `compose.local.yaml` (see the [README](../README.md)).
 
-The production Compose file runs the published `ghcr.io/progries/stageforce:latest` image on amd64 or arm64. It includes persistent SQLite storage, health checks, bounded logs, graceful shutdown and a read-only root filesystem. It does not install Traefik or configure DNS. Run one CRM instance on local storage.
+## First deployment
 
-The `latest` tag advances on releases from `main`; updates still require an explicit pull and `up`. To pin a release for rollback, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.1.12` (or the relevant published version).
+### 1. Routing and configuration
 
-### 1. Prepare routing and configuration
-
-Point `stageforce.jaimo.me` to the server. The existing Traefik container must share the external Docker network configured as `TRAEFIK_NETWORK`. Verify its HTTPS entrypoint, certificate resolver and middleware names; the supplied defaults match the earlier Glass Board deployment conventions. If that external network is missing, check the actual Traefik configuration rather than creating an unrelated network.
-
-From a stable deployment directory:
+Point `stageforce.jaimo.me` to the server. The existing Traefik container must share the external Docker network configured as `TRAEFIK_NETWORK`. Check its HTTPS entrypoint, certificate resolver and middleware names against `.env`.
 
 ```sh
 git clone https://github.com/ProgRies/stageforce.git
@@ -18,20 +14,22 @@ cd stageforce
 cp .env.example .env
 ```
 
-If Compose reports `CRM_HOST is missing`, the production `.env` has not been created or does not define that value. Run the commands from this directory. For **local Mac testing**, use `docker compose -p stageforce-real -f compose.local.yaml up -d --build` instead; this local file needs no production `.env` or Traefik. Omit the project flag only if your existing local instance uses the default project.
-
-Copy `.env.example` only on the first installation. Review `.env`:
+Copy `.env.example` only on the first installation, then review `.env`:
 
 | Setting | Default / meaning |
 | --- | --- |
 | `CRM_HOST` | `stageforce.jaimo.me`, hostname only |
-| `CRM_IMAGE` | `ghcr.io/progries/stageforce:latest`, latest published release |
+| `CRM_IMAGE` | Exact published release, e.g. `ghcr.io/progries/stageforce:0.3.12`. Never `latest` |
+| `TRUST_PROXY` | `1`: Traefik sets `X-Forwarded-For`; sign-in limits count per client address |
+| `INTERNAL_DOMAINS` | `stage.bio,jaimo-solutions.com` (compose default): addresses that count as colleagues, not clients |
+| `SNAPSHOT_INTERVAL_HOURS` | `6`: hours between automatic snapshots, `0` disables them |
+| `SNAPSHOT_KEEP` | `28`: number of healthy snapshots kept |
 | `TRAEFIK_NETWORK` | `reverse-proxy`, existing external network |
 | `TRAEFIK_ENTRYPOINT` | `web-secure`, existing HTTPS entrypoint |
 | `TRAEFIK_CERTRESOLVER` | `letsencrypt`, existing certificate resolver |
-| `TRAEFIK_MIDDLEWARES` | `default@file`, existing middleware; an explicitly empty value disables this assignment |
+| `TRAEFIK_MIDDLEWARES` | `default@file`; an explicitly empty value disables this assignment |
 
-Compose derives `APP_URL=https://stageforce.jaimo.me` from `CRM_HOST`. No application port is exposed directly to the host. Do not add a second browser login/SSO challenge in front of `/api/integrations/gmail/`: Google authenticates there with the application’s scoped Gmail key. The administrator should review the existing middleware rather than broadly disable server security. Do not log request bodies or Authorization headers.
+Compose derives `APP_URL=https://stageforce.jaimo.me` from `CRM_HOST`. No application port is published on the host.
 
 ### 2. Pull and start
 
@@ -43,46 +41,61 @@ docker compose ps
 docker compose logs --tail=100 crm
 ```
 
-A public GHCR package needs no registry login. If pulling returns `denied`/`unauthorized`, the administrator must confirm package access and use `docker login ghcr.io -u YOUR_GITHUB_USERNAME` with an authorized token (classic PAT with `read:packages` and package access), or the package owner can intentionally make the image public. Enter the token at the password prompt, never in this repository or `.env`. GitHub repository access and container-package visibility are separate.
+If pulling returns `denied`/`unauthorized`, the package is private: `docker login ghcr.io -u YOUR_GITHUB_USERNAME` with a token that has `read:packages`, typed at the password prompt, never into `.env`.
 
-Check that the container becomes healthy, and that these URLs work over valid public HTTPS:
+Check that the container becomes healthy and that https://stageforce.jaimo.me/ shows the login and https://stageforce.jaimo.me/healthz returns `{"ok":true}`.
 
-- https://stageforce.jaimo.me/ — login screen
-- https://stageforce.jaimo.me/healthz — `{"ok":true}`
-- https://stageforce.jaimo.me/assets/stageforce-icon.svg — add-on icon
+Keep the deployment directory and Compose project name stable: Docker scopes the `storage` volume to that project, so a different name looks like an empty CRM.
 
-Keep the deployment directory/project name stable: Docker scopes the `storage` volume to that project. Changing the project name can make the application appear empty by selecting a different volume. Health checks report failures; they do not themselves restart an unhealthy running process.
+### 3. Accounts
 
-### 3. Choose the data source and account
+Create the accounts as described under [Accounts](#accounts), normally with `--temporary`. To move an existing local database instead, see [Move local work to the server](#move-local-work-to-the-server).
 
-**If local cleanup should be preserved:** use the full SQLite backup and restore instructions below. This includes the existing users, passwords and CRM history. Do not reimport the original snapshot or create the same user again.
+### 4. Connect the browser extension
 
-**If starting empty:** create the first user through the terminal:
+Each colleague creates a key in the hosted CRM (gear → **Browser-Erweiterung verbinden**) and enters `https://stageforce.jaimo.me` with that key in the extension. Keys from a local database do not work against the server. See [extension-setup.md](extension-setup.md).
+
+## Server requirements
+
+- Keep `TRUST_PROXY=1` (the production default) when Traefik sits in front: sign-in limits count per client address, which the proxy appends to `X-Forwarded-For`. Use `TRUST_PROXY=0` only if clients connect to the container directly; without a proxy a trusted header could be forged.
+- Set `NODE_ENV=production`, `APP_URL=https://<your-crm-host>` and the persistent `DATA_DIR`.
+- Set `INTERNAL_DOMAINS=stage.bio,jaimo-solutions.com` (comma separated). Addresses on these domains, aliases like billing@ included, count as colleagues: they are never suggested as client contacts, and mail sent from them is filed as sent. CRM users' own domains always count.
+- Put the service behind your HTTPS reverse proxy with a valid certificate. Do not expose the development port publicly.
+- Route `/api/integrations/extension` to the application. It authenticates a personal bearer key, not Google credentials or a browser-only proxy login.
+- Route `/api/live` to the application without response buffering and with a read timeout above one minute (nginx: `proxy_buffering off; proxy_read_timeout 120s;`). It is a long-lived Server-Sent Events stream that tells open tabs which organisations changed; the server sends a heartbeat every 25 seconds. It uses the normal session cookie and carries only organisation and user ids, never contents.
+- The organisation map loads its tiles and place search through the CRM server, so browsers never contact a map provider and the CSP stays `'self'`. The server needs outbound HTTPS to `tile.openstreetmap.org` (tiles, cached for 30 days under `DATA_DIR/map-tiles`) and `nominatim.openstreetmap.org` (only text someone types into the place search, at most one request per second). The provider sees the server's address and a `StageForce CRM (<APP_URL>)` user agent, never organisation names, contacts or who is looking. Point `MAP_TILE_URL` (`…/{z}/{x}/{y}.png`) or `MAP_SEARCH_URL` (Nominatim-compatible) at another provider, or set either to an empty value to turn it off. The public OpenStreetMap servers are fine for a small team; heavy use needs your own or a commercial tile service.
+- Never log request bodies or Authorization headers. Restrict server access and encrypt the host disk and backups.
+- Create individual users. Every active CRM user currently has team-wide read/edit access; there are no per-organisation access rules.
+- Pair each extension with the hosted CRM address and a key issued by that CRM.
+
+The container runs as the unprivileged `node` user (UID 1000). Every write (database, snapshots, map tile cache) goes to `/app/data`; the root filesystem is read-only, with a bounded `/tmp`.
+
+## Accounts
 
 ```sh
-docker compose exec crm node server/cli.mjs user:add ries@jaimo-solutions.com "Christian Ries"
+docker compose exec crm node server/cli.mjs user:add colleague@example.com "Colleague" --temporary
+docker compose exec crm node server/cli.mjs user:password colleague@example.com --temporary
+docker compose exec crm node server/cli.mjs user:disable colleague@example.com
+docker compose exec crm node server/cli.mjs user:mfa-reset colleague@example.com
+docker compose exec crm node server/cli.mjs user:list
 ```
 
-Choose a password of at least 12 characters at the hidden prompt. There is no signup page. Import the private original snapshot once using the [README instructions](../README.md#import-the-real-crm-exactly-once), if needed. No customer data is included in the image.
+Passwords are entered at a hidden prompt and hashed with scrypt. Password reset and account disabling revoke sessions and extension keys. Session expiry is seven days; extension key expiry is 90 days. The current design uses one active extension key per CRM user.
 
-### 4. Connect the already-installed Gmail add-on
+With `--temporary`, the password you type is a starting password: after password and code, the user must choose their own before the CRM or the phone app opens (the server refuses everything else until then). Users can change their password at any time under Einstellungen → Passwort ändern with their current password; there is no e-mail confirmation. That ends their other sessions, including phones, and keeps the current one. Every password, temporary or not, needs at least 12 characters, so a starting password can be an easy-to-type phrase of that length that you share with the user directly.
 
-1. In Apps Script, set `CRM_ORIGIN` in `Code.gs` to `https://stageforce.jaimo.me`. Replace the example hostname in all three manifest entries: fetch allowlist, logo URL and open-link prefix. Preserve their existing paths and trailing slashes. Save and reload Gmail.
-2. Log into **the hosted CRM** as `ries@jaimo-solutions.com`, matching the primary Google account. Open **⚙ → Gmail verbinden → Schlüssel erstellen**.
-3. Paste the new key into **Verbindungsschlüssel** in the Gmail sidebar and click **Verbinden**. A key from a separate localhost database will not authenticate against this server.
-4. Open an existing email, click **E-Mail zuordnen**, then confirm the organisation, contacts and timeline placement in the Gmail sidebar. Click **Im CRM speichern**. Reimport it to check duplicate handling.
+Every sign-in needs a TOTP code from an authenticator app (or a single-use recovery code). New users set the app up on their first sign-in; they cannot reach the CRM before that. If a phone is lost and the recovery codes are gone, `user:mfa-reset` removes the old authenticator, ends the user's sessions and revokes their extension key; the next sign-in sets up a new app. Check identity out of band before resetting, because the reset leaves the password as the only factor until the user enrols again. `user:list` shows who has set up the app and how many recovery codes are left.
 
-The add-on only reads the selected message on request. It does not send, draft, delete or modify email. See [gmail-setup.md](gmail-setup.md) for installation and troubleshooting. Live Google delivery must be tested after deployment; repository/container checks cannot verify your server's DNS, TLS or Workspace policy.
+Creating a browser-extension key asks for a fresh authenticator code, because the key signs the extension in for 90 days without one.
 
-## Boundaries
+Sign-in limits: 30 attempts per client address and 10 per account and address within ten minutes, and 50 per account within an hour. There is no team-wide limit, so one address cannot lock everybody out.
 
-One Node service and one SQLite volume on the same host. Traefik terminates HTTPS. Production `APP_URL` must equal the browser's origin exactly (scheme and hostname). Browser mutations require Origin and session CSRF checks. The dedicated Gmail endpoints require a separate bearer key and reject browser Origin headers. Capture-only keys cannot read CRM data or confirm imports. Newly issued sidebar-review keys additionally permit limited organisation search, review context and explicit confirmation of the owning user’s imports, never general CRM API access. It does not trust forwarded host headers. No server port is published in the production Compose file.
+```sh
+docker compose exec crm node server/cli.mjs security:log                       # latest 50 events
+docker compose exec crm node server/cli.mjs security:log colleague@example.com 100
+```
 
-The container runs as the unprivileged `node` user (UID 1000). Docker initializes the named volume from the image's owned `/app/data`. If using a host bind mount instead, provision that directory for UID/GID 1000; do not make it world-writable. The production root filesystem is read-only, with a writable data volume and bounded `/tmp`.
-
-Account sessions expire after seven days. Password changes and account disabling revoke existing sessions and Gmail keys. Passwords use scrypt with independent random salts. Every user can read and edit CRM data; only the server operator can manage accounts. There are no default credentials, self-service registration or mail-sending endpoints.
-
-The browser renders email content as text, never as sender-provided HTML. No remote images, attachment fetches or embedded tracking resources are loaded. Uploads are limited to 10 MB and two concurrently parsed messages; body text has a 500,000-character limit. Rate limits cover uploads and login attempts. Pending email text is stored for at most 24 hours and cleaned up once per minute while the application is running. Restarted servers clean up stale imports too.
+Security events (sign-ins, wrong passwords and codes, recovery-code use, MFA set-up and resets, browser keys created or revoked, CLI account changes) are kept for 90 days with time, account and client address. Each user sees their own under Einstellungen → Anmeldeaktivität, and the first screen after signing in warns about wrong passwords or codes since their previous sign-in.
 
 ## Backups and restore
 
@@ -129,9 +142,14 @@ To restore, decrypt with `age -d -i key.txt stageforce-....sqlite.age > known-go
 
 ### Manual backup and restore
 
-The CLI `backup FILE` command still writes a one-off consistent backup to any path, for example before an update.
+`backup FILE` writes a one-off consistent backup to any path, for example before an update:
 
-For a restore, first make a fresh backup of the current instance and stop it. From the source directory, with a known-good backup in a private host path:
+```sh
+docker compose exec crm node server/cli.mjs backup /app/data/backups/before-update.sqlite
+docker compose cp crm:/app/data/backups/before-update.sqlite ./before-update.sqlite
+```
+
+For a restore, first make a fresh backup of the current instance. Then, with a known-good backup or snapshot in a private host path:
 
 ```sh
 docker compose stop crm
@@ -139,19 +157,28 @@ docker compose run --rm --no-deps --entrypoint sh -v /absolute/private/path/know
 docker compose up -d
 ```
 
-A snapshot from `/app/data/snapshots/` can be restored the same way after copying it out with `docker compose cp`. Removing WAL/SHM files is appropriate only for this stopped-instance restore from a consistent backup. Never remove them from a running application. The backup includes users and Gmail keys, so restore also restores accounts/session/key state; reset affected passwords if restoring after an account compromise.
+Removing WAL/SHM files is appropriate only for this stopped-instance restore. Never remove them from a running application. A backup includes users, password hashes, MFA secrets and extension keys, so a restore also restores account state; reset affected passwords after an account compromise.
+
+### Reset to an empty database
+
+```sh
+docker compose exec crm node server/cli.mjs backup /app/data/backups/before-reset.sqlite
+docker compose cp crm:/app/data/backups/before-reset.sqlite ./before-reset.sqlite
+docker compose down -v
+docker compose up -d
+```
+
+`down -v` deletes the whole `storage` volume: database, snapshots, in-volume backups and the map tile cache. Use it only for a deliberate reset, never for an update.
 
 ## Updates
 
-Before an update, take a consistent backup and copy it off the container. Keep the existing `.env`, Compose project name and volume. Do not run `docker compose down -v`: it removes the database volume.
+Before an update, take a backup and copy it off the container (see above). Keep `.env`, the Compose project name and the volume.
 
 ```sh
-docker compose exec crm node server/cli.mjs backup /app/data/backups/before-update.sqlite
-docker compose cp crm:/app/data/backups/before-update.sqlite ./before-update.sqlite
 git pull --ff-only
 ```
 
-Set `CRM_IMAGE` in the existing `.env` to `ghcr.io/progries/stageforce:latest` (or a published version tag to pin a release). An old `.env` containing `stageforce:0.1.10` overrides the new default and must be updated. Then:
+Set `CRM_IMAGE` in `.env` to the new exact version, then:
 
 ```sh
 docker compose config --quiet
@@ -160,32 +187,19 @@ docker compose up -d
 docker compose ps
 ```
 
-Startup applies supported additive database migrations automatically; do not repeat the initial spreadsheet import. For rollback after a schema change, restore the matching backup as well as the previous image. Configuration-only commits do not require a new image release. Source builds for local testing still use `compose.local.yaml`.
-
-## Verification performed for this release
-
-- TypeScript check and optimized UI build.
-- Isolated service and HTTP tests, including authenticated mutations, CSRF/origin rejection, duplicate imports/retries, conflict detection, MIME handling, migration and SQLite backup/reopen.
-- Full real-snapshot migration, row counts, foreign-key/integrity checks and representative search/list timing.
-- Production dependency audit.
-
-Docker builds, login and restart persistence are tested by GitHub Actions before image publication. Browser rendering has not been manually verified in the current build environment. The administrator should also test the two UI flows over the final HTTPS hostname before the team cuts over. The original hosted prototype remains separate.
-
-## Gmail add-on
-
-See [gmail-setup.md](gmail-setup.md). Google must reach the HTTPS hostname and `/api/integrations/gmail/` without a browser-only proxy login. The application still authenticates each request with a dedicated key. Proxy access logs must not log Authorization headers or request bodies. No CORS relaxation is needed. Google credentials are never placed in the CRM container.
+Startup migrates the database schema automatically. For a rollback after a schema change, restore the matching backup as well as the previous image.
 
 ## Move local work to the server
 
-Use the full local SQLite database after cleanup, not the original spreadsheet snapshot. The backup preserves organisations, contacts, history, approved email text, links, accounts and password hashes. Pending reviews still expire after 24 hours; confirm relevant work before the move.
-
-At cutover, stop making local edits and take the final consistent backup from the repository directory. Use the same Compose project as your local instance. For Christian’s Mac installation (`stageforce-real`):
+Use the full local SQLite database, not the original spreadsheet snapshot. It keeps organisations, contacts, history, accounts, password hashes and MFA set-ups. On your Mac, in the repository folder:
 
 ```sh
-docker compose -p stageforce-real -f compose.local.yaml exec crm node server/cli.mjs backup /app/data/transfer.sqlite
-docker compose -p stageforce-real -f compose.local.yaml cp crm:/app/data/transfer.sqlite ./stageforce-transfer.sqlite
+docker compose -f compose.local.yaml exec crm node server/cli.mjs backup /app/data/transfer.sqlite
+docker compose -f compose.local.yaml cp crm:/app/data/transfer.sqlite ./stageforce-transfer.sqlite
 ```
 
-For an installation started without `-p stageforce-real`, omit that flag from both commands.
+Give that file to the server administrator through a secure channel, never Git or a public upload. The administrator restores it with the stopped-instance procedure above, using the same or a newer application version. Browser-extension keys must then be recreated against the hosted CRM.
 
-Give that private backup to the server administrator through your normal secure transfer method. Do not commit or publicly upload it. The administrator should use the stopped-instance restore procedure above with this file and the same or a newer application version. Confirm login, representative recent edits and history on the HTTPS site, then continue working only on that hosted instance. Keep the local copy as a fallback until the transfer is verified. Do not re-run the spreadsheet migration or create replacement accounts after restoring the database.
+## GitHub account and repository
+
+Whoever can push to `main` and publish a release controls what the server can run. Turn on two-factor authentication for every account with write access, and protect `main` (Settings → Branches: require a pull request before merging, block force pushes and deletion).

@@ -1,43 +1,56 @@
+import {useConfirm} from './ConfirmDialog';
 import {useEffect,useRef,useState} from 'react';
-import {Settings,RefreshCw,Copy,Check,X} from 'lucide-react';
+import {Settings,RefreshCw,Copy,Check,X,ShieldCheck,Smartphone,KeyRound} from 'lucide-react';
+import {PasswordForm} from './PasswordChange';
 import {AppearanceControls} from './Appearance';
 import {api} from './api';
 
+export const EVENT_LABELS:Record<string,string>={login:'Angemeldet',logout:'Abgemeldet',password_failed:'Falsches Passwort',code_failed:'Falscher Code bei der Anmeldung',key_code_failed:'Falscher Code beim Schlüssel',recovery_code_used:'Wiederherstellungscode benutzt',mfa_enrolled:'Authenticator eingerichtet',mfa_reset:'Zwei-Faktor zurückgesetzt',password_reset:'Passwort zurückgesetzt',password_changed:'Passwort geändert',password_change_failed:'Falsches Passwort beim Ändern',key_created:'Erweiterungs-Schlüssel erstellt',device_revoked:'Handy-App abgemeldet',key_revoked:'Erweiterungs-Schlüssel widerrufen',user_added:'Konto angelegt',user_disabled:'Konto deaktiviert'};
 type Props={signedIn?:boolean;loadedAt?:string;stale?:boolean;loading?:boolean;disabled?:boolean;onRefresh?:()=>void};
 export default function SystemSettings(props:Props){
- const[open,setOpen]=useState(false),[gmail,setGmail]=useState<any>(null),[key,setKey]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[copied,setCopied]=useState(false);
+ const ask=useConfirm();
+ const[open,setOpen]=useState(false),[extension,setExtension]=useState<any>(null),[key,setKey]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[copied,setCopied]=useState(false),[code,setCode]=useState<string|null>(null),[events,setEvents]=useState<any[]|null>(null),[phones,setPhones]=useState<any[]|null>(null);
+ const[pwDone,setPwDone]=useState('');
  const ref=useRef<HTMLDivElement>(null),trigger=useRef<HTMLButtonElement>(null),visibility=useRef(0);
- const close=()=>{visibility.current++;setOpen(false);setKey('');setCopied(false);};
+ const close=()=>{visibility.current++;setOpen(false);setPwDone('');setKey('');setCopied(false);setCode(null);setEvents(null);setPhones(null);};
  useEffect(()=>{
   if(!open)return;
-  const outside=(e:PointerEvent)=>{if(!ref.current?.contains(e.target as Node))close();};
-  const escape=(e:KeyboardEvent)=>{if(e.key==='Escape'){close();trigger.current?.focus();}};
+  const outside=(e:PointerEvent)=>{if((e.target as Element)?.closest?.('.confirm-dialog'))return;if(!ref.current?.contains(e.target as Node))close();};
+  const escape=(e:KeyboardEvent)=>{if(e.key==='Escape'&&!document.querySelector('.confirm-dialog[open]')){close();trigger.current?.focus();}};
   document.addEventListener('pointerdown',outside);document.addEventListener('keydown',escape);
-  let active=true;if(props.signedIn)api({action:'gmailStatus'}).then(v=>{if(active)setGmail(v);}).catch(e=>{if(active)setError(e.message);});
+  let active=true;if(props.signedIn)api({action:'extensionStatus'}).then(v=>{if(active)setExtension(v);}).catch(e=>{if(active)setError(e.message);});
   return()=>{active=false;document.removeEventListener('pointerdown',outside);document.removeEventListener('keydown',escape);};
  },[open,props.signedIn]);
  async function connection(action:string){
-  if(action==='gmailCreate'&&gmail?.connected&&!window.confirm('Den bisherigen Gmail-Schlüssel ersetzen? Danach das Add-on neu verbinden.'))return;
-  if(action==='gmailRevoke'&&!window.confirm('Gmail-Verbindung widerrufen? Bereits vorgemerkte Importe bleiben zum Prüfen verfügbar.'))return;
+  // A new key first asks for a fresh authenticator code; the request goes out once the code is entered.
+  if(action==='extensionCreate'&&code===null){if(extension?.connected&&!await ask('Den bisherigen Erweiterungs-Schlüssel ersetzen? Danach die Browser-Erweiterung neu verbinden.','Schlüssel ersetzen'))return;setError('');setKey('');setCode('');return;}
+  if(action==='extensionRevoke'&&!await ask('Browser-Verbindung widerrufen?','Widerrufen'))return;
   const opened=visibility.current;setBusy(true);setError('');setKey('');setCopied(false);
-  try{const v=await api({action,...(action==='gmailCreate'?{sidebarReview:true}:{})});if(opened===visibility.current){setGmail(v);setKey(v.token||'');}}catch(e:any){if(opened===visibility.current)setError(e.message);}finally{setBusy(false);}
+  try{const v=await api(action==='extensionCreate'?{action,code}:{action});if(opened===visibility.current){setExtension(v);setKey(v.token||'');setCode(null);setEvents(null);}}catch(e:any){if(opened===visibility.current){setError(e.message);if(action==='extensionCreate')setCode('');}}finally{setBusy(false);}
  }
  return <div className="system-settings" data-tour="settings" ref={ref}>
-  <button ref={trigger} type="button" className="icon-button" title="Einstellungen" aria-label="Einstellungen" aria-expanded={open} aria-controls="system-settings-panel" onClick={()=>{if(open)close();else{setError('');setOpen(true);}}}><Settings size={19}/></button>
+  <button ref={trigger} type="button" className="icon-button" title="Einstellungen" aria-label="Einstellungen" aria-expanded={open} aria-controls="system-settings-panel" onClick={async()=>{if(open)close();else{setError('');setOpen(true);}}}><Settings size={19}/></button>
   {open&&<section id="system-settings-panel" className="settings-popover glass" aria-label="Einstellungen">
-   <header><strong>Einstellungen</strong><button type="button" className="icon-button" aria-label="Einstellungen schließen" onClick={()=>{close();trigger.current?.focus();}}><X size={16}/></button></header>
+   <header><strong>Einstellungen</strong><button type="button" className="icon-button" aria-label="Einstellungen schließen" onClick={async()=>{close();trigger.current?.focus();}}><X size={16}/></button></header>
    <div className="settings-row"><span>Darstellung</span><AppearanceControls/></div>
    {props.onRefresh&&<div className="settings-row"><span className={`connection ${props.stale?'stale':''}`} title={props.loadedAt?`Geladen ${new Date(props.loadedAt).toLocaleTimeString('de-DE')}`:undefined}><i/>{props.stale?'Veraltet':props.loadedAt?'Live':'Laden …'}</span><button type="button" className="text-button" disabled={props.disabled||props.loading} onClick={props.onRefresh}><RefreshCw size={15} className={props.loading?'spin':''}/>Aktualisieren</button></div>}
-   {props.signedIn&&<details className="settings-gmail"><summary>Gmail verbinden</summary><p>Im Gmail-Add-on Organisation und Kontakte prüfen, dann ausdrücklich im CRM speichern. Der Schlüssel erlaubt dafür die CRM-Suche und Importbestätigung.</p>
-    {gmail&&!gmail.publicHttps&&<p>Für Gmail muss dieses CRM über öffentlich erreichbares HTTPS laufen. Lokal funktioniert der .eml-Import.</p>}
-    {gmail?.connected&&<small>Verbunden · gültig bis {new Date(gmail.expires_at).toLocaleDateString('de-DE')}</small>}
-    {gmail?.connected&&!gmail.sidebar_review&&<small>Für die Prüfung direkt in Gmail: Schlüssel erneuern und das Add-on neu verbinden.</small>}
-    {gmail?.last_used_at&&<small>Zuletzt verwendet: {new Date(gmail.last_used_at).toLocaleString('de-DE')}</small>}
-    <div className="settings-key-actions"><button type="button" className="button secondary small" disabled={busy||!gmail} onClick={()=>connection('gmailCreate')}>{gmail?.connected?'Schlüssel erneuern':'Schlüssel erstellen'}</button>{gmail?.connected&&<button type="button" className="text-button" disabled={busy} onClick={()=>connection('gmailRevoke')}>Widerrufen</button>}</div>
-    {key&&<div className="settings-key"><label className="field"><span>Einmalig im Gmail-Add-on einfügen</span><input aria-label="Gmail-Verbindungsschlüssel" readOnly value={key} onFocus={e=>e.target.select()}/></label><button type="button" className="text-button" onClick={async()=>{try{await navigator.clipboard.writeText(key);setCopied(true);}catch{setError('Bitte den Schlüssel im Feld markieren und kopieren.');}}}>{copied?<Check size={14}/>:<Copy size={14}/>} {copied?'Kopiert':'Kopieren'}</button><small>Nur für dein Konto. Wird nach dem Schließen nicht erneut angezeigt.</small></div>}
-    <a href="https://github.com/ProgRies/stageforce/blob/main/docs/gmail-setup.md" target="_blank" rel="noopener noreferrer">Einrichtung öffnen ↗</a>
+   {props.signedIn&&<details className="settings-extension"><summary>Browser-Erweiterung verbinden</summary><p>Schlüssel erstellen und zusammen mit dieser CRM-Adresse in den Einstellungen der Chrome-Erweiterung einfügen.</p><p><strong>{window.location.origin}</strong></p>
+    {extension?.connected&&<small>Verbunden · gültig bis {new Date(extension.expires_at).toLocaleDateString('de-DE')}</small>}
+    {extension?.last_used_at&&<small>Zuletzt verwendet: {new Date(extension.last_used_at).toLocaleString('de-DE')}</small>}
+    {code!==null&&<form className="settings-code" onSubmit={e=>{e.preventDefault();connection('extensionCreate');}}><label className="field"><span>Code aus deiner Authenticator-App</span><input autoFocus inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required placeholder="123456" value={code} disabled={busy} onChange={e=>setCode(e.target.value.replace(/\D/g,''))}/></label>{error&&<p role="alert" className="save-error">{error}</p>}<div className="settings-key-actions"><button className="button primary small" disabled={busy||code.length!==6}>{busy?'Prüfen …':'Schlüssel erstellen'}</button><button type="button" className="text-button" disabled={busy} onClick={()=>{setCode(null);setError('');}}>Abbrechen</button></div><small>Ein Schlüssel meldet die Erweiterung 90 Tage ohne Code an. Deshalb wird hier ein frischer Code verlangt.</small></form>}
+    {code===null&&<div className="settings-key-actions"><button type="button" className="button secondary small" disabled={busy||!extension} onClick={()=>connection('extensionCreate')}>{extension?.connected?'Schlüssel erneuern':'Schlüssel erstellen'}</button>{extension?.connected&&<button type="button" className="text-button" disabled={busy} onClick={()=>connection('extensionRevoke')}>Widerrufen</button>}</div>}
+    {key&&<div className="settings-key"><label className="field"><span>Einmalig in der Browser-Erweiterung einfügen</span><input aria-label="Erweiterungs-Verbindungsschlüssel" readOnly value={key} onFocus={e=>e.target.select()}/></label><button type="button" className="text-button" onClick={async()=>{try{await navigator.clipboard.writeText(key);setCopied(true);}catch{setError('Bitte den Schlüssel im Feld markieren und kopieren.');}}}>{copied?<Check size={14}/>:<Copy size={14}/>} {copied?'Kopiert':'Kopieren'}</button><small>Nur für dein Konto. 90 Tage gültig, jederzeit widerrufbar. Wird nur jetzt angezeigt.</small></div>}
    </details>}
-   {error&&<p role="alert" className="save-error">{error}</p>}
+   {props.signedIn&&<details className="settings-extension"><summary><KeyRound size={14} aria-hidden="true"/> Passwort ändern</summary><p>Ohne E-Mail-Bestätigung: dein bisheriges Passwort genügt. Andere Browser und die Handy-App werden danach abgemeldet; hier bleibst du angemeldet.</p>
+    {pwDone?<p role="status" className="login-notice"><Check size={14} aria-hidden="true"/>{pwDone}</p>:<PasswordForm onDone={r=>{setPwDone(r.signedOut?`Passwort geändert. ${r.signedOut} weitere Sitzung${r.signedOut===1?'':'en'} abgemeldet.`:'Passwort geändert.');setEvents(null);setPhones(null);}}/>}
+   </details>}
+   {props.signedIn&&<details className="settings-extension" onToggle={e=>{if((e.target as HTMLDetailsElement).open&&!events)api({action:'securityEvents'}).then(v=>setEvents(v.items)).catch(e=>setError(e.message));}}><summary><ShieldCheck size={14} aria-hidden="true"/> Anmeldeaktivität</summary><p>Die letzten Anmeldungen und Sicherheitsereignisse deines Kontos. Etwas, das du nicht warst? Bitte sofort den Administrator, dein Passwort und deine Zwei-Faktor-Anmeldung zurückzusetzen.</p>
+    {events===null?<small>Wird geladen …</small>:events.length===0?<small>Noch keine Ereignisse.</small>:<ul className="security-events">{events.map((e,i)=><li key={i} className={/failed/.test(e.event)?'warn':''}><span>{EVENT_LABELS[e.event]||e.event}{e.detail?` · ${e.detail}`:''}</span><small>{new Date(e.at).toLocaleString('de-DE')} · {e.ip}</small></li>)}</ul>}
+   </details>}
+   {props.signedIn&&<details className="settings-extension" onToggle={e=>{if((e.target as HTMLDetailsElement).open&&!phones)api({action:'mobileDevices'}).then(v=>setPhones(v.items)).catch(e=>setError(e.message));}}><summary><Smartphone size={14} aria-hidden="true"/> Handy-App</summary><p>Zum Anrufe-Eintragen unterwegs: auf dem iPhone in Safari öffnen, Teilen, „Zum Home-Bildschirm“. Einmal mit Code anmelden; das Handy bleibt dann angemeldet, solange die App mindestens alle 90 Tage geöffnet wird.</p><p><strong>{window.location.origin}/m/</strong></p>
+    {phones===null?<small>Wird geladen …</small>:phones.length===0?<small>Noch kein Handy angemeldet.</small>:<ul className="security-events">{phones.map(p=><li key={p.id}><span>{p.label||'Handy'} · zuletzt {new Date(p.last_used_at).toLocaleDateString('de-DE')}</span><button type="button" className="text-button" disabled={busy} onClick={async()=>{if(!await ask(`${p.label||'Handy'} abmelden? Dort ist danach eine neue Anmeldung mit Code nötig.`,'Abmelden'))return;try{setPhones((await api({action:'mobileDeviceRevoke',id:p.id})).items);setEvents(null);}catch(e:any){setError(e.message);}}}>Abmelden</button></li>)}</ul>}
+   </details>}
+   {error&&code===null&&<p role="alert" className="save-error">{error}</p>}
   </section>}
  </div>;
 }

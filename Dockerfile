@@ -2,9 +2,11 @@ FROM node:24-bookworm-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts
-COPY index.html tsconfig.json ./
+COPY index.html tsconfig.json vite.config.mjs ./
+COPY m ./m
 COPY src ./src
 COPY public ./public
+COPY integrations/chrome/extract.js integrations/chrome/call-card.js ./integrations/chrome/
 RUN npm run typecheck && npm run build
 
 FROM node:24-bookworm-slim AS runtime

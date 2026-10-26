@@ -1,23 +1,282 @@
-# Stage Force 0.1.12
+# StageForce 0.3.12 · first server release of the 0.3 line
 
-Review and save selected emails directly in the Gmail sidebar: confirm or find/create an organisation, select its contacts, check message text and timeline placement, then explicitly save. Stage-purple primary actions keep the native cards simple. Google's card interface does not support custom glass backgrounds.
+This release brings everything built on `local-development` (two-factor sign-in, live updates, call lists and call card, meetings, map, phone app, browser extension 0.4.20, security hardening) onto `main` together with the automatic snapshots, and publishes it as `ghcr.io/progries/stageforce:0.3.12`.
 
-The same parser, conservative quote cleanup, duplicate detection, atomic save and conflict checks power both Gmail and the existing browser reviewer. Long text previews are paginated without truncating stored content. After saving, a link opens the organisation in the CRM. No new Gmail permissions, background scans, AI processing, sending or mailbox writes.
+- **Server:** `compose.yaml` is the production file again (pinned image, Traefik, read-only root, `storage` volume). Set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.12` in the server's `.env`. New settings with safe defaults: `TRUST_PROXY`, `INTERNAL_DOMAINS`, `SNAPSHOT_INTERVAL_HOURS`, `SNAPSHOT_KEEP`. See [deployment.md](deployment.md).
+- **Your Mac:** local development moved to `compose.local.yaml`: `docker compose -f compose.local.yaml up -d --build`. The Compose project and the `demo-storage` volume stay the same, so local data is kept.
+- **Snapshots:** the server takes a verified SQLite snapshot every 6 hours and keeps 28. `cli.mjs snapshot:latest --stdout` hands the newest healthy one to a backup tool.
+- **Passwords:** users change their own password under Einstellungen → Passwort ändern (current password, no e-mail). `user:add … --temporary` and `user:password … --temporary` make the admin's password a starting password that must be replaced at first sign-in.
+- **Keeping an existing 0.1.x server database** (instead of the planned reset): startup migrates it to schema 13. Every user must set up an authenticator app at the next sign-in. Back up first; 0.1.x cannot open the migrated database. Old Gmail add-on keys no longer work; colleagues use the browser extension instead.
 
-## Update
+## 0.3.12 · Phone app for logging calls
 
-Back up the database before deployment. On the server:
+Rebuild the CRM. On start the CRM adds columns to sessions and calls (session kind, label, last use; call direction); no data is changed. Then install the app on the iPhone as described in docs/mobile-app.md.
 
-```sh
-docker compose exec crm node server/cli.mjs backup /app/data/backups/before-0.1.12.sqlite
-docker compose cp crm:/app/data/backups/before-0.1.12.sqlite ./before-0.1.12.sqlite
-git pull --ff-only
-docker compose pull
-docker compose up -d
-```
+- New phone app at `/m/`, installable on the iPhone home screen. It opens on "Wer ruft an?": search by name, organisation or the last digits of a number, pick the person, type the note, tap the result.
+- A caller who is not in the CRM can be created during the call ("Neuer Lead"). Organisations created this way always appear in Prüfen until someone checks them.
+- New result for answered calls: "Gespräch geführt" logs the call without changing the planned follow-up. "Nicht erreicht" is not offered for calls that came in.
+- The phone signs in once with password and code and then stays signed in for 90 days from its last use. Einstellungen → Handy-App lists signed-in phones and signs them out.
+- The desktop page, its styles and its call card are unchanged.
 
-Use `CRM_IMAGE=ghcr.io/progries/stageforce:latest` or `:0.1.12`. Startup applies schema 5 automatically. Do not repeat the original import. A rollback to an older version requires the matching database backup.
+## 0.3.12 · extension 0.4.20
 
-In Apps Script replace `Code.gs` with the current repository version, retain `CRM_ORIGIN='https://stageforce.jaimo.me'`, save and reload Gmail. Keep the existing manifest and its configured hostname. In the hosted CRM, renew your Gmail connection key; remove the old connection in the sidebar and connect with the replacement. Old keys remain capture-only and continue to offer the browser review path. See [Gmail setup](gmail-setup.md).
+Rebuild the CRM and reload the extension in `chrome://extensions`. No data change; the CRM adds a database index on start.
 
-Automated tests cover scope isolation, legacy key preservation, ownership/expiry, duplicates/retries, organisation conflicts, selected contacts, full text preservation, date placement and the three-step Apps Script flow. A live Workspace/sidebar visual check remains necessary after deployment; Google services are mocked in automated tests.
+- Emails a colleague already saved are now recognised in your mailbox too. Gmail gives each mailbox its own ids, so the copy is matched by sender, subject (ignoring Re:/AW:), the minute it was sent and at least one shared recipient. The button then says "Already in StageForce", the popup names who saved it, and saving again adds no second copy.
+- The inbox list's **✓ CRM** mark also appears when a colleague saved the latest email of a conversation, so you can see which emails are still missing. For this, the latest email's sender, time and subject are sent to the CRM; only a yes or no comes back.
+- Dates with spelled-out months ("Mo., 20. Okt. 2026, 10:00", "Mon, Oct 20, 2026, 10:00 AM") are now read too, which also prefills the date for English Gmail.
+- Limits: matching needs both Gmail accounts to show the same time zone, and a subject edited before saving is not matched.
+
+## 0.3.12 · Security hardening
+
+Rebuild the CRM. The CRM adds one table on start (security events); no data is changed. Production: pin `CRM_IMAGE` to an exact version and keep `TRUST_PROXY=1` behind Traefik (see docs/deployment.md).
+
+- Creating a browser-extension key now asks for a fresh code from the authenticator app. A stolen session alone can no longer mint a 90-day key.
+- Sign-in limits count per client address and per account. The shared team-wide limit is gone, so nobody can lock the whole team out by sending wrong passwords.
+- Sign-ins, wrong passwords and codes, recovery-code use, MFA and key changes are recorded for 90 days. Einstellungen → Anmeldeaktivität shows your own; `cli.mjs security:log` shows everyone's. After signing in you are warned about wrong passwords or codes since your previous sign-in.
+- Releases no longer publish a `latest` image tag; servers run the exact version they name.
+
+## 0.3.12 · Call card only where you called · extension 0.4.19
+
+Rebuild the CRM and reload the extension. No database change.
+
+- The call card now only appears in the tab where the call was started, and again after reloading that same tab. Other CRM tabs, Gmail and page loads no longer open it on their own.
+- A card whose call was saved or discarded elsewhere disappears when its tab gets a live update or is brought to the front again.
+- Starting a call quietly drops an older open call that has no note (a closed tab, a test call). An older call with a note is still shown so it can be saved or discarded first.
+- Closing the floating window puts the card back into the page collapsed.
+
+## 0.3.12 · Floating call card · extension 0.4.18
+
+Rebuild the CRM and reload the extension in `chrome://extensions`, then refresh Gmail. The CRM adds one table on start (draft notes of running calls); no data is changed.
+
+- A started call now lives in its own small window that floats above every tab, site and app (Chrome's Picture-in-Picture window). Move it to the top-right corner once; Chrome remembers the spot. It has the note field, "Wähl-App erneut öffnen", the five results, minimise and discard.
+- The CRM and the Gmail popup use the same card. A call started in Gmail no longer keeps the popup open, and switching organisations in the CRM during a call no longer asks "Ungespeicherte Eingaben verwerfen?". Calling is also possible while a note is being written.
+- Opening the dial app no longer triggers Chrome's "Leave site? Changes you made may not be saved" prompt.
+- The note is saved as you type. Closing the floating window puts the card back into the top-right corner of the page; closing the tab keeps the call open, and the CRM (any tab) or the Gmail popup shows it again, collapsed, until it is saved or discarded. Calls left unsaved for more than 12 hours are treated as abandoned.
+- One call at a time: while a call is open, call buttons are disabled; starting a second call elsewhere shows the open one instead.
+- Where the floating window is not available (other browsers, or Chrome refuses it), the card stays fixed in the top-right corner of the page.
+
+## 0.3.12 · Map pins
+
+Pin organisations on a map. Rebuild the CRM. The CRM adds one table on start (map pins); no data is changed.
+
+- Every organisation can optionally get a pin: "Pin auf Karte setzen" at the bottom of the right column opens the map. Search a place (prefilled with the organisation's town) or click the map, drag the pin to fine-tune, then save. "Pin ändern" moves or removes it.
+- Once set, a small map preview shows the pin. Clicking it opens the full map with all other pinned organisations; hover a pin for its name, click it and "Öffnen" to jump to that organisation.
+- Map tiles and the place search run through the CRM server. Browsers never contact the map provider, and only the typed search text leaves the server (see deployment notes).
+- Pin changes are kept in the change log and reach colleagues' open tabs live.
+
+## 0.3.12 · Upcoming meetings
+
+Plan meetings ahead and see what is coming up. Rebuild the CRM. The CRM adds one table on start (cancelled meetings); no data is changed.
+
+- "Notiz hinzufügen" → Meeting takes dates up to two years ahead ("Meeting planen"), e.g. an Intro or Setup meeting in two weeks. Notes stay limited to today or earlier.
+- Planned meetings show "Geplant" on their card, a "Nächstes Meeting …" line above the timeline, and a "Meeting morgen" / "Meeting Mo., 09.11." chip next to the organisation in the lists.
+- An organisation with a booked meeting is left out of new call lists until the meeting has taken place or is cancelled.
+- The pencil on a meeting now also changes its date and marks it "Abgesagt" (shown struck through). Cancellation emails saved through the extension set the same mark.
+- A planned meeting counts as the last contact once its day has come, unless it was cancelled.
+
+## 0.3.12 · extension 0.4.17
+
+Log any email as a meeting. Reload the extension and refresh Gmail; rebuild the CRM. No database migration is required.
+
+- The popup always shows "Also log as meeting" with a date and time, so any email (a thank-you after a call, a confirmation the detection misses) can be logged as a Meeting in the same save. It starts unticked unless the email is an invitation or confirmation.
+- Calendar and booking confirmations without a video link are recognised and ticked with their date: Google/Outlook acceptances ("Akzeptiert:", "Accepted:"), "Terminbestätigung", "Buchungsbestätigung", "Termin bestätigt", "New Event:" (Calendly and similar), and emails with an .ics invitation. Dates in a sentence ("Ihr Termin am 05.11.2026 um 15:30 Uhr") are read too.
+- Several emails about one meeting (invite, acceptance, reminder, booking confirmation) stay one entry: an email belongs to a meeting with the same join link or title, or else to a meeting of that organisation on the same day at the same time. The popup then says "Meeting on … already logged" and stays unticked; ticking only adds the email's contacts. Updated invitations and cancellations still move or mark the entry.
+- Declines and counter-proposals are still ignored. A booking-tool link in a signature alone does not tick the box.
+
+## 0.3.12 · extension 0.4.16
+
+Rebuild the CRM and reload the extension in `chrome://extensions`. No database change.
+
+- Ticking **Include quoted history** now also checks the earlier emails in the thread for contacts and phone numbers. Numbers of people already in the email header appear as removable "new" chips. Other authors appear unticked with "From quoted history", their found numbers and an add-contact button; colleagues are left out. Unticking removes them again.
+- The Gmail inbox list shows a small **✓ CRM** mark on conversations that are already in StageForce. Only Gmail ids are sent to the CRM and only a yes or no comes back, so no client names are put into the Gmail page. Results are cached, so an inbox page costs at most one request per minute.
+
+## 0.3.12 · Two-factor sign-in
+
+Rebuild the CRM. The database moves to schema 10 on start. Everyone is signed out once and every browser-extension key is revoked, because neither was confirmed with a second factor.
+
+- Sign-in now needs a password **and** a six-digit code from an authenticator app. The password alone only opens a ten-minute step for the code; no session exists until the code is correct.
+- The first sign-in after the update shows a QR code (and the key for typing it in by hand). Scan it, confirm with a code, and save the ten recovery codes, which are shown only once. Without this setup the login cannot complete.
+- "Kein Zugriff auf die App?" accepts a recovery code instead. Each recovery code works once.
+- A code is accepted once; five wrong codes end the step and the password has to be entered again.
+- Sessions, extension keys and live updates only work for accounts with a confirmed authenticator.
+- After signing in again, create a new key in settings and paste it into the browser extension.
+- Admin: `user:mfa-reset EMAIL` removes a lost authenticator, ends that user's sessions and revokes their extension key; the next sign-in sets up a new app. `user:list` shows who has set it up.
+
+## 0.3.12 · Live updates
+
+Rebuild the CRM and refresh its browser tab. No database change.
+
+- Open CRM tabs update on their own when a colleague saves something: an email from the extension, a call, a note, a field, a FastBill decision, a merge or a delete. It usually shows within half a second.
+- While you are typing, have a note open, are on a call or are saving, the update waits until you are done, so your input is never replaced. If the organisation you are editing was changed meanwhile, a short notice says so; saving then reports the conflict as before, and nothing is overwritten.
+- Changes made with the command-line tool show up within about two seconds.
+- Behind a reverse proxy, `/api/live` must not be buffered; see the deployment notes.
+
+## 0.3.12 · CRM
+
+Rebuild the CRM. The database moves to schema 9 on start (personal call lists); no data is changed.
+
+- After a call, one tap records the result (Nicht erreicht, Später anrufen, Termin, E-Mail nötig, Kein Interesse) and sets when the organisation comes back. Termin opens the booking calendar.
+- "Notiz hinzufügen" can record a Meeting, which counts as the last contact.
+- **Prüfen** lists organisations that need an email after a call, with the latest timeline entry. Saving an outgoing email clears the point; **Erledigt** clears it by hand. The old automatic field checks are gone.
+- Each user gets their own call list: only organisations they own ("Zuständig") or nobody owns, and none a colleague already holds today. The first saved call to an unowned organisation makes the caller its owner.
+- The in-app tour covers status and ownership, meetings, call results and Prüfen. Started from Anrufe or Prüfen, it switches to Organisationen and opens an organisation first.
+- Cleanup: removed the unused full-page organisation editor, the old note types (E-Mail, Telefonat, Anrufversuch) from the note API, an unused helper and about 200 unused CSS selectors. Removed the demo-data command; see the README for resetting the local database.
+
+## 0.3.12 · FastBill click to add
+
+Rebuild the CRM and refresh its browser tab. No database change.
+
+- FastBill rows are now added to the CRM one at a time. **Als neue Organisation hinzufügen** creates the organisation from that row in one click; **Zuordnen** links it to an existing one; **Nicht relevant** skips it. The next open row opens after each decision.
+- Better duplicate protection: suggestions now also use phone numbers, company domains, contact names and similar names without legal forms. Adding a new organisation while possible matches exist needs one extra confirmation.
+- Re-importing the same export only asks about rows that are still undecided, including ones marked Nicht relevant before.
+- New organisations from FastBill start as Lead. They start as Kunde when a staged invoice export shows a bill for that customer that is neither cancelled nor a draft.
+- A new organisation from FastBill without an email address shows up in Prüfen.
+- Removed the one-time spreadsheet migration (`npm run cli migrate`). It could add every organisation at once, bypassing the review queue, and it was only usable on an empty CRM.
+
+## 0.3.12 · extension 0.4.15
+
+Meetings from video-call invitations. Rebuild the CRM, reload the extension and refresh Gmail. The CRM adds one table on start (meeting references); no data is changed.
+
+- When an email holds a Zoom, Microsoft Teams, Google Meet, Webex, GoTo Meeting, Whereby, Jitsi or Skype invitation, the popup shows "Also log … meeting" with the meeting date and time read from the invitation (Google Calendar subjects, "Wann:/When:/Time:/Datum:" lines). Save stores the email and a Meeting entry on that date in the organisation timeline, linked to the same contacts.
+- Invitations with a join link or a date are ticked by default; a loose mention ("per Google Meet?") is offered unticked. Accept/decline replies are ignored.
+- An updated invitation for the same meeting (same join link) moves the existing entry instead of adding a second one; a cancellation marks it "Abgesagt". Meetings in the future do not change the last contact date.
+
+## 0.3.12 · extension 0.4.14
+
+Email conversations and company addresses. Rebuild the CRM, reload the extension and refresh Gmail. The CRM adds two tables on start (conversation references and full original texts); no data is changed.
+
+- Emails from an old Gmail conversation can be saved in any order. The first saved email remembers the conversation; every later email from it prefills that organisation, even from a new sender. The timeline orders them by their own send time.
+- The popup lists the other opened messages of the conversation that are not in the CRM yet, ticked by default; Save stores them all under the same organisation. Messages Gmail has not opened (collapsed and never expanded) cannot be read; use "Expand all" in Gmail first.
+- Replies are stored without the quoted history by default (Gmail quotes and Outlook "From/Sent" headers). "Include quoted history" switches it back for one email. Forwarded emails keep their content. The full loaded text is always kept in the database beside the stored reply.
+- `INTERNAL_DOMAINS` (e.g. `stage.bio,jaimo-solutions.com`) marks company domains: aliases like billing@ are never suggested as client contacts, and mail sent from them is filed as sent. The popup takes the direction from the CRM.
+- German phone numbers are stored as +49 (030 1234567 becomes +49 30 1234567; 00 becomes +). Other numbers keep their spelling. Duplicate checks treat both spellings as the same number.
+
+## 0.3.12 · extension 0.4.13
+
+Better contact and phone extraction in the Gmail popup. Reload the extension and refresh Gmail; rebuild the CRM for the role field. No database migration is required.
+
+- Read German signature labels (T, M, Tel., Mob., Handy, Büro, Zentrale, Durchwahl) and split "Tel. … | Fax … | Mobil …" lines, dropping only the fax entry. Dates are no longer taken as phone numbers.
+- Suggest sender phones from the signature block only, not from numbers mentioned in the text.
+- Mark suggested numbers as "new" with an × to drop them before saving the email.
+- Keep table cells apart in email text, so contact-form emails stay readable and their addresses parse correctly.
+- Extract contact recognises titles, combines first and last name fields, skips company lines, and suggests role and company. The role is saved for new contacts; the company prefills the organisation search when none is selected.
+- Send recipients' display names, so new contacts from To/Cc get real names.
+- Ctrl/Cmd+Enter saves and continues, or saves the open contact editor.
+
+## 0.3.10-local · extension 0.4.12
+
+Centered the collapsed sidebar logo and placed organisation status below the name. Contact editing uses inset icons and accessible field names. The popup shows connection settings only while disconnected and no longer offers a manual animation pause control; system reduced-motion settings remain respected.
+
+Rebuild the CRM, reload the extension and refresh Gmail. No database migration is required.
+
+- Edit call notes and notes directly in their timeline cards. Preserve event dates, authors and contact links; audit edits and reject conflicting changes.
+- Toggle a contact pencil to an X. Closing discards its draft; saving updates the card and collapses its editor without clearing the timeline or loaded older activities.
+- Use StageForce confirmation dialogs inside the CRM, and the organisation creation form in FastBill imports. Browser tab-close protection still applies to unsaved work.
+- Keep StageForce call buttons white in the header, contacts and expanded call cards. Timeline colors remain blue for emails, purple for calls and amber for notes in both themes.
+- Include the shared contact parser in the Docker build stage and context.
+
+Rebuild the CRM and refresh its browser tab. Extension 0.4.11 is unchanged. No database migration is required.
+
+## 0.3.8-local · extension 0.4.11
+
+- Edit contact names and phone numbers with the pencil in Gmail, including on already imported emails. Saving a contact writes it to the selected organisation independently of importing the email.
+- Highlight contact details in an email and choose Extract contact / Kontakt extrahieren. Parsing happens locally; review the suggestion and save a new contact or enrich an existing one. Extracted contacts can be linked without changing the original sender or recipients.
+- Expand CRM contact editors directly inside their cards, with single-line email and phone inputs. Separate multiple values with semicolons.
+- Place a white StageForce quick-call control beside Notiz hinzufügen. It uses the first valid number of the most recently contacted person with a number, falling back to contact order. Calling and call notes use the existing flow.
+- Keep expanded timeline entries open when refreshing contacts. Validate contact and email organisation associations before saving.
+
+Rebuild the CRM and reload the extension for this update. No database migration is required.
+
+## Extension 0.4.10
+
+- Use a compact 1200px popup with a 70/30 desktop split and a stacked layout on small screens.
+- Close by clicking outside the popup; pending call notes retain their discard confirmation, and saves in progress stay open.
+- Bring the CRM’s blue/purple signal background into dark-mode popups using a bounded 20fps canvas, with pause, reduced-motion and hidden-tab handling. Dispose the renderer when the popup closes.
+
+## Extension 0.4.9
+
+- Keep Gmail header buttons visually identical in light and dark mode.
+- Use a white-to-mint gradient, dark text and a green checkmark for saved emails.
+
+## Extension 0.4.8
+
+- Give saved-email buttons a bright green outline, neutral background and lightning emoji in light and dark mode.
+
+## 0.3.7-local · extension 0.4.7
+
+- Inset the message-direction arrow in the Gmail popup.
+- Standardize CRM dropdown spacing across forms, appearance settings, call queues and imports, preserving the organisation status control.
+- Match arrow colors to light/dark themes and retain native arrows in forced-colors mode.
+
+## Extension 0.4.6 · CRM 0.3.6-local
+
+- Failed authentication or connection checks disable email saving and show a retry action while preserving the draft.
+- Save success requires an explicit CRM acknowledgement; missing or malformed responses cannot mark an email as saved.
+- Worker reloads preserve an existing pairing. After reloading the extension, refresh Gmail to replace its old content-script context.
+
+## 0.3.6-local · extension 0.4.5
+
+- Gmail buttons distinguish saved mail (green), connection issues (amber), and messages ready to import (a brief StageForce shimmer). Click and save animations respect reduced-motion preferences.
+- Disconnected buttons open connection settings; connection warnings retry when returning to Gmail or coming online.
+- CRM shows the two contacts with the latest recorded email/call in this organization, with alphabetical fallback. Expand the remaining contacts when needed. An active call or contact edit prevents collapsing its controls.
+
+## 0.3.5-local · extension 0.4.4
+
+- Chrome toolbar and extension management use the StageForce client logo in native icon sizes.
+- Organization list previews show Lead, Kunde and Partner / Agentur, including any retained legacy status.
+- Added security boundary regression coverage for cookie flags, CSRF, authentication, request size, static-file isolation and SQL-like inputs.
+
+# StageForce 0.3.4-local / extension 0.4.3
+
+- Collapsible desktop navigation keeps the logo, icons and hover labels. Width and label transitions respect reduced motion; the chosen state is remembered.
+- Tighter organisation list hides the unknown-type placeholder. Status dropdown arrow is inset.
+- Extension search results overlay the form so suggestions do not move the email preview.
+- Contact names fall back to readable email usernames, including shared addresses. Existing entered names remain preferred; suggested names can be edited.
+- Contact editing no longer asks for a primary contact. Existing legacy selections remain stored.
+
+# StageForce 0.3.3-local
+
+- Organisation header contains the immediately saved Lead / Kunde / Partner / Agentur selector and editable FastBill link.
+- Right column contains Gmail search, contacts, links and one general notes field with Save.
+- Note drafts are retained in the current browser tab across organisation changes and reloads; save explicitly to share with colleagues. Concurrent note edits require review before overwriting.
+- Add Note creates a dated timeline event alongside calls and emails; existing Notiz events also appear there. General notes edits stay in the change log.
+- Existing next-step and review text remains available under Changes & Sources below the timeline.
+
+# StageForce 0.3.2-local / extension 0.4.2
+
+- Narrower navigation with compact spacing and visible labels.
+- Create organisations from search results through a themed form with existing-name matching.
+- Search and refresh shortcuts in the toolbar.
+- Phone sections appear in the extension only when a number is detected or stored in the CRM.
+
+# StageForce 0.3.1-local / extension 0.4.1
+
+- Light, dark and system themes cover phone controls, note fields and settings.
+- Extension popups follow the signed-in CRM user’s theme, with matching surfaces and static gradients.
+- Add Note creates an internal note; call events use the contact phone controls.
+- Schema 8 stores per-user theme preferences and preserves existing data.
+
+# StageForce 0.3.0-local / extension 0.4.0
+
+- Durable saved-email badges and read-only reopening from SQLite.
+- 75/25 popup, bounded initial email preview, keyboard isolation.
+- Signature phone suggestions and attachment metadata references.
+- Click-to-dial with notes in the CRM and extension; organisation/contact saved before dialling; cancel preserves them without a call event.
+- Schema 7 preserves existing users, keys and CRM records.
+- 57 automated tests, typecheck, build and Chromium fixture checks pass. Live Gmail, Docker Desktop and Mac/iPhone calling require a local check.
+
+See [Update instructions](update-local.md).
+
+# StageForce 0.2.0-local
+
+Local development version; not published or deployed.
+
+- Chrome extension v0.3.0: lighter, simplified two-column popup; actual organisation search, conservative automatic matching, contact selection and optional organisation links.
+- Personal revocable keys; localhost testing and later HTTPS hosting; matching sends headers only, Save sends message text.
+- One atomic save for the email and related records; repeat-save protection.
+- Existing CRM interface and SQLite records retained. Connection settings now pair the browser extension.
+- Gmail Apps Script implementation, endpoints and installation instructions removed.
+- Schema 6 adds extension credentials and drops obsolete Gmail add-on credentials. Back up before using any existing database; older binaries cannot open schema 6. Rollback requires the previous database backup.
+
+Start with [local setup](extension-setup.md). Production data is not included.

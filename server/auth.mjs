@@ -7,7 +7,29 @@ export function email(value){return typeof value==='string'&&value.length<=254&&
 export async function hashPassword(password){if(typeof password!=='string'||password.length<12||password.length>1024)throw Error('Passwort: mindestens 12, höchstens 1024 Zeichen.');const salt=randomBytes(16).toString('hex');const hash=await scrypt(password,salt,64,{N:32768,r:8,p:1,maxmem:64*1024*1024});return `${salt}:${hash.toString('hex')}`;}
 export async function verifyPassword(password,stored){if(typeof password!=='string'||password.length>1024)return false;const [salt,hex]=(stored||'00000000000000000000000000000000:'+('00'.repeat(64))).split(':');const hash=await scrypt(password,salt,64,{N:32768,r:8,p:1,maxmem:64*1024*1024});const expected=Buffer.from(hex,'hex');return hash.length===expected.length&&timingSafeEqual(hash,expected);}
 export async function addUser(db,address,name,password){if(!email(address)||!name?.trim())throw Error('Gültige E-Mail und Name erforderlich.');const id=uid(),hash=await hashPassword(password);db.prepare('INSERT INTO users(id,email,name,password_hash,created_at) VALUES(?,?,?,?,?)').run(id,address.trim().toLowerCase(),name.trim(),hash,now());return id;}
-export function publicUser(u){return {id:u.id,email:u.email,name:u.name};}
-export function createSession(db,user){const token=randomBytes(32).toString('base64url'),csrf=randomBytes(24).toString('base64url');db.prepare('INSERT INTO sessions VALUES(?,?,?,?)').run(hashToken(token),user.id,csrf,Date.now()+7*86400000);return{token,csrf,user:publicUser(user)};}
-export function getSession(db,req){const cookies=Object.fromEntries((req.headers.cookie||'').split(';').map(s=>{const p=s.trim().indexOf('=');return p<0?['','']:[s.trim().slice(0,p),s.trim().slice(p+1)];}));const token=cookies.stage_session;if(!token||token.length>128)return null;return db.prepare('SELECT u.id,u.email,u.name,s.csrf,s.token_hash FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>? AND u.active=1').get(hashToken(token),Date.now())||null;}
+export function publicUser(u){return {id:u.id,email:u.email,name:u.name,...(u.must_change_password?{mustChangePassword:true}:{})};}
+// The signed-in user replaces their own password: the current one proves it is them, no e-mail round trip.
+// Every other session (other browsers, phones) ends; this one stays signed in. Returns the ended sessions for the live channel.
+export async function changePassword(db,user,current,next){
+ const row=db.prepare('SELECT password_hash FROM users WHERE id=? AND active=1').get(user.id);
+ if(!row||!await verifyPassword(current,row.password_hash))return null;
+ if(typeof next!=='string'||next.length<12)throw Error('Das neue Passwort braucht mindestens 12 Zeichen.');
+ if(next===current)throw Error('Das neue Passwort muss sich vom bisherigen unterscheiden.');
+ const hash=await hashPassword(next);
+ const ended=db.prepare('SELECT token_hash FROM sessions WHERE user_id=? AND token_hash<>?').all(user.id,user.token_hash).map(r=>r.token_hash);
+ db.prepare('UPDATE users SET password_hash=?,must_change_password=0 WHERE id=?').run(hash,user.id);
+ db.prepare('DELETE FROM sessions WHERE user_id=? AND token_hash<>?').run(user.id,user.token_hash);
+ return ended;
+}
+// A browser tab gets 7 days. The phone app gets 90 days that move forward each day it is used, so a phone in regular use
+// never asks for the code again; each phone is listed under Einstellungen and can be signed out there.
+export const SESSION_MS={web:7*86400000,mobile:90*86400000};
+export function createSession(db,user,{kind='web',label=''}={}){if(!Object.hasOwn(SESSION_MS,kind))kind='web';const token=randomBytes(32).toString('base64url'),csrf=randomBytes(24).toString('base64url'),time=Date.now();db.prepare('INSERT INTO sessions(token_hash,user_id,csrf,expires_at,kind,label,created_at,last_used_at) VALUES(?,?,?,?,?,?,?,?)').run(hashToken(token),user.id,csrf,time+SESSION_MS[kind],kind,String(label).slice(0,60),time,time);return{token,csrf,kind,maxAge:SESSION_MS[kind]/1000,user:publicUser(user)};}
+export function getSession(db,req){const cookies=Object.fromEntries((req.headers.cookie||'').split(';').map(s=>{const p=s.trim().indexOf('=');return p<0?['','']:[s.trim().slice(0,p),s.trim().slice(p+1)];}));const token=cookies.stage_session;if(!token||token.length>128)return null;const time=Date.now(),session=db.prepare('SELECT u.id,u.email,u.name,u.must_change_password,s.csrf,s.token_hash,s.kind,s.last_used_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>? AND u.active=1 AND EXISTS(SELECT 1 FROM user_mfa m WHERE m.user_id=u.id)').get(hashToken(token),time);if(!session)return null;
+ // The phone app's session moves forward at most once an hour, so ordinary requests do not write.
+ if(session.kind==='mobile'&&time-session.last_used_at>3600000){db.prepare('UPDATE sessions SET last_used_at=?,expires_at=? WHERE token_hash=?').run(time,time+SESSION_MS.mobile,session.token_hash);session.renewed=true;}
+ session.token=token;return session;}
+// The phones signed in to the app, for the list under Einstellungen. The id is the row number, never the token.
+export function mobileSessions(db,userId){return db.prepare("SELECT rowid AS id,label,created_at,last_used_at,expires_at FROM sessions WHERE user_id=? AND kind='mobile' AND expires_at>? ORDER BY last_used_at DESC").all(userId,Date.now());}
+export function revokeMobileSession(db,userId,id){const row=db.prepare("SELECT token_hash FROM sessions WHERE rowid=? AND user_id=? AND kind='mobile'").get(Number(id),userId);if(row)db.prepare('DELETE FROM sessions WHERE token_hash=?').run(row.token_hash);return row?.token_hash||null;}
 export function limited(db,key,max=10,window=600000){const time=Date.now(),hashed=hashToken(key);db.prepare('DELETE FROM login_limits WHERE reset_at<?').run(time);let r=db.prepare('SELECT * FROM login_limits WHERE key=?').get(hashed);if(!r){db.prepare('INSERT INTO login_limits VALUES(?,1,?)').run(hashed,time+window);return false;}db.prepare('UPDATE login_limits SET count=count+1 WHERE key=?').run(hashed);return r.count>=max;}

@@ -22,7 +22,8 @@ jobs:
           docker compose --env-file .env.example config --quiet
           docker compose -f compose.local.yaml config --quiet
           docker compose --env-file .env.example config --format json > /tmp/stageforce-compose.json
-          node scripts/check-compose.mjs /tmp/stageforce-compose.json
+          docker compose -f compose.local.yaml config --format json > /tmp/stageforce-compose-local.json
+          node scripts/check-compose.mjs /tmp/stageforce-compose.json /tmp/stageforce-compose-local.json
       - run: npm ci --ignore-scripts
       - run: node scripts/check-source.mjs
       - run: npm test && npm run typecheck && npm run build
