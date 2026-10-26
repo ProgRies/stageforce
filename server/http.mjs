@@ -8,7 +8,7 @@ import {readFile} from 'node:fs/promises';
 import {resolve,extname} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {openDB} from './db.mjs';
-import {getSession,verifyPassword,createSession,limited,publicUser,mobileSessions,revokeMobileSession} from './auth.mjs';
+import {getSession,verifyPassword,createSession,limited,publicUser,mobileSessions,revokeMobileSession,changePassword} from './auth.mjs';
 import {startChallenge,challengeUser,completeChallenge,confirmCode} from './mfa.mjs';
 import {clientIP,logEvent,failuresSinceLastLogin,recentEvents,pruneEvents} from './security.mjs';
 import {Problem,listData,entity,history,search,save,createOrg,activitySave,contactSave,linkSave,reviewDone,stageImport,importPreview,confirmImport,timelinePosition} from './crm.mjs';
@@ -18,7 +18,7 @@ import {deleteOrganisation,mergeOrganisations} from './lifecycle.mjs';
 import {liveHub} from './live.mjs';
 import {locationSave,mapService} from './map.mjs';
 // Actions that only read, or only touch the caller's own settings and staging, are not announced to other tabs.
-const quiet=new Set(['appearanceSave','extensionStatus','extensionCreate','extensionRevoke','load','detail','history','search','imports','importPreview','importPosition','importDelete','message','check','messageStatus','threadStatus','meeting','lookup','callOpen','callDraft','mapSearch','securityEvents','mobileHome','mobileSearch','mobileDevices','mobileDeviceRevoke']);
+const quiet=new Set(['appearanceSave','passwordChange','extensionStatus','extensionCreate','extensionRevoke','load','detail','history','search','imports','importPreview','importPosition','importDelete','message','check','messageStatus','threadStatus','meeting','lookup','callOpen','callDraft','mapSearch','securityEvents','mobileHome','mobileSearch','mobileDevices','mobileDeviceRevoke']);
 // The phone app names the device it was signed in on, so the list under Einstellungen says which phone is which.
 const deviceLabel=req=>{const ua=String(req.headers['user-agent']||'');return /iPhone/.test(ua)?'iPhone':/iPad/.test(ua)?'iPad':/Android/.test(ua)?'Android-Handy':'Handy';};
 const touched=(b,data)=>[b.id,b.other,b.into,b.organisationId,data?.entity?.id,data?.organisation?.id,data?.deleted];
@@ -73,6 +73,8 @@ export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:300
   if(req.method==='GET'&&path==='/api/session')return success(res,{user:publicUser(session),csrf:session.csrf,appearance:appearance(db,session)});
   if(req.method!=='POST')throw new Problem('Methode nicht erlaubt.',405);
   if(req.headers['x-csrf-token']!==session.csrf)throw new Problem('Sicherheitsprüfung fehlgeschlagen. Bitte neu anmelden.',403,'forbidden');
+  // After a --temporary password from the administrator, nothing but choosing an own password (and signing out) is open.
+  if(session.must_change_password&&path!=='/api/crm'&&path!=='/api/logout')throw new Problem('Bitte lege zuerst ein eigenes Passwort fest.',403,'password_change_required');
   if(path==='/api/logout'){logEvent(db,{event:'logout',user:session,ip:clientIP(req)});db.prepare('DELETE FROM sessions WHERE token_hash=?').run(session.token_hash);live.endSession(session.token_hash);res.setHeader('Set-Cookie',cookie('',0));return success(res,{});}
   if(path==='/api/import'){if(parsing>=2||limited(db,'upload:'+session.id,20,60000))throw new Problem('Bitte kurz warten und erneut importieren.',429);parsing++;try{const raw=await body(req,10*1024*1024);let p;try{p=await parseEmail(raw,session.email);}catch(e){throw new Problem(e.message||'E-Mail konnte nicht gelesen werden.');}return success(res,stageImport(db,session,p));}finally{parsing--;}}
   if(path==='/api/fastbill'){
@@ -96,7 +98,15 @@ export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:300
   if(path!=='/api/crm')throw new Problem('Nicht gefunden.',404);
   if(!String(req.headers['content-type']).startsWith('application/json'))throw new Problem('JSON erwartet.',415);
   const b=JSON.parse((await body(req)).toString());let data;
+  if(session.must_change_password&&b.action!=='passwordChange'&&b.action!=='appearanceSave')throw new Problem('Bitte lege zuerst ein eigenes Passwort fest.',403,'password_change_required');
   switch(b.action){
+   case 'passwordChange':{
+    if(limited(db,'password-change:'+session.id,5))throw new Problem('Zu viele Versuche. Bitte in zehn Minuten erneut versuchen.',429,'rate_limited');
+    let ended;try{ended=await changePassword(db,session,b.current,b.next);}catch(e){throw new Problem(e.message);}
+    if(!ended){logEvent(db,{event:'password_change_failed',user:session,ip:clientIP(req)});throw new Problem('Das bisherige Passwort stimmt nicht.',403,'password_invalid');}
+    for(const hash of ended)live.endSession(hash);
+    logEvent(db,{event:'password_changed',user:session,ip:clientIP(req),detail:ended.length?`${ended.length} weitere Sitzung${ended.length===1?'':'en'} beendet`:''});
+    data={user:publicUser({...session,must_change_password:0}),signedOut:ended.length};break;}
    case 'appearanceSave':data=saveAppearance(db,session,b);break;
    case 'extensionStatus':data=extensionStatus(db,session);break;
    case 'extensionCreate':{

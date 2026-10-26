@@ -2,6 +2,7 @@ import {useEffect,useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {LockKeyhole} from 'lucide-react';
 import {AppearanceProvider} from '../Appearance';
+import {RequiredPasswordChange} from '../PasswordChange';
 import {MfaChallenge,RecoveryCodes,SecurityWarning,type MfaStep,type MfaResult} from '../MfaLogin';
 import {request,setCSRF} from '../api';
 import CallLogger from './CallLogger';
@@ -21,6 +22,7 @@ function App(){
  function restart(message?:string){setMfa(null);setError(message||'');setNotice('');}
  async function logout(){try{await request('/api/logout',{});}catch{}setUser(null);setNotice('Abgemeldet. Bis zum nächsten Mal.');}
  if(loading)return <main className="m-center"><div className="m-mark m-mark-loading" aria-label="Stage Force wird geladen"><i/><i/><i/></div></main>;
+ if(user?.mustChangePassword)return <main className="m-center m-auth"><RequiredPasswordChange user={user} onDone={setUser} onLogout={logout}/></main>;
  if(user)return <CallLogger user={user} onLogout={logout}/>;
  const shell=(card:React.ReactNode)=><main className="m-center m-auth">{card}</main>;
  if(warning)return shell(<SecurityWarning result={warning} onContinue={()=>{const r={...warning,security:undefined};setWarning(null);next(r);}}/>);

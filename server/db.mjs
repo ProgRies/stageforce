@@ -13,6 +13,8 @@ export function openDB(path=resolve(process.env.DATA_DIR||'data','crm.sqlite')){
   // Version 13: sessions know their kind (a browser tab or the phone app), a label and their last use; calls know their direction.
   const has=(table,column)=>db.prepare(`PRAGMA table_info(${table})`).all().some(c=>c.name===column);
   if(!has('sessions','kind'))db.exec("ALTER TABLE sessions ADD COLUMN kind TEXT NOT NULL DEFAULT 'web'; ALTER TABLE sessions ADD COLUMN label TEXT NOT NULL DEFAULT ''; ALTER TABLE sessions ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0; ALTER TABLE sessions ADD COLUMN last_used_at INTEGER NOT NULL DEFAULT 0;");
+  // A password the administrator set with --temporary is replaced by the user at the next sign-in.
+  if(!has('users','must_change_password'))db.exec('ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0 CHECK(must_change_password IN (0,1))');
   if(!has('call_attempts','direction'))db.exec("ALTER TABLE call_attempts ADD COLUMN direction TEXT NOT NULL DEFAULT 'out'");
   // Sessions and browser keys from before MFA were never confirmed with a second factor: everyone signs in again once.
   if(version>0&&version<10)db.exec('DELETE FROM sessions; DELETE FROM extension_keys;');});

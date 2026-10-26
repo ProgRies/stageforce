@@ -5,6 +5,7 @@ import {LockKeyhole} from 'lucide-react';
 import Desk from './Desk';
 import {AppearanceProvider} from './Appearance';
 import SystemSettings from './SystemSettings';
+import {RequiredPasswordChange} from './PasswordChange';
 import {MfaChallenge,RecoveryCodes,SecurityWarning,type MfaStep,type MfaResult} from './MfaLogin';
 import {request,setCSRF} from './api';
 import './style.css';
@@ -20,6 +21,7 @@ function App(){const[user,setUser]=useState<any>(null),[loading,setLoading]=useS
  function next(r:MfaResult){if(r.security){setWarning(r);return;}if(r.recoveryCodes||r.recoveryLeft!==undefined)setCodes(r);else setUser(r.user);}
  function restart(message?:string){setMfa(null);setError(message||'');setNotice('');}
  if(loading)return <main className="login-page"><p>Stage wird geladen …</p></main>;
+ if(user?.mustChangePassword)return <main className="login-page"><RequiredPasswordChange user={user} onDone={setUser} onLogout={()=>{request('/api/logout',{}).catch(()=>{}).finally(()=>{setUser(null);setNotice('Abgemeldet.');});}}/></main>;
  if(user)return <Desk user={user}/>;
  if(warning)return <main className="login-page"><SecurityWarning result={warning} onContinue={()=>{const r={...warning,security:undefined};setWarning(null);next(r);}}/></main>;
  if(codes)return <main className="login-page"><RecoveryCodes result={codes} onContinue={()=>{setUser(codes.user);setCodes(null);}}/></main>;

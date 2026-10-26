@@ -40,14 +40,16 @@ Rollback after a schema upgrade requires the matching pre-upgrade database backu
 ## Accounts
 
 ```sh
-docker compose exec crm node server/cli.mjs user:add colleague@example.com "Colleague"
-docker compose exec crm node server/cli.mjs user:password colleague@example.com
+docker compose exec crm node server/cli.mjs user:add colleague@example.com "Colleague" --temporary
+docker compose exec crm node server/cli.mjs user:password colleague@example.com --temporary
 docker compose exec crm node server/cli.mjs user:disable colleague@example.com
 docker compose exec crm node server/cli.mjs user:mfa-reset colleague@example.com
 docker compose exec crm node server/cli.mjs user:list
 ```
 
 Passwords are entered at a hidden prompt and hashed with scrypt. Password reset and account disabling revoke sessions and extension keys. Session expiry is seven days; extension key expiry is 90 days. The current design uses one active extension key per CRM user.
+
+With `--temporary`, the password you type is a starting password: after password and code, the user must choose their own before the CRM or the phone app opens (the server refuses everything else until then). Users can change their password at any time under Einstellungen → Passwort ändern with their current password; there is no e-mail confirmation. That ends their other sessions, including phones, and keeps the current one. Every password, temporary or not, needs at least 12 characters, so a starting password can be an easy-to-type phrase of that length that you share with the user directly.
 
 Every sign-in needs a TOTP code from an authenticator app (or a single-use recovery code). New users set the app up on their first sign-in; they cannot reach the CRM before that. If a phone is lost and the recovery codes are gone, `user:mfa-reset` removes the old authenticator, ends the user's sessions and revokes their extension key; the next sign-in sets up a new app. Check identity out of band before resetting, because the reset leaves the password as the only factor until the user enrols again. `user:list` shows who has set up the app and how many recovery codes are left.
 
