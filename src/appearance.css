@@ -75,7 +75,7 @@
 
 /* Small utility menu; primary organisation action stays outside it. */
 .system-settings{position:relative}
-.settings-popover{position:absolute;right:0;top:calc(100% + 10px);z-index:18;width:330px;max-width:calc(100vw - 32px);max-height:calc(100dvh - 120px);overflow:auto;padding:15px 18px;border-radius:18px;background:var(--surface-panel);box-shadow:0 16px 48px #18314e26;color:var(--ink)}
+.settings-popover{position:absolute;right:0;top:calc(100% + 10px);z-index:var(--layer-popover);width:330px;max-width:calc(100vw - 32px);max-height:calc(100dvh - 120px);overflow:auto;padding:15px 18px;border-radius:18px;background:var(--surface-panel);box-shadow:0 16px 48px #18314e26;color:var(--ink)}
 .settings-popover header,.settings-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .settings-popover header{margin-bottom:8px;font-size:14px}
 .settings-row{min-height:51px;font-size:13px;border-bottom:1px solid var(--line)}
