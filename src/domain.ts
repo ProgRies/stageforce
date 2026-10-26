@@ -1,6 +1,7 @@
 export type CellValue = string | number;
 export type UpcomingMeeting = { date: string; text: string };
-export type Entity = { id: string; row: number; values: CellValue[]; version: string; ownerId?: string; reservedBy?: string; upcoming?: UpcomingMeeting|null };
+export type MapPin = { lat: number; lng: number };
+export type Entity = { id: string; row: number; values: CellValue[]; version: string; ownerId?: string; reservedBy?: string; upcoming?: UpcomingMeeting|null; location?: MapPin|null };
 export type TeamUser = { id: string; name: string; email: string };
 export type EntityLink = { id: string; a: string; b: string; note: string };
 export const HEADERS = ["Entität-ID","Name","Entitätstyp","FastBill-Link (manuell)","Ort","Bundesland","Website","Größe","Größenmaß","Beziehungsstatus","Vertriebsphase","Zuständig intern","Hauptkontakt","E-Mail","Telefon","Letzter belegter Kontakt","Nächster Schritt","Wiedervorlage","Kurzüberblick","Prüfbedarf","Kontakte JSON","Historie JSON","Verknüpfte Entitäten JSON","Quellen JSON"];

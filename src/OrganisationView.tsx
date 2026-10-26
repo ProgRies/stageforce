@@ -3,14 +3,16 @@ import ContactSelection from './ContactSelection';
 import type {ContactSuggestion} from './contactExtraction';
 import OrganisationHeader from './OrganisationHeader';
 import PhoneCall from './PhoneCall';
-import {useEffect,useRef,useState} from 'react';
+import {lazy,Suspense,useEffect,useRef,useState} from 'react';
 import {Mail,Phone,ChevronDown,ArrowUpRight,Plus,Check,X,Pencil,MessageSquare,CalendarCheck} from 'lucide-react';
 import {api} from './api';
 import OrganisationFields from './OrganisationFields';
 import EntityTools from './EntityTools';
 import OrganisationManage from './OrganisationManage';
 import {meetingWhen,latestMeetingDate,text,jsonList,formatDate,todayBerlin,gmailSearch,websiteURL,activityLabel,type Entity,type EntityLink,type TeamUser} from './domain';
-type Props={users:TeamUser[];entity:Entity;entities:Entity[];links:EntityLink[];history:any[];historyTotal:number;loading:boolean;onMore:()=>void;onPick:(id:string)=>void;onSaved:(entity?:Entity)=>void;onActivitySaved:(result:{entity:Entity;activityId:string;text:string;date?:string;cancelled?:boolean})=>void;onCallSaved:()=>void;onRemoved:(removedId:string,nextId:string|null,message:string)=>void;callReason?:string;onSkip:()=>void;accountEmail:string;onPendingChange:(pending:boolean)=>void;onBusyChange:(busy:boolean)=>void};
+// Leaflet is only loaded when an organisation is opened.
+const OrganisationMap=lazy(()=>import('./OrganisationMap'));
+type Props={users:TeamUser[];entity:Entity;entities:Entity[];links:EntityLink[];history:any[];historyTotal:number;loading:boolean;onMore:()=>void;onPick:(id:string)=>Promise<boolean>|void;onSaved:(entity?:Entity)=>void;onActivitySaved:(result:{entity:Entity;activityId:string;text:string;date?:string;cancelled?:boolean})=>void;onCallSaved:()=>void;onRemoved:(removedId:string,nextId:string|null,message:string)=>void;callReason?:string;onSkip:()=>void;accountEmail:string;onPendingChange:(pending:boolean)=>void;onBusyChange:(busy:boolean)=>void};
 export default function OrganisationView({users,entity,entities,links,history,historyTotal,loading,onMore,onPick,onSaved,onActivitySaved,onCallSaved,onRemoved,callReason,onSkip,accountEmail,onPendingChange,onBusyChange}:Props){
  const ask=useConfirm();
  const [messages,setMessages]=useState<Record<string,any>>({}),[messageErrors,setMessageErrors]=useState<Record<string,string>>({}),[moreOpen,setMoreOpen]=useState(false),[internal,setInternal]=useState<any[]>([]),[internalTotal,setInternalTotal]=useState(0),[internalOpen,setInternalOpen]=useState(false),[error,setError]=useState('');
@@ -21,14 +23,14 @@ export default function OrganisationView({users,entity,entities,links,history,hi
  const [fieldsDirty,setFieldsDirty]=useState(false),[toolsDirty,setToolsDirty]=useState(false);
  const [openEvents,setOpenEvents]=useState<Record<string,boolean>>({});
  const [extracted,setExtracted]=useState<ContactSuggestion>();
- const [headerBusy,setHeaderBusy]=useState(false);
+ const [headerBusy,setHeaderBusy]=useState(false),[mapDirty,setMapDirty]=useState(false),[mapBusy,setMapBusy]=useState(false);
  const [activityEdit,setActivityEdit]=useState<{id:string;text:string;originalText:string;isNote:boolean;date?:string;cancelled?:boolean}|null>(null),[activityError,setActivityError]=useState(''),[activityBusy,setActivityBusy]=useState(false);
  const activityLock=useRef(false);
  async function saveActivity(){if(!activityEdit||activityLock.current)return;activityLock.current=true;setActivityBusy(true);setActivityError('');try{const result=await api({action:'activitySave',id:entity.id,activityId:activityEdit.id,text:activityEdit.text,originalText:activityEdit.originalText,...(activityEdit.date?{date:activityEdit.date,cancelled:!!activityEdit.cancelled}:{})});setActivityEdit(null);onActivitySaved(result);}catch(e:any){setActivityError(e.message);}finally{activityLock.current=false;setActivityBusy(false);}}
  const [fieldsBusy,setFieldsBusy]=useState(false),[toolsBusy,setToolsBusy]=useState(false);
- useEffect(()=>{onBusyChange(activityBusy||busy||headerBusy||fieldsBusy||toolsBusy||queueBusy||historySaving);},[activityBusy,busy,headerBusy,fieldsBusy,toolsBusy,queueBusy,historySaving,onBusyChange]);
+ useEffect(()=>{onBusyChange(activityBusy||busy||headerBusy||fieldsBusy||toolsBusy||queueBusy||historySaving||mapBusy);},[activityBusy,busy,headerBusy,fieldsBusy,toolsBusy,queueBusy,historySaving,mapBusy,onBusyChange]);
  useEffect(()=>()=>onBusyChange(false),[onBusyChange]);
- const pending=!!activityEdit||fieldsDirty||toolsDirty||noteOpen||queueCalling||historyCalling;
+ const pending=!!activityEdit||fieldsDirty||toolsDirty||noteOpen||queueCalling||historyCalling||mapDirty;
  useEffect(()=>{onPendingChange(pending);},[pending,onPendingChange]);
  useEffect(()=>()=>onPendingChange(false),[onPendingChange]);
  const pendingMessages=useRef(new Set<string>()),requestId=useRef<string|null>(null),mounted=useRef(true);
@@ -67,6 +69,8 @@ export default function OrganisationView({users,entity,entities,links,history,hi
  <EntityTools liveCall={queueCalling||historyCalling} extracted={extracted} entity={entity} entities={entities} links={links} disabled={!!activityEdit||headerBusy||fieldsBusy||fieldsDirty||noteOpen||loading} onSaved={updated=>{onSaved(updated);for(const id of Object.keys(messages))message(id,true);}} onPick={onPick} onDirtyChange={setToolsDirty} onBusyChange={setToolsBusy}/>
 
  <OrganisationFields entity={entity} accountEmail={accountEmail} disabled={!!activityEdit||headerBusy||toolsDirty||noteOpen||loading} onSaved={onSaved} onDirtyChange={setFieldsDirty} onBusyChange={setFieldsBusy}/>
+
+ <Suspense fallback={null}><OrganisationMap entity={entity} entities={entities} disabled={!!activityEdit||headerBusy||fieldsBusy||toolsBusy||loading} onSaved={onSaved} onPick={onPick} onDirtyChange={setMapDirty} onBusyChange={setMapBusy}/></Suspense>
 
  </aside>
 
