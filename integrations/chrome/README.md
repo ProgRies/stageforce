@@ -1,4 +1,4 @@
-# StageForce Chrome extension · 0.4.18
+# StageForce Chrome extension · 0.4.19
 
 Load this folder using Chrome → Extensions → Developer mode → Load unpacked.
 

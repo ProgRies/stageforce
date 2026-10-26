@@ -15,8 +15,9 @@ export function prepareCall(db,user,b,{participant=null}={}){
  const requestId=field(b.requestId,36);if(!/^[a-f0-9-]{36}$/.test(requestId))throw new Problem('Invalid request ID.');
  return transaction(db,()=>{
  const prior=db.prepare('SELECT * FROM call_attempts WHERE id=?').get(requestId);if(prior){if(prior.user_id!==user.id)throw new Problem('Call not found.',404);return callView(db,prior);}
- // One call at a time: the floating call card belongs to the user, not to the page that started it.
- if(openAttempt(db,user))throw new Problem('Another call is still open. Save or discard it first.',409);
+ // One call at a time. An older open call without a note was left behind (a closed tab, an unanswered dial) and gives way;
+ // one with a note is kept, and its card is shown instead.
+ const open=openAttempt(db,user);if(open){if((db.prepare('SELECT notes FROM call_drafts WHERE call_id=?').get(open.id)?.notes||'').trim())throw new Problem('Another call with a note is still open. Save or discard it first.',409);db.prepare('DELETE FROM call_attempts WHERE id=?').run(open.id);}
  const phone=field(b.phone,100),dial=dialNumber(phone),startedAt=field(b.startedAt,50);
  if(!/^\d{4}-\d{2}-\d{2}T.*Z$/.test(startedAt)||!Number.isFinite(Date.parse(startedAt))||Date.parse(startedAt)>Date.now()+300000)throw new Problem('Check call time.');
  let id=b.organisationId;
