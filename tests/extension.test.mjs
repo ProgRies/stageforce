@@ -72,3 +72,11 @@ test('schema 5 upgrade preserves CRM records',async()=>{
  assert.equal(getOrg(db,org.id).name,'Preserved');assert.equal(db.prepare('SELECT count(*) n FROM users').get().n,1);assert.equal(db.prepare('PRAGMA user_version').get().user_version,13);assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(),[]);
  }finally{db.close();rmSync(dir,{recursive:true,force:true});}
 });
+test('inbox and English Gmail dates with spelled-out months are read as local time',()=>{
+ const f=globalThis.stageForceDate,local=(...a)=>new Date(...a).toISOString();
+ assert.equal(f('Mo., 20. Okt. 2026, 10:00').toISOString(),local(2026,9,20,10,0));
+ assert.equal(f('Do., 5. März 2026, 07:30').toISOString(),local(2026,2,5,7,30));
+ assert.equal(f('Mon, Oct 20, 2026, 12:05 PM').toISOString(),local(2026,9,20,12,5));
+ assert.equal(f('Tue, 3 Mar 2026, 23:59').toISOString(),local(2026,2,3,23,59));
+ assert.equal(f('Oct 20, 2026, 13:00 PM'),null);assert.equal(f('Mon, Foo 20, 2026, 10:00'),null);assert.equal(f('20. Okt.'),null);
+});

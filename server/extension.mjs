@@ -27,8 +27,17 @@ function envelope(b,user,db){
 }
 function identity(b,user){const mailbox=field(b.mailbox,254).toLowerCase();if(mailbox!==user.email.toLowerCase())throw new Problem('The Gmail mailbox must match your CRM account.',403);return{mailbox,gmailId:field(b.gmailMessageId||'',200)};}
 function fingerprint(b){return createHash('sha256').update('extension-v1:'+JSON.stringify([field(b.from?.email,254).toLowerCase(),field(b.timestampRaw||b.timestamp,150),field(b.originalSubject,1000),field(b.originalBody,500000)])).digest('hex');}
+// A colleague's copy of an email has other Gmail ids, so it is recognised by sender, the minute it was sent and the subject (without Re:/AW: prefixes).
+// Before an email is linked or deduplicated, a shared recipient is required too, so one offer sent separately to two clients stays two emails.
+const subjectKey=v=>String(v||'').toLowerCase().replace(/^(?:\s*(?:re|aw|antw|wg|fw|fwd)\s*(?:\[\d+\])?\s*:)+/,'').replace(/\s+/g,' ').trim();
+function sameEmail(db,senders,stamp,subject,recipients=null){
+ const t=Date.parse(stamp||''),key=subjectKey(subject);if(!senders.length||!Number.isFinite(t)||!key)return null;const start=Math.floor(t/60000)*60000;
+ const rows=db.prepare('SELECT m.*,a.organisation_id FROM messages m JOIN activities a ON a.message_id=m.id WHERE m.sent_at>=? AND m.sent_at<?').all(new Date(start).toISOString(),new Date(start+60000).toISOString()).filter(m=>{let from='';try{from=String(JSON.parse(m.sender_json)[0]?.email||'').toLowerCase();}catch{}if(!senders.includes(from)||subjectKey(m.subject)!==key)return false;if(!recipients)return true;let to=[];try{to=JSON.parse(m.recipients_json).map(a=>String(a?.email||'').toLowerCase());}catch{}return to.some(e=>recipients.includes(e));});
+ return rows.length===1?rows[0]:null;
+}
 function existingMessage(db,user,b){const {mailbox,gmailId}=identity(b,user);let m=gmailId?db.prepare('SELECT m.*,a.organisation_id FROM extension_message_refs r JOIN messages m ON m.id=r.message_id JOIN activities a ON a.message_id=m.id WHERE r.mailbox=? AND r.gmail_id=?').get(mailbox,gmailId):null;
- if(!m&&(typeof b.originalBody==='string'||/^[a-f0-9]{64}$/.test(b.legacyFingerprint||''))){m=db.prepare('SELECT m.*,a.organisation_id FROM messages m JOIN activities a ON a.message_id=m.id WHERE m.dedupe_key=?').get(b.legacyFingerprint||fingerprint(b));if(m&&gmailId)db.prepare('INSERT OR IGNORE INTO extension_message_refs VALUES(?,?,?)').run(mailbox,gmailId,m.id);}return m;}
+ if(!m&&(typeof b.originalBody==='string'||/^[a-f0-9]{64}$/.test(b.legacyFingerprint||''))){m=db.prepare('SELECT m.*,a.organisation_id FROM messages m JOIN activities a ON a.message_id=m.id WHERE m.dedupe_key=?').get(b.legacyFingerprint||fingerprint(b));if(m&&gmailId)db.prepare('INSERT OR IGNORE INTO extension_message_refs VALUES(?,?,?)').run(mailbox,gmailId,m.id);}
+ if(!m&&b.from?.email){m=sameEmail(db,[field(b.from.email,254).toLowerCase()],field(b.sentAt||b.timestamp||'',50),field(b.originalSubject||b.subject||'',1000),(Array.isArray(b.recipients)?b.recipients.slice(0,200):[]).map(a=>field(a?.email,254).toLowerCase()));if(m&&gmailId)db.prepare('INSERT OR IGNORE INTO extension_message_refs VALUES(?,?,?)').run(mailbox,gmailId,m.id);}return m;}
 // Where an address is already stored in the CRM, across all organisations, so the popup can say so before saving.
 function crmContact(db,address){const rows=db.prepare("SELECT c.name,o.id,o.name AS organisation FROM contact_addresses ca JOIN contacts c ON c.id=ca.contact_id JOIN organisation_contacts oc ON oc.contact_id=c.id JOIN organisations o ON o.id=oc.organisation_id WHERE ca.kind='email' AND ca.value=? COLLATE NOCASE ORDER BY o.name COLLATE NOCASE").all(address);if(!rows.length)return null;const organisations=[...new Map(rows.map(r=>[r.id,{id:r.id,name:r.organisation}])).values()];return{name:contactName(rows.find(r=>r.name)?.name,address),organisations:organisations.slice(0,5),more:Math.max(0,organisations.length-5)};}
 function attachReference(db,user,b,mid){const {mailbox,gmailId}=identity(b,user),thread=threadId(b);if(gmailId)db.prepare('INSERT OR IGNORE INTO extension_message_refs VALUES(?,?,?)').run(mailbox,gmailId,mid);if(thread)db.prepare('INSERT OR IGNORE INTO extension_thread_refs VALUES(?,?,?)').run(mailbox,thread,mid);}
@@ -48,12 +57,15 @@ export function extensionAction(db,user,b,origin){
   const {mailbox}=identity(b,user);if(!Array.isArray(b.ids)||b.ids.length>150)throw new Problem('Invalid conversations.');
   const ids=[...new Set(b.ids.map(v=>field(v,200).replace(/^#/,'')))];if(ids.some(v=>!/^[\w:.-]+$/.test(v)))throw new Problem('Invalid conversations.');
   const thread=db.prepare('SELECT 1 FROM extension_thread_refs WHERE mailbox=? AND thread_id=? LIMIT 1'),message=db.prepare('SELECT 1 FROM extension_message_refs WHERE mailbox=? AND gmail_id=?');
-  return{saved:ids.filter(v=>thread.get(mailbox,v)||message.get(mailbox,v))};
+  const saved=ids.filter(v=>thread.get(mailbox,v)||message.get(mailbox,v));
+  // Rows not saved from this mailbox may still hold an email a colleague saved: their latest message is matched by sender, minute and subject.
+  if(b.rows!==undefined){if(!Array.isArray(b.rows)||b.rows.length>150)throw new Problem('Invalid conversations.');for(const r of b.rows){const id=field(r?.id,200).replace(/^#/,'');if(!/^[\w:.-]+$/.test(id)||!Array.isArray(r.from)||r.from.length>10)throw new Problem('Invalid conversations.');if(saved.includes(id))continue;const senders=r.from.map(e=>field(e,254).toLowerCase()).filter(e=>email(e));if(sameEmail(db,senders,field(r.sentAt,50),field(r.subject,1000)))saved.push(id);}}
+  return{saved};
  }
  if(b.action==='messageStatus'){
   const m=existingMessage(db,user,b);if(!m)return{saved:false};
   const organisation=brief(getOrg(db,m.organisation_id));if(!b.detail)return{saved:true,organisation};
-  return{saved:true,organisation,message:{id:m.id,subject:m.subject,body:m.body,timestamp:m.sent_at,direction:m.direction,attachments:JSON.parse(m.attachments_json)},participants:db.prepare('SELECT c.id FROM activity_contacts ac JOIN contacts c ON c.id=ac.contact_id JOIN activities a ON a.id=ac.activity_id WHERE a.message_id=?').all(m.id).map(r=>contacts(db,m.organisation_id).find(c=>c.id===r.id)).filter(Boolean).map(c=>({contactId:c.id,email:c.e_mails[0]||'',name:contactName(c.name,c.e_mails[0]),phones:c.telefone,known:true}))};
+  return{saved:true,organisation,savedBy:db.prepare('SELECT DISTINCT u.name FROM message_sources s JOIN users u ON u.id=s.user_id WHERE s.message_id=? AND s.user_id<>? ORDER BY u.name').all(m.id,user.id).map(r=>r.name).filter(Boolean).slice(0,3),message:{id:m.id,subject:m.subject,body:m.body,timestamp:m.sent_at,direction:m.direction,attachments:JSON.parse(m.attachments_json)},participants:db.prepare('SELECT c.id FROM activity_contacts ac JOIN contacts c ON c.id=ac.contact_id JOIN activities a ON a.id=ac.activity_id WHERE a.message_id=?').all(m.id).map(r=>contacts(db,m.organisation_id).find(c=>c.id===r.id)).filter(Boolean).map(c=>({contactId:c.id,email:c.e_mails[0]||'',name:contactName(c.name,c.e_mails[0]),phones:c.telefone,known:true}))};
  }
  if(b.action==='contactSave'){
   identity(b,user);if(b.confirmed!==true)throw new Problem('Explicit contact confirmation required.');
