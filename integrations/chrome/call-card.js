@@ -1,7 +1,8 @@
 // The live call card, shared by the CRM and the Gmail extension. A started call belongs to the user, not to the page:
 // the card floats in an always-on-top Picture-in-Picture window, so other tabs, sites and apps stay usable while it runs.
 // Where that window is unavailable or closed, the card stays fixed in the top-right corner of the page that started it.
-// The server keeps the open call and its draft note, so another tab, the CRM or Gmail can pick the call up again.
+// The server keeps the open call and its draft note. A card only appears where the call was started (and again after reloading
+// that tab); other tabs never open one on their own, they only drop a card whose call was saved or discarded elsewhere.
 (() => {
  const CSS=`
 .sf-call{--bg:#fff;--panel:#f6f5fc;--ink:#252b44;--muted:#646b86;--line:#d8d4ea;--accent:#6b55b8;--accent-ink:#fff;--input:#fff;--danger:#b4234a;--live:#1f9d63;
@@ -43,7 +44,7 @@ body.sf-pip{margin:0;background:#fff}body.sf-pip.dark{background:#1e2140}`;
  const plusDays=(day,n)=>new Date(Date.parse(day+'T12:00:00Z')+n*86400000).toISOString().slice(0,10);
  const clock=ms=>{const s=Math.max(0,Math.floor(ms/1000)),h=Math.floor(s/3600),m=Math.floor(s/60)%60,p=v=>String(v).padStart(2,'0');return(h?h+':'+p(m):p(m))+':'+p(s%60);};
  const supported=()=>typeof window.documentPictureInPicture?.requestWindow==='function';
- function create({api,theme=()=>'light',onChange=()=>{},onSaved=()=>{},onOpen=null}){
+ function create({api,theme=()=>'light',onChange=()=>{},onSaved=()=>{},onOpen=null,rememberKey=''}){
   let call=null,notes='',later='',busy=false,confirming=false,minimized=false,error='',pip=null,host=null,tick=null,draftTimer=null,drafted='';
   const doc=document,el=(tag,props={},...children)=>{const e=Object.assign(doc.createElement(tag),props);e.append(...children);return e;};
   const icon=name=>{const s=doc.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('viewBox','0 0 24 24');s.setAttribute('aria-hidden','true');const p=doc.createElementNS('http://www.w3.org/2000/svg','path');p.setAttribute('d',ICONS[name]);for(const[k,v]of Object.entries({fill:'none',stroke:'currentColor','stroke-width':'2','stroke-linecap':'round','stroke-linejoin':'round'}))p.setAttribute(k,v);s.append(p);return s;};
@@ -83,7 +84,7 @@ body.sf-pip{margin:0;background:#fff}body.sf-pip.dark{background:#1e2140}`;
    outcomes.replaceChildren(...call.outcomes.map((o,i,all)=>el('button',{type:'button',className:'button'+(o.key==='meeting'?' primary':'')+(i===all.length-1&&all.length%2?' wide':''),textContent:o.label,title:o.key==='meeting'?'Öffnet den Terminkalender':o.next,onclick:e=>o.key==='callback'?(later=plusDays(berlin(),1),update()):save(o.key,e)})));
    if(!pip&&!host){host=doc.createElement('div');host.style.cssText='position:fixed;top:16px;right:16px;z-index:2147483647';const root=host.attachShadow({mode:'closed'});root.append(el('style',{textContent:CSS}),card);doc.documentElement.append(host);}
    if(!keysIsolated){keysIsolated=true;for(const type of ['keydown','keyup','keypress'])window.addEventListener(type,isolate,true);}
-   clearInterval(tick);tick=setInterval(update,1000);update();onChange(call);
+   clearInterval(tick);tick=setInterval(update,1000);update();remember(call.callId);onChange(call);
   }
   // Opening the dialler is a tel: navigation, so the page would ask "Leave site?" for unsaved input. Nothing is left: skip that one prompt.
   // Registered when the card is created, so it runs before the page's own beforeunload handlers.
@@ -93,7 +94,7 @@ body.sf-pip{margin:0;background:#fff}body.sf-pip.dark{background:#1e2140}`;
   let keysIsolated=false;const isolate=e=>{if(host&&e.composedPath().includes(host))e.stopImmediatePropagation();};
   function finish(){
    clearInterval(tick);clearTimeout(draftTimer);call=null;notes=drafted=later=error='';busy=confirming=minimized=false;
-   const w=pip;pip=null;w?.close();host?.remove();host=null;card.remove();card.classList.remove('in-pip');onChange(null);
+   const w=pip;pip=null;w?.close();host?.remove();host=null;card.remove();card.classList.remove('in-pip');remember('');onChange(null);
   }
   // Picture-in-Picture needs the click that started it, and opening the dialler uses that click up: the window is requested first,
   // before anything is awaited. A later attempt comes from the arrow in the card.
@@ -103,8 +104,8 @@ body.sf-pip{margin:0;background:#fff}body.sf-pip.dark{background:#1e2140}`;
    if(!w)return false;if(!call||pip){w.close();return false;}
    pip=w;const d=w.document;d.title='Anruf · '+call.organisation.name;d.head.replaceChildren(Object.assign(d.createElement('style'),{textContent:CSS}));d.body.className='sf-pip';
    card.classList.add('in-pip');d.body.replaceChildren(card);host?.remove();host=null;update();
-   // Closing the floating window brings the card back into the page; the call itself stays open.
-   w.addEventListener('pagehide',()=>{if(pip!==w)return;pip=null;card.classList.remove('in-pip');if(call)show();},{once:true});
+   // Closing the floating window puts the card back into the page, collapsed; the call itself stays open.
+   w.addEventListener('pagehide',()=>{if(pip!==w)return;pip=null;card.classList.remove('in-pip');if(call){minimized=true;show();}},{once:true});
    return true;
   }
   async function save(outcome,event){
@@ -118,6 +119,12 @@ body.sf-pip{margin:0;background:#fff}body.sf-pip.dark{background:#1e2140}`;
    if(busy||!call)return;busy=true;error='';update();
    try{await api({action:'callCancel',callId:call.callId});finish();}catch(e){busy=false;error=e.message||'Verwerfen fehlgeschlagen.';update();}
   }
+  // Per browser tab, so a reload brings back this tab's call and no other tab's.
+  function remember(id){if(!rememberKey)return;try{if(id)sessionStorage.setItem(rememberKey,id);else sessionStorage.removeItem(rememberKey);}catch{}}
+  const remembered=()=>{try{return rememberKey?sessionStorage.getItem(rememberKey)||'':'';}catch{return'';}};
+  // Coming back to a tab re-checks a shown call, so one saved in another tab or in Gmail disappears here too.
+  let checked=0;const recheck=()=>{if(call&&!busy&&document.visibilityState==='visible'&&Date.now()-checked>3000){checked=Date.now();sync();}};
+  document.addEventListener('visibilitychange',recheck);window.addEventListener('focus',recheck);
   function resume(open,{collapsed=false}={}){if(!open||(call&&call.callId===open.callId))return;if(call)return;call=open;notes=drafted=open.notes||'';minimized=collapsed;show();}
   return{
    get call(){return call;},
@@ -129,15 +136,20 @@ body.sf-pip{margin:0;background:#fff}body.sf-pip.dark{background:#1e2140}`;
     floating?.then(w=>{if(w&&busy){const d=w.document;d.head.replaceChildren(Object.assign(d.createElement('style'),{textContent:CSS}));d.body.className='sf-pip'+(theme()==='dark'?' dark':'');d.body.replaceChildren(Object.assign(d.createElement('p'),{className:'sf-call',textContent:'Anruf wird vorbereitet …',style:'margin:0;padding:16px;border:0;box-shadow:none'}));}});
     try{const r=await prepare();busy=false;resume(r);dial.click();adopt(await floating);area.focus();return r;}
     // Usually another call is still open: show it next to the error.
-    catch(e){busy=false;(await floating)?.close();await sync(false);throw e;}
+    catch(e){busy=false;(await floating)?.close();await sync({show:true});throw e;}
    },
    resume,
    sync,
    popOut,
    refresh:update,
   };
-  // Shows a call that is open on the server (started in another tab or in Gmail) and drops one saved or discarded elsewhere.
-  async function sync(collapsed=true){if(busy)return;let open=null;try{open=(await api({action:'callOpen'})).call;}catch{return;}if(busy)return;if(!open){if(call)finish();return;}if(call&&call.callId!==open.callId)finish();resume(open,{collapsed});}
+  // Drops a shown call that was saved or discarded elsewhere. It only shows an open call when asked: right after a refused start
+  // (usually because that call is still open), or after a reload of the tab that started it.
+  async function sync({show=false,restore=false}={}){
+   if(busy)return;let open=null;try{open=(await api({action:'callOpen'})).call;}catch{return;}if(busy)return;
+   if(call&&call.callId!==open?.callId)finish();
+   if(open&&!call&&(show||(restore&&open.callId===remembered())))resume(open,{collapsed:!show});
+  }
  }
  globalThis.stageForceCallCard={create,supported};
 })();

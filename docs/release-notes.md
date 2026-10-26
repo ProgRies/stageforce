@@ -1,3 +1,12 @@
+## Unreleased · Call card only where you called · extension 0.4.19
+
+Rebuild the CRM and reload the extension. No database change.
+
+- The call card now only appears in the tab where the call was started, and again after reloading that same tab. Other CRM tabs, Gmail and page loads no longer open it on their own.
+- A card whose call was saved or discarded elsewhere disappears when its tab gets a live update or is brought to the front again.
+- Starting a call quietly drops an older open call that has no note (a closed tab, a test call). An older call with a note is still shown so it can be saved or discarded first.
+- Closing the floating window puts the card back into the page collapsed.
+
 ## Unreleased · Floating call card · extension 0.4.18
 
 Rebuild the CRM and reload the extension in `chrome://extensions`, then refresh Gmail. The CRM adds one table on start (draft notes of running calls); no data is changed.

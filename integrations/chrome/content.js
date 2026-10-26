@@ -383,7 +383,7 @@ async function open(n){
  const meetingChoice=()=>$('#meeting').classList.contains('hidden')||!$('#meeting-log').checked?undefined:{log:true,date:$('#meeting-date').value,time:$('#meeting-time').value};
  async function reconnect(){
   if(busy||checking)return;checking++;connected=false;$('#retry').disabled=true;controls();
-  try{const c=await send({type:'status'});if(!active)return;connected=true;if(messageButton(n)?.dataset.state!=='saved')setMessageButton(n,'ready');themeMode=['light','dark'].includes(c.appearance)?c.appearance:'system';applyTheme();callDock.sync();$('#connection').textContent=new URL(c.origin).host+' · '+c.email;$('#error').textContent='';$('#retry').hidden=true;await loadSaved();if(!savedMessage){await lookup(!selected);await loadConversation();await detectMeeting();}}
+  try{const c=await send({type:'status'});if(!active)return;connected=true;if(messageButton(n)?.dataset.state!=='saved')setMessageButton(n,'ready');themeMode=['light','dark'].includes(c.appearance)?c.appearance:'system';applyTheme();$('#connection').textContent=new URL(c.origin).host+' · '+c.email;$('#error').textContent='';$('#retry').hidden=true;await loadSaved();if(!savedMessage){await lookup(!selected);await loadConversation();await detectMeeting();}}
   catch(e){if(active){connectionError(e);buttonIssue(messageButton(n),e);$('#connection').textContent='Check connection';$('#error').textContent=e.message;}}
   finally{checking--;if(active){$('#retry').disabled=false;controls();}}
  }

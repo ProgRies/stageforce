@@ -50,7 +50,7 @@ test('an open call can be resumed with its draft note, blocks a second call and 
  const{org,start}=dial(db,user);const id=start();
  assert.deepEqual(draftCall(db,user,{callId:id,notes:'Ruft nach 15 Uhr zurück'}),{saved:true});
  const open=openCall(db,user).call;assert.equal(open.callId,id);assert.equal(open.organisation.name,'Lead');assert.equal(open.notes,'Ruft nach 15 Uhr zurück');assert.equal(open.dial,'+49301234567');assert.deepEqual(open.outcomes.map(o=>o.key),['not_reached','callback','meeting','email','no_interest']);
- assert.throws(()=>dial(db,user,'Other').start(),/Another call is still open/);
+ assert.throws(()=>dial(db,user,'Other').start(),/Another call with a note is still open/);
  // Repeating the same request returns the open call instead of refusing it.
  assert.equal(prepareCall(db,user,{organisationId:org.id,contactId:open.contact.id,phone:'030 1234567',startedAt:open.startedAt,requestId:id}).callId,id);
  const colleague=db.prepare('SELECT * FROM users WHERE id=?').get(await addUser(db,'sam@team.test','Sam','long-password-1234'));
@@ -63,4 +63,9 @@ test('abandoned calls older than twelve hours neither resume nor block, and disc
  assert.equal(openCall(db,user).call,null);const id=start();draftCall(db,user,{callId:id,notes:'Notiz'});
  cancelCall(db,user,{callId:id});assert.equal(openCall(db,user).call,null);assert.equal(db.prepare('SELECT count(*) n FROM call_drafts').get().n,0);
  draftCall(db,user,{callId:start(),notes:'Notiz'});deleteOrganisation(db,user,{id:org.id,version:getOrg(db,org.id).version,confirmName:'Lead'});assert.equal(db.prepare('SELECT count(*) n FROM call_drafts').get().n,0);
+}finally{db.close();}});
+test('starting a call drops an older open call without a note, so nothing lingers',async()=>{const{db,user}=await setup();try{
+ const first=dial(db,user,'First').start(),second=dial(db,user,'Second').start();
+ assert.equal(db.prepare('SELECT count(*) n FROM call_attempts WHERE id=?').get(first).n,0);assert.equal(openCall(db,user).call.callId,second);
+ draftCall(db,user,{callId:second,notes:'   '});assert.equal(dial(db,user,'Third').start().length,36);
 }finally{db.close();}});
