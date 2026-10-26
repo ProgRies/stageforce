@@ -1,4 +1,4 @@
-# StageForce · 0.3.12
+# StageForce · 0.3.13
 
 StageForce is our internal CRM for Stage clients. It has three parts that share one SQLite database:
 
@@ -80,6 +80,6 @@ After changing the extension, click its reload button in `chrome://extensions` a
 
 Work happens on the `local-development` branch. `main` is what gets published: a version change merged into `main` builds and publishes `ghcr.io/progries/stageforce:<version>` (see [Releases](docs/release.md)).
 
-Current versions: CRM 0.3.12, extension 0.4.20, database schema 13. Startup migrates older databases automatically; back up first, because older versions cannot open a newer schema.
+Current versions: CRM 0.3.13, extension 0.4.20, database schema 13. Startup migrates older databases automatically; back up first, because older versions cannot open a newer schema.
 
 No real customer data, mailbox contents, passwords or keys belong in this repository.
