@@ -196,3 +196,4 @@ svg{flex-shrink:0}
 .security-events{padding-left:18px}
 
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+.password-form{display:grid;gap:12px}

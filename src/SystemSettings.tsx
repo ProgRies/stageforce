@@ -1,16 +1,18 @@
 import {useConfirm} from './ConfirmDialog';
 import {useEffect,useRef,useState} from 'react';
-import {Settings,RefreshCw,Copy,Check,X,ShieldCheck,Smartphone} from 'lucide-react';
+import {Settings,RefreshCw,Copy,Check,X,ShieldCheck,Smartphone,KeyRound} from 'lucide-react';
+import {PasswordForm} from './PasswordChange';
 import {AppearanceControls} from './Appearance';
 import {api} from './api';
 
-export const EVENT_LABELS:Record<string,string>={login:'Angemeldet',logout:'Abgemeldet',password_failed:'Falsches Passwort',code_failed:'Falscher Code bei der Anmeldung',key_code_failed:'Falscher Code beim Schlüssel',recovery_code_used:'Wiederherstellungscode benutzt',mfa_enrolled:'Authenticator eingerichtet',mfa_reset:'Zwei-Faktor zurückgesetzt',password_reset:'Passwort zurückgesetzt',key_created:'Erweiterungs-Schlüssel erstellt',device_revoked:'Handy-App abgemeldet',key_revoked:'Erweiterungs-Schlüssel widerrufen',user_added:'Konto angelegt',user_disabled:'Konto deaktiviert'};
+export const EVENT_LABELS:Record<string,string>={login:'Angemeldet',logout:'Abgemeldet',password_failed:'Falsches Passwort',code_failed:'Falscher Code bei der Anmeldung',key_code_failed:'Falscher Code beim Schlüssel',recovery_code_used:'Wiederherstellungscode benutzt',mfa_enrolled:'Authenticator eingerichtet',mfa_reset:'Zwei-Faktor zurückgesetzt',password_reset:'Passwort zurückgesetzt',password_changed:'Passwort geändert',password_change_failed:'Falsches Passwort beim Ändern',key_created:'Erweiterungs-Schlüssel erstellt',device_revoked:'Handy-App abgemeldet',key_revoked:'Erweiterungs-Schlüssel widerrufen',user_added:'Konto angelegt',user_disabled:'Konto deaktiviert'};
 type Props={signedIn?:boolean;loadedAt?:string;stale?:boolean;loading?:boolean;disabled?:boolean;onRefresh?:()=>void};
 export default function SystemSettings(props:Props){
  const ask=useConfirm();
  const[open,setOpen]=useState(false),[extension,setExtension]=useState<any>(null),[key,setKey]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[copied,setCopied]=useState(false),[code,setCode]=useState<string|null>(null),[events,setEvents]=useState<any[]|null>(null),[phones,setPhones]=useState<any[]|null>(null);
+ const[pwDone,setPwDone]=useState('');
  const ref=useRef<HTMLDivElement>(null),trigger=useRef<HTMLButtonElement>(null),visibility=useRef(0);
- const close=()=>{visibility.current++;setOpen(false);setKey('');setCopied(false);setCode(null);setEvents(null);setPhones(null);};
+ const close=()=>{visibility.current++;setOpen(false);setPwDone('');setKey('');setCopied(false);setCode(null);setEvents(null);setPhones(null);};
  useEffect(()=>{
   if(!open)return;
   const outside=(e:PointerEvent)=>{if((e.target as Element)?.closest?.('.confirm-dialog'))return;if(!ref.current?.contains(e.target as Node))close();};
@@ -38,6 +40,9 @@ export default function SystemSettings(props:Props){
     {code!==null&&<form className="settings-code" onSubmit={e=>{e.preventDefault();connection('extensionCreate');}}><label className="field"><span>Code aus deiner Authenticator-App</span><input autoFocus inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required placeholder="123456" value={code} disabled={busy} onChange={e=>setCode(e.target.value.replace(/\D/g,''))}/></label>{error&&<p role="alert" className="save-error">{error}</p>}<div className="settings-key-actions"><button className="button primary small" disabled={busy||code.length!==6}>{busy?'Prüfen …':'Schlüssel erstellen'}</button><button type="button" className="text-button" disabled={busy} onClick={()=>{setCode(null);setError('');}}>Abbrechen</button></div><small>Ein Schlüssel meldet die Erweiterung 90 Tage ohne Code an. Deshalb wird hier ein frischer Code verlangt.</small></form>}
     {code===null&&<div className="settings-key-actions"><button type="button" className="button secondary small" disabled={busy||!extension} onClick={()=>connection('extensionCreate')}>{extension?.connected?'Schlüssel erneuern':'Schlüssel erstellen'}</button>{extension?.connected&&<button type="button" className="text-button" disabled={busy} onClick={()=>connection('extensionRevoke')}>Widerrufen</button>}</div>}
     {key&&<div className="settings-key"><label className="field"><span>Einmalig in der Browser-Erweiterung einfügen</span><input aria-label="Erweiterungs-Verbindungsschlüssel" readOnly value={key} onFocus={e=>e.target.select()}/></label><button type="button" className="text-button" onClick={async()=>{try{await navigator.clipboard.writeText(key);setCopied(true);}catch{setError('Bitte den Schlüssel im Feld markieren und kopieren.');}}}>{copied?<Check size={14}/>:<Copy size={14}/>} {copied?'Kopiert':'Kopieren'}</button><small>Nur für dein Konto. 90 Tage gültig, jederzeit widerrufbar. Wird nur jetzt angezeigt.</small></div>}
+   </details>}
+   {props.signedIn&&<details className="settings-extension"><summary><KeyRound size={14} aria-hidden="true"/> Passwort ändern</summary><p>Ohne E-Mail-Bestätigung: dein bisheriges Passwort genügt. Andere Browser und die Handy-App werden danach abgemeldet; hier bleibst du angemeldet.</p>
+    {pwDone?<p role="status" className="login-notice"><Check size={14} aria-hidden="true"/>{pwDone}</p>:<PasswordForm onDone={r=>{setPwDone(r.signedOut?`Passwort geändert. ${r.signedOut} weitere Sitzung${r.signedOut===1?'':'en'} abgemeldet.`:'Passwort geändert.');setEvents(null);setPhones(null);}}/>}
    </details>}
    {props.signedIn&&<details className="settings-extension" onToggle={e=>{if((e.target as HTMLDetailsElement).open&&!events)api({action:'securityEvents'}).then(v=>setEvents(v.items)).catch(e=>setError(e.message));}}><summary><ShieldCheck size={14} aria-hidden="true"/> Anmeldeaktivität</summary><p>Die letzten Anmeldungen und Sicherheitsereignisse deines Kontos. Etwas, das du nicht warst? Bitte sofort den Administrator, dein Passwort und deine Zwei-Faktor-Anmeldung zurückzusetzen.</p>
     {events===null?<small>Wird geladen …</small>:events.length===0?<small>Noch keine Ereignisse.</small>:<ul className="security-events">{events.map((e,i)=><li key={i} className={/failed/.test(e.event)?'warn':''}><span>{EVENT_LABELS[e.event]||e.event}{e.detail?` · ${e.detail}`:''}</span><small>{new Date(e.at).toLocaleString('de-DE')} · {e.ip}</small></li>)}</ul>}

@@ -10,7 +10,7 @@ import {reviewItems} from '../server/crm.mjs';
 import {makeServer} from '../server/http.mjs';
 import {createSession} from '../server/auth.mjs';
 import {enableMfa,newSecret} from '../server/mfa.mjs';
-function setup(){const db=openDB(':memory:');for(const id of['one','two'])db.prepare('INSERT INTO users VALUES(?,?,?,?,1,?)').run(id,id+'@example.test',id,'unused','2026-01-01');enableMfa(db,'one',newSecret());return{db,user:{id:'one',email:'one@example.test'},other:{id:'two',email:'two@example.test'}};}
+function setup(){const db=openDB(':memory:');for(const id of['one','two'])db.prepare('INSERT INTO users(id,email,name,password_hash,active,created_at) VALUES(?,?,?,?,1,?)').run(id,id+'@example.test',id,'unused','2026-01-01');enableMfa(db,'one',newSecret());return{db,user:{id:'one',email:'one@example.test'},other:{id:'two',email:'two@example.test'}};}
 const sample='Kundennummer;Firmenname;Vorname;Nachname;E-Mail;Telefon;Ort;IBAN;Betrag brutto\r\n0012;Example Studio;Pat;Test;pat@example.test;+49 12345678;Bonn;BANKSECRET;999.00';
 function stage(db,user,text=sample,opts={}){return stageFastbill(db,user,{scope:'main',records:csvRecords(text),...opts});}
 const first=(db,user,b)=>fastbillRows(db,user,{batchId:b.id}).items[0];

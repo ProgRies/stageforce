@@ -9,7 +9,7 @@ import {parseEmail} from '../server/email.mjs';
 import {createSession} from '../server/auth.mjs';
 import {enableMfa,newSecret} from '../server/mfa.mjs';
 import {makeServer} from '../server/http.mjs';
-function setup(){const db=openDB(':memory:');for(const name of['alex','bea'])db.prepare('INSERT INTO users VALUES(?,?,?,?,1,?)').run(name,name+'@our-team.test',name,'unused','2026-01-01');enableMfa(db,'alex',newSecret());return{db,user:{id:'alex',email:'alex@our-team.test'}};}
+function setup(){const db=openDB(':memory:');for(const name of['alex','bea'])db.prepare('INSERT INTO users(id,email,name,password_hash,active,created_at) VALUES(?,?,?,?,1,?)').run(name,name+'@our-team.test',name,'unused','2026-01-01');enableMfa(db,'alex',newSecret());return{db,user:{id:'alex',email:'alex@our-team.test'}};}
 async function mail({sender='Pat Test <pat@customer.test>',to='alex@our-team.test',cc='',date='Tue, 13 Oct 2026 10:00:00 +0200',id='one',body='Agreed.'}={}){return parseEmail(Buffer.from(`From: ${sender}\r\nTo: ${to}\r\nCc: ${cc}\r\nMessage-ID: <${id}@example.test>\r\nDate: ${date}\r\nSubject: Message ${id}\r\n\r\n${body}`),'alex@our-team.test');}
 const confirm=(p,org,extra={})=>({importId:p.id,id:org.id,version:org.version,date:'2026-10-13',body:p.cleaned,...extra});
 
