@@ -1,13 +1,13 @@
 # Phone app (iPhone PWA)
 
-Stage Force has a small phone app at `/m/` for logging a call while it is still running. It is a separate page with its own
-code (`m/index.html`, `src/mobile/`) and stylesheet; the desktop page at `/` loads none of it and is unchanged.
+StageForce has a small phone app at `/m/` for logging a call while it is still running. It is a separate page with its own
+code (`m/index.html`, `src/mobile/`) and stylesheet; the desktop page at `/` loads none of it.
 
 ## Install on the iPhone
 
 1. Open `https://<your CRM address>/m/` in **Safari** (the address is also shown under Einstellungen → Handy-App).
 2. Tap **Teilen** → **Zum Home-Bildschirm** → **Hinzufügen**.
-3. Open Stage Force from the home screen and sign in once with password and authenticator code.
+3. Open StageForce from the home screen and sign in once with password and authenticator code.
 
 An app added to the home screen keeps its own cookies, separate from Safari. Signing in inside Safari does not carry over:
 sign in inside the installed app.
