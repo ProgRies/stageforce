@@ -1,3 +1,12 @@
+## Unreleased · Map pins
+
+Pin organisations on a map. Rebuild the CRM. The CRM adds one table on start (map pins); no data is changed.
+
+- Every organisation can optionally get a pin: "Pin auf Karte setzen" at the bottom of the right column opens the map. Search a place (prefilled with the organisation's town) or click the map, drag the pin to fine-tune, then save. "Pin ändern" moves or removes it.
+- Once set, a small map preview shows the pin. Clicking it opens the full map with all other pinned organisations; hover a pin for its name, click it and "Öffnen" to jump to that organisation.
+- Map tiles and the place search run through the CRM server. Browsers never contact the map provider, and only the typed search text leaves the server (see deployment notes).
+- Pin changes are kept in the change log and reach colleagues' open tabs live.
+
 ## Unreleased · Upcoming meetings
 
 Plan meetings ahead and see what is coming up. Rebuild the CRM. The CRM adds one table on start (cancelled meetings); no data is changed.

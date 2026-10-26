@@ -258,3 +258,27 @@
 /* During a live call the call card floats above the timeline instead of pushing into it; everything else stays usable. */
 .quick-call{position:relative}.quick-call .sf-call-note{position:absolute;top:100%;right:0;z-index:30;width:280px;max-width:calc(100vw - 32px);margin-top:8px;border-color:#8d77bd;box-shadow:0 18px 50px #1b1f4a40,0 2px 8px #1b1f4a1f}
 [data-theme="dark"] .quick-call .sf-call-note{border-color:#7a64b0;box-shadow:0 18px 50px #00000080,0 2px 8px #0000004d}
+/* Optional map pin per organisation: a small preview in the sidebar, the full map in a dialog. */
+.organisation-map{margin-top:22px;display:grid;gap:6px}
+.map-preview{display:block;width:100%;height:132px;padding:0;border:1px solid var(--line);border-radius:14px;overflow:hidden;cursor:pointer;background:var(--surface-input,#fff)}
+.map-preview>div{width:100%;height:100%;pointer-events:none}
+.map-preview:focus-visible{outline:2px solid var(--action);outline-offset:2px}
+.map-credit{font-size:9px;color:var(--muted);text-align:right}
+.map-actions{display:flex;flex-wrap:wrap;gap:4px 14px}.map-actions .text-button{margin-top:0;display:inline-flex;align-items:center;gap:6px;font-size:12px}
+.map-pin-icon{background:none;border:0}
+.map-pin{display:block;width:100%;height:100%;border-radius:50% 50% 50% 0;transform:rotate(-45deg) scale(.82);transform-origin:50% 50%;background:#8d96b8;border:2px solid #fff;box-shadow:0 2px 6px #1b1f4a59}
+.map-pin-icon.current .map-pin{background:var(--brand-gradient);border-width:3px;box-shadow:0 4px 12px #1b1f4a73}
+.map-dialog{position:fixed;inset:0;margin:auto;width:1000px;max-width:calc(100vw - 32px);height:720px;max-height:calc(100dvh - 32px);border:1px solid var(--line);border-radius:20px;padding:20px;background:var(--surface-panel);color:var(--ink);box-shadow:0 18px 70px #070c3540;flex-direction:column;gap:12px}
+.map-dialog[open]{display:flex}.map-dialog::backdrop{background:#05091980}
+.map-dialog>header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}.map-dialog h2{font-size:18px}.map-dialog header small{color:var(--muted);font-size:12px}
+.map-search{position:relative;display:flex;align-items:center;gap:8px}.map-search .searchbox{flex:1;min-height:42px;margin:0}.map-search>.button{min-height:42px;padding:0 16px}.map-search input{width:100%}
+.map-results{position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:1000;list-style:none;margin:0;padding:6px;border:1px solid var(--line);border-radius:12px;background:var(--surface-panel);box-shadow:0 12px 40px #1b1f4a40}
+.map-results li{font-size:13px}.map-results li.muted{padding:8px 10px}.map-results button{display:block;width:100%;text-align:left;padding:8px 10px;border-radius:8px;cursor:pointer;color:var(--ink);line-height:1.4}.map-results button:hover,.map-results button:focus-visible{background:var(--surface-accent,#eee9fb)}
+.map-canvas{position:relative;z-index:0;flex:1;min-height:200px;border-radius:14px;overflow:hidden;border:1px solid var(--line);background:#dfe3ea}
+.map-dialog>footer{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}.map-dialog>footer p{flex:1;min-width:180px;font-size:12px;margin:0}
+.map-label{display:grid;gap:3px;font:inherit;max-width:240px}.map-label strong{font-size:13px;font-weight:600}.map-label small{font-size:11px;color:#5b6577}.map-label .button{margin-top:6px;justify-self:start}
+.map-dialog .leaflet-container,.organisation-map .leaflet-container{font-family:inherit}
+[data-theme="dark"] .map-canvas .leaflet-bar a,[data-theme="dark"] .map-canvas .leaflet-control-attribution{background:#1c2440e6;color:#c9d1ea;border-color:#34406a}[data-theme="dark"] .map-canvas .leaflet-control-attribution a{color:#a9b8ff}
+[data-theme="dark"] .map-canvas,[data-theme="dark"] .map-preview{background:#1a2138}
+[data-theme="dark"] .map-canvas .leaflet-tile-pane,[data-theme="dark"] .map-preview .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.85) contrast(.9) saturate(.6)}
+[data-theme="dark"] .map-pin{border-color:#1c2440}
