@@ -63,12 +63,12 @@ export default function OrganisationView({users,entity,entities,links,history,hi
  <OrganisationManage entity={entity} entities={entities} disabled={pending||headerBusy||fieldsBusy||toolsBusy||busy||loading} onRemoved={onRemoved}/></div>}{error&&<p className="save-error">{error}</p>}</div>
  </section><aside className="organisation-sidebar" aria-label="Organisation im Überblick">
 
+ <Suspense fallback={null}><OrganisationMap entity={entity} entities={entities} disabled={!!activityEdit||headerBusy||fieldsBusy||toolsBusy||loading} onSaved={onSaved} onPick={onPick} onDirtyChange={setMapDirty} onBusyChange={setMapBusy}/></Suspense>
  <a className="button secondary gmail-search" data-tour="gmail" href={gmail.url} title={gmail.query} target="_blank" rel="noopener noreferrer"><Mail size={17}/>In Gmail suchen <ArrowUpRight size={14}/></a>
  <EntityTools extracted={extracted} entity={entity} entities={entities} links={links} disabled={!!activityEdit||headerBusy||fieldsBusy||fieldsDirty||noteOpen||loading} onSaved={updated=>{onSaved(updated);for(const id of Object.keys(messages))message(id,true);}} onPick={onPick} onDirtyChange={setToolsDirty} onBusyChange={setToolsBusy}/>
 
  <OrganisationFields entity={entity} accountEmail={accountEmail} disabled={!!activityEdit||headerBusy||toolsDirty||noteOpen||loading} onSaved={onSaved} onDirtyChange={setFieldsDirty} onBusyChange={setFieldsBusy}/>
 
- <Suspense fallback={null}><OrganisationMap entity={entity} entities={entities} disabled={!!activityEdit||headerBusy||fieldsBusy||toolsBusy||loading} onSaved={onSaved} onPick={onPick} onDirtyChange={setMapDirty} onBusyChange={setMapBusy}/></Suspense>
 
  </aside>
 

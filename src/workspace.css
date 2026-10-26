@@ -255,10 +255,12 @@
 /* During a live call the call card floats above the timeline instead of pushing into it; everything else stays usable. */
 .quick-call{position:relative}
 /* Optional map pin per organisation: a small preview in the sidebar, the full map in a dialog. */
-.organisation-map{margin-top:22px;display:grid;gap:6px}
-.map-preview{display:block;width:100%;height:132px;padding:0;border:1px solid var(--line);border-radius:14px;overflow:hidden;cursor:pointer;background:var(--surface-input,#fff)}
-.map-preview>div{width:100%;height:100%;pointer-events:none}
-.map-preview:focus-visible{outline:2px solid var(--action);outline-offset:2px}
+.organisation-map{margin-bottom:18px;display:grid;gap:6px}
+.map-preview{position:relative;height:150px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--surface-input,#fff)}
+.map-preview-open{display:block;width:100%;height:100%;padding:0;cursor:pointer}.map-preview-open>div{width:100%;height:100%;pointer-events:none}
+.map-preview-open:focus-visible{outline:2px solid var(--action);outline-offset:-2px}
+.map-zoom{position:absolute;top:8px;right:8px;z-index:500;display:grid;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--surface-panel);box-shadow:0 2px 8px #1b1f4a26}
+.map-zoom button{display:grid;place-items:center;width:28px;height:28px;cursor:pointer;color:var(--ink)}.map-zoom button+button{border-top:1px solid var(--line)}.map-zoom button:hover{background:var(--surface-accent,#eee9fb)}.map-zoom button:focus-visible{outline:2px solid var(--action);outline-offset:-2px}
 .map-credit{font-size:9px;color:var(--muted);text-align:right}
 .map-actions{display:flex;flex-wrap:wrap;gap:4px 14px}.map-actions .text-button{margin-top:0;display:inline-flex;align-items:center;gap:6px;font-size:12px}
 .map-pin-icon{background:none;border:0}
