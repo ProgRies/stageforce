@@ -22,5 +22,6 @@ try{
  // Docker may assign a new ephemeral host port when the container restarts.
  base=address();
  let ready=false;for(let i=0;i<30;i++){try{if((await fetch(base+'/healthz')).ok){ready=true;break;}}catch{}await new Promise(r=>setTimeout(r,500));}if(!ready)throw Error('Restart health failed');
- const loaded=await crm(await login(),{action:'load'});if(loaded.data.entities.map(e=>e.values[1]).join()!=='Persistence check')throw Error('Persistence check failed');console.log('Container login and restart persistence passed.');
+ const loaded=await crm(await login(),{action:'load'});if(loaded.data.entities.map(e=>e.values[1]).join()!=='Persistence check')throw Error('Persistence check failed');for(const path of ['/m/','/m/manifest.webmanifest','/m/sw.js','/m/icon-180.png'])if(!(await fetch(base+path)).ok)throw Error('Phone app file missing: '+path);
+ console.log('Container login, restart persistence and phone app files passed.');
 }catch(error){try{console.error(docker(['logs','--tail','40',name]));}catch{}throw error;}finally{try{docker(['rm','-f',name]);}catch{}try{docker(['volume','rm',volume]);}catch{}}

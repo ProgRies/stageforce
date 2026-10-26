@@ -3,6 +3,9 @@
 !package.json
 !package-lock.json
 !index.html
+!vite.config.mjs
+!m/
+!m/index.html
 !tsconfig.json
 !src/
 !src/**

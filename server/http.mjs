@@ -1,5 +1,6 @@
 import {appearance,saveAppearance} from './appearance.mjs';
-import {prepareCall,saveCall,cancelCall,openCall,draftCall} from './calls.mjs';
+import {prepareCall,saveCall,cancelCall,openCall,draftCall,startIncoming} from './calls.mjs';
+import {mobileHome,mobileSearch} from './mobile.mjs';
 import {reserveQueue} from './leads.mjs';
 import {extensionStatus,extensionCreate,extensionRevoke,authorizeExtension,extensionAction} from './extension.mjs';
 import {createServer} from 'node:http';
@@ -7,7 +8,7 @@ import {readFile} from 'node:fs/promises';
 import {resolve,extname} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {openDB} from './db.mjs';
-import {getSession,verifyPassword,createSession,limited,publicUser} from './auth.mjs';
+import {getSession,verifyPassword,createSession,limited,publicUser,mobileSessions,revokeMobileSession} from './auth.mjs';
 import {startChallenge,challengeUser,completeChallenge,confirmCode} from './mfa.mjs';
 import {clientIP,logEvent,failuresSinceLastLogin,recentEvents,pruneEvents} from './security.mjs';
 import {Problem,listData,entity,history,search,save,createOrg,activitySave,contactSave,linkSave,reviewDone,stageImport,importPreview,confirmImport,timelinePosition} from './crm.mjs';
@@ -17,7 +18,9 @@ import {deleteOrganisation,mergeOrganisations} from './lifecycle.mjs';
 import {liveHub} from './live.mjs';
 import {locationSave,mapService} from './map.mjs';
 // Actions that only read, or only touch the caller's own settings and staging, are not announced to other tabs.
-const quiet=new Set(['appearanceSave','extensionStatus','extensionCreate','extensionRevoke','load','detail','history','search','imports','importPreview','importPosition','importDelete','message','check','messageStatus','threadStatus','meeting','lookup','callOpen','callDraft','mapSearch','securityEvents']);
+const quiet=new Set(['appearanceSave','extensionStatus','extensionCreate','extensionRevoke','load','detail','history','search','imports','importPreview','importPosition','importDelete','message','check','messageStatus','threadStatus','meeting','lookup','callOpen','callDraft','mapSearch','securityEvents','mobileHome','mobileSearch','mobileDevices','mobileDeviceRevoke']);
+// The phone app names the device it was signed in on, so the list under Einstellungen says which phone is which.
+const deviceLabel=req=>{const ua=String(req.headers['user-agent']||'');return /iPhone/.test(ua)?'iPhone':/iPad/.test(ua)?'iPad':/Android/.test(ua)?'Android-Handy':'Handy';};
 const touched=(b,data)=>[b.id,b.other,b.into,b.organisationId,data?.entity?.id,data?.organisation?.id,data?.deleted];
 export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:3000',staticDir=resolve('dist'),map}={}){
  const url=new URL(origin);if(url.origin!==origin.replace(/\/$/,''))throw Error('APP_URL must be an origin without a path.');origin=url.origin;const secure=url.protocol==='https:';if(process.env.NODE_ENV==='production'&&!secure)throw Error('Production APP_URL must use HTTPS.');let parsing=0;const live=liveHub(db);map??=mapService({agent:`StageForce CRM (${origin})`});
@@ -55,13 +58,16 @@ export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:300
    // Counted before this sign-in is logged, so the user sees what happened since their previous one.
    const warnings=failuresSinceLastLogin(db,challenge.id);
    if(result.recoveryCodes)logEvent(db,{event:'mfa_enrolled',user:challenge,ip});if(result.usedRecovery)logEvent(db,{event:'recovery_code_used',user:challenge,ip,detail:'noch '+result.recoveryLeft});
-   logEvent(db,{event:'login',user:challenge,ip,detail:result.recoveryCodes?'Einrichtung':result.usedRecovery?'Wiederherstellungscode':'Authenticator'});
-   const session=createSession(db,result.user);res.setHeader('Set-Cookie',[cookie(session.token),challengeCookie('',0)]);
+   const mobile=b.device==='mobile';
+   logEvent(db,{event:'login',user:challenge,ip,detail:(result.recoveryCodes?'Einrichtung':result.usedRecovery?'Wiederherstellungscode':'Authenticator')+(mobile?' · Handy-App ('+deviceLabel(req)+')':'')});
+   const session=createSession(db,result.user,mobile?{kind:'mobile',label:deviceLabel(req)}:{});res.setHeader('Set-Cookie',[cookie(session.token,session.maxAge),challengeCookie('',0)]);
    return success(res,{user:session.user,csrf:session.csrf,appearance:appearance(db,result.user),recoveryCodes:result.recoveryCodes,recoveryLeft:result.usedRecovery?result.recoveryLeft:undefined,security:warnings.passwords||warnings.codes?warnings:undefined});
   }
  }
  if(path.startsWith('/api/')){
   const session=getSession(db,req);if(!session)throw new Problem('Bitte anmelden.',401,'unauthorized');
+  // The phone app's cookie moves forward with its session, so iOS keeps it as long as the server does.
+  if(session.kind==='mobile'&&(session.renewed||path==='/api/session'))res.setHeader('Set-Cookie',cookie(session.token,90*86400));
   if(req.method==='GET'&&path==='/api/live'){if(req.headers.origin&&req.headers.origin!==origin)throw new Problem('Unzulässiger Ursprung.',403,'forbidden');return live.open(req,res,session);}
   if(req.method==='GET'&&path.startsWith('/api/map/tile/')){const m=path.match(/^\/api\/map\/tile\/(\d{1,2})\/(\d{1,7})\/(\d{1,7})\.png$/);if(!m)throw new Problem('Nicht gefunden.',404,'not_found');const bytes=await map.tile(+m[1],+m[2],+m[3]);res.writeHead(200,{'Content-Type':'image/png','Cache-Control':'private, max-age=86400'});return res.end(bytes);}
   if(req.method==='GET'&&path==='/api/session')return success(res,{user:publicUser(session),csrf:session.csrf,appearance:appearance(db,session)});
@@ -111,6 +117,11 @@ export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:300
    case 'callSave':data=saveCall(db,session,b);break;
    case 'callOpen':data=openCall(db,session);break;
    case 'callDraft':data=draftCall(db,session,b);break;
+   case 'callIncoming':data=startIncoming(db,session,b);break;
+   case 'mobileHome':data=mobileHome(db,session);break;
+   case 'mobileSearch':data=mobileSearch(db,b.query);break;
+   case 'mobileDevices':data={items:mobileSessions(db,session.id),current:session.kind==='mobile'};break;
+   case 'mobileDeviceRevoke':{const hash=revokeMobileSession(db,session.id,b.id);if(hash){live.endSession(hash);logEvent(db,{event:'device_revoked',user:session,ip:clientIP(req)});}data={items:mobileSessions(db,session.id)};break;}
    case 'queueReserve':data=reserveQueue(db,session,b);break;
    case 'activitySave':data=activitySave(db,session,b);break;
    case 'contact':data=contactSave(db,session,b);break;
@@ -130,7 +141,11 @@ export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:300
   }if(!quiet.has(b.action))live.changed(touched(b,data),session.id);return success(res,data);
  }
  if(req.method!=='GET'&&req.method!=='HEAD')throw new Problem('Methode nicht erlaubt.',405);
- const rel=path==='/index.html'||path==='/'?'index.html':path.slice(1);if(rel!=='index.html'&&!rel.startsWith('assets/'))throw new Problem('Nicht gefunden.',404);const file=resolve(staticDir,rel);if(!file.startsWith(staticDir+'/'))throw new Problem('Nicht gefunden.',404);let bytes;try{bytes=await readFile(file);}catch{throw new Problem('Nicht gefunden.',404);}const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml'};res.writeHead(200,{'Content-Type':types[extname(file)]||'application/octet-stream','Cache-Control':rel==='index.html'?'no-store':'public, max-age=31536000, immutable'});res.end(req.method==='HEAD'?undefined:bytes);
+ // The phone app lives under /m/ with its own page, manifest, service worker and icons; the desktop page is unchanged.
+ const rel=path==='/index.html'||path==='/'?'index.html':path==='/m'||path==='/m/'?'m/index.html':path.slice(1);if(rel!=='index.html'&&!rel.startsWith('assets/')&&!rel.startsWith('m/'))throw new Problem('Nicht gefunden.',404);const file=resolve(staticDir,rel);if(!file.startsWith(staticDir+'/'))throw new Problem('Nicht gefunden.',404);let bytes;try{bytes=await readFile(file);}catch{throw new Problem('Nicht gefunden.',404);}const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.webmanifest':'application/manifest+json; charset=utf-8'};
+ // Hashed assets never change; the pages, the manifest and the service worker are always checked, so an update reaches the phone on the next open.
+ const cache=rel.startsWith('assets/')?'public, max-age=31536000, immutable':rel.endsWith('.png')?'public, max-age=86400':'no-cache';
+ res.writeHead(200,{'Content-Type':types[extname(file)]||'application/octet-stream','Cache-Control':rel.endsWith('index.html')?'no-store':cache,...(rel==='m/sw.js'?{'Service-Worker-Allowed':'/m/'}:{})});res.end(req.method==='HEAD'?undefined:bytes);
  }catch(e){if(e instanceof SyntaxError)return json(res,400,{status:'invalid',message:'Ungültige Eingabe.'});if(!(e instanceof Problem))console.error('Request failed:',e.code||e.name);if(!res.headersSent)json(res,e.http||500,{status:e.code||'error',message:e instanceof Problem?e.message:'Die Anfrage konnte nicht verarbeitet werden.'});else res.end();}});
  server.requestTimeout=30000;server.headersTimeout=15000;const cleanup=setInterval(()=>{db.prepare('DELETE FROM email_imports WHERE expires_at<?').run(Date.now());db.prepare('DELETE FROM sessions WHERE expires_at<?').run(Date.now());pruneEvents(db);},60000);cleanup.unref();server.on('close',()=>clearInterval(cleanup));
  // Open live streams would otherwise keep close() waiting forever.

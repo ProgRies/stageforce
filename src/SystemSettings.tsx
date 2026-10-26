@@ -1,16 +1,16 @@
 import {useConfirm} from './ConfirmDialog';
 import {useEffect,useRef,useState} from 'react';
-import {Settings,RefreshCw,Copy,Check,X,ShieldCheck} from 'lucide-react';
+import {Settings,RefreshCw,Copy,Check,X,ShieldCheck,Smartphone} from 'lucide-react';
 import {AppearanceControls} from './Appearance';
 import {api} from './api';
 
-export const EVENT_LABELS:Record<string,string>={login:'Angemeldet',logout:'Abgemeldet',password_failed:'Falsches Passwort',code_failed:'Falscher Code bei der Anmeldung',key_code_failed:'Falscher Code beim Schlüssel',recovery_code_used:'Wiederherstellungscode benutzt',mfa_enrolled:'Authenticator eingerichtet',mfa_reset:'Zwei-Faktor zurückgesetzt',password_reset:'Passwort zurückgesetzt',key_created:'Erweiterungs-Schlüssel erstellt',key_revoked:'Erweiterungs-Schlüssel widerrufen',user_added:'Konto angelegt',user_disabled:'Konto deaktiviert'};
+export const EVENT_LABELS:Record<string,string>={login:'Angemeldet',logout:'Abgemeldet',password_failed:'Falsches Passwort',code_failed:'Falscher Code bei der Anmeldung',key_code_failed:'Falscher Code beim Schlüssel',recovery_code_used:'Wiederherstellungscode benutzt',mfa_enrolled:'Authenticator eingerichtet',mfa_reset:'Zwei-Faktor zurückgesetzt',password_reset:'Passwort zurückgesetzt',key_created:'Erweiterungs-Schlüssel erstellt',device_revoked:'Handy-App abgemeldet',key_revoked:'Erweiterungs-Schlüssel widerrufen',user_added:'Konto angelegt',user_disabled:'Konto deaktiviert'};
 type Props={signedIn?:boolean;loadedAt?:string;stale?:boolean;loading?:boolean;disabled?:boolean;onRefresh?:()=>void};
 export default function SystemSettings(props:Props){
  const ask=useConfirm();
- const[open,setOpen]=useState(false),[extension,setExtension]=useState<any>(null),[key,setKey]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[copied,setCopied]=useState(false),[code,setCode]=useState<string|null>(null),[events,setEvents]=useState<any[]|null>(null);
+ const[open,setOpen]=useState(false),[extension,setExtension]=useState<any>(null),[key,setKey]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[copied,setCopied]=useState(false),[code,setCode]=useState<string|null>(null),[events,setEvents]=useState<any[]|null>(null),[phones,setPhones]=useState<any[]|null>(null);
  const ref=useRef<HTMLDivElement>(null),trigger=useRef<HTMLButtonElement>(null),visibility=useRef(0);
- const close=()=>{visibility.current++;setOpen(false);setKey('');setCopied(false);setCode(null);setEvents(null);};
+ const close=()=>{visibility.current++;setOpen(false);setKey('');setCopied(false);setCode(null);setEvents(null);setPhones(null);};
  useEffect(()=>{
   if(!open)return;
   const outside=(e:PointerEvent)=>{if((e.target as Element)?.closest?.('.confirm-dialog'))return;if(!ref.current?.contains(e.target as Node))close();};
@@ -41,6 +41,9 @@ export default function SystemSettings(props:Props){
    </details>}
    {props.signedIn&&<details className="settings-extension" onToggle={e=>{if((e.target as HTMLDetailsElement).open&&!events)api({action:'securityEvents'}).then(v=>setEvents(v.items)).catch(e=>setError(e.message));}}><summary><ShieldCheck size={14} aria-hidden="true"/> Anmeldeaktivität</summary><p>Die letzten Anmeldungen und Sicherheitsereignisse deines Kontos. Etwas, das du nicht warst? Bitte sofort den Administrator, dein Passwort und deine Zwei-Faktor-Anmeldung zurückzusetzen.</p>
     {events===null?<small>Wird geladen …</small>:events.length===0?<small>Noch keine Ereignisse.</small>:<ul className="security-events">{events.map((e,i)=><li key={i} className={/failed/.test(e.event)?'warn':''}><span>{EVENT_LABELS[e.event]||e.event}{e.detail?` · ${e.detail}`:''}</span><small>{new Date(e.at).toLocaleString('de-DE')} · {e.ip}</small></li>)}</ul>}
+   </details>}
+   {props.signedIn&&<details className="settings-extension" onToggle={e=>{if((e.target as HTMLDetailsElement).open&&!phones)api({action:'mobileDevices'}).then(v=>setPhones(v.items)).catch(e=>setError(e.message));}}><summary><Smartphone size={14} aria-hidden="true"/> Handy-App</summary><p>Zum Anrufe-Eintragen unterwegs: auf dem iPhone in Safari öffnen, Teilen, „Zum Home-Bildschirm“. Einmal mit Code anmelden; das Handy bleibt dann angemeldet, solange die App mindestens alle 90 Tage geöffnet wird.</p><p><strong>{window.location.origin}/m/</strong></p>
+    {phones===null?<small>Wird geladen …</small>:phones.length===0?<small>Noch kein Handy angemeldet.</small>:<ul className="security-events">{phones.map(p=><li key={p.id}><span>{p.label||'Handy'} · zuletzt {new Date(p.last_used_at).toLocaleDateString('de-DE')}</span><button type="button" className="text-button" disabled={busy} onClick={async()=>{if(!await ask(`${p.label||'Handy'} abmelden? Dort ist danach eine neue Anmeldung mit Code nötig.`,'Abmelden'))return;try{setPhones((await api({action:'mobileDeviceRevoke',id:p.id})).items);setEvents(null);}catch(e:any){setError(e.message);}}}>Abmelden</button></li>)}</ul>}
    </details>}
    {error&&code===null&&<p role="alert" className="save-error">{error}</p>}
   </section>}

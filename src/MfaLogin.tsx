@@ -8,9 +8,10 @@ export type MfaResult={user:any,csrf:string,appearance:any,recoveryCodes?:string
 function QrCode({text}:{text:string}){const cells=useMemo(()=>{const qr=qrcode(0,'M');qr.addData(text);qr.make();const n=qr.getModuleCount(),list:string[]=[];for(let y=0;y<n;y++)for(let x=0;x<n;x++)if(qr.isDark(y,x))list.push(`M${x+4} ${y+4}h1v1h-1z`);return{n:n+8,path:list.join('')};},[text]);
  return <svg className="mfa-qr" viewBox={`0 0 ${cells.n} ${cells.n}`} role="img" aria-label="QR-Code für die Authenticator-App" shapeRendering="crispEdges"><rect width={cells.n} height={cells.n} fill="#fff"/><path d={cells.path} fill="#111"/></svg>;}
 const grouped=(secret:string)=>secret.match(/.{1,4}/g)!.join(' ');
-export function MfaChallenge({step,onDone,onRestart}:{step:MfaStep,onDone:(r:MfaResult)=>void,onRestart:(message?:string)=>void}){
+// The phone app signs in with device="mobile" and gets its long-lived session; the desktop sends none.
+export function MfaChallenge({step,onDone,onRestart,device}:{step:MfaStep,onDone:(r:MfaResult)=>void,onRestart:(message?:string)=>void,device?:'mobile'}){
  const[code,setCode]=useState(''),[recovery,setRecovery]=useState(false),[error,setError]=useState(''),[busy,setBusy]=useState(false);const setup=step.mfa==='setup';
- async function submit(e:React.FormEvent){e.preventDefault();setBusy(true);setError('');try{onDone(await request('/api/login/mfa',{code:code.trim()}));}catch(e:any){if(e.status==='mfa_expired')onRestart(e.message);else{setError(e.message||'Der Code stimmt nicht.');setCode('');}}finally{setBusy(false);}}
+ async function submit(e:React.FormEvent){e.preventDefault();setBusy(true);setError('');try{onDone(await request('/api/login/mfa',device?{code:code.trim(),device}:{code:code.trim()}));}catch(e:any){if(e.status==='mfa_expired')onRestart(e.message);else{setError(e.message||'Der Code stimmt nicht.');setCode('');}}finally{setBusy(false);}}
  return <form className="login-card glass mfa-card" onSubmit={submit}>
   <div className="mfa-heading">{setup?<Smartphone size={22} aria-hidden="true"/>:<ShieldCheck size={22} aria-hidden="true"/>}<h1>{setup?'Zwei-Faktor einrichten':'Bestätigungscode'}</h1></div>
   {setup?<>
