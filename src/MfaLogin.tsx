@@ -3,7 +3,7 @@ import qrcode from 'qrcode-generator';
 import {Copy,Download,ShieldCheck,Smartphone} from 'lucide-react';
 import {request} from './api';
 export type MfaStep={mfa:'setup',secret:string,uri:string,email:string}|{mfa:'verify'};
-export type MfaResult={user:any,csrf:string,appearance:any,recoveryCodes?:string[],recoveryLeft?:number};
+export type MfaResult={user:any,csrf:string,appearance:any,recoveryCodes?:string[],recoveryLeft?:number,security?:{passwords:number,codes:number,since:number|null}};
 // The QR code is drawn as plain SVG rectangles, so the secret never leaves the page and the CSP stays strict.
 function QrCode({text}:{text:string}){const cells=useMemo(()=>{const qr=qrcode(0,'M');qr.addData(text);qr.make();const n=qr.getModuleCount(),list:string[]=[];for(let y=0;y<n;y++)for(let x=0;x<n;x++)if(qr.isDark(y,x))list.push(`M${x+4} ${y+4}h1v1h-1z`);return{n:n+8,path:list.join('')};},[text]);
  return <svg className="mfa-qr" viewBox={`0 0 ${cells.n} ${cells.n}`} role="img" aria-label="QR-Code für die Authenticator-App" shapeRendering="crispEdges"><rect width={cells.n} height={cells.n} fill="#fff"/><path d={cells.path} fill="#111"/></svg>;}
@@ -42,5 +42,16 @@ export function RecoveryCodes({result,onContinue}:{result:MfaResult,onContinue:(
   <div className="mfa-actions"><button type="button" className="button secondary" onClick={copy}><Copy size={15} aria-hidden="true"/>{copied?'Kopiert':'Kopieren'}</button><button type="button" className="button secondary" onClick={download}><Download size={15} aria-hidden="true"/>Als Datei</button></div>
   <label className="mfa-confirm"><input type="checkbox" checked={saved} onChange={e=>setSaved(e.target.checked)}/>Ich habe die Codes sicher abgelegt, z. B. im Passwort-Manager.</label>
   <button className="button primary wide" disabled={!saved} onClick={onContinue}>Weiter zu Stage Force</button>
+ </div>;
+}
+// Wrong passwords or codes since the previous sign-in. A wrong code after a right password means someone else knows the password.
+export function SecurityWarning({result,onContinue}:{result:MfaResult,onContinue:()=>void}){
+ const w=result.security!,count=(n:number,one:string,many:string)=>n===1?`1 ${one}`:`${n} ${many}`;
+ return <div className="login-card glass mfa-card" role="alert">
+  <div className="mfa-heading"><ShieldCheck size={22} aria-hidden="true"/><h1>Fehlversuche bei deinem Konto</h1></div>
+  <p>{w.since?`Seit deiner letzten Anmeldung am ${new Date(w.since).toLocaleString('de-DE')}`:'Vor dieser Anmeldung'} gab es {[w.passwords&&count(w.passwords,'falsches Passwort','falsche Passwörter'),w.codes&&count(w.codes,'falschen Code','falsche Codes')].filter(Boolean).join(' und ')}.</p>
+  {w.codes>0?<p><strong>Falsche Codes heißen: Jemand kannte dein Passwort.</strong> Warst du das nicht, bitte sofort den Administrator, dein Passwort zu ändern.</p>:<p>Warst du das selbst, ist alles in Ordnung. Sonst hat jemand dein Passwort geraten; die Zwei-Faktor-Anmeldung hat ihn aufgehalten.</p>}
+  <p>Alle Ereignisse findest du unter Einstellungen → Anmeldeaktivität.</p>
+  <button className="button primary wide" onClick={onContinue}>Verstanden</button>
  </div>;
 }

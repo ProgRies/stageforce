@@ -69,6 +69,6 @@ test('schema 5 upgrade preserves CRM records',async()=>{
  const {mkdtempSync,rmSync}=await import('node:fs');const{tmpdir}=await import('node:os');const{join}=await import('node:path');
  const dir=mkdtempSync(join(tmpdir(),'extension-migration-')),path=join(dir,'crm.sqlite');let db=openDB(path);
  try{const id=await addUser(db,msg.mailbox,'Alex','long-password-1234'),org=createOrg(db,{id},'Preserved');db.exec('DROP TABLE extension_keys; PRAGMA user_version=5');db.close();db=openDB(path);
- assert.equal(getOrg(db,org.id).name,'Preserved');assert.equal(db.prepare('SELECT count(*) n FROM users').get().n,1);assert.equal(db.prepare('PRAGMA user_version').get().user_version,11);assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(),[]);
+ assert.equal(getOrg(db,org.id).name,'Preserved');assert.equal(db.prepare('SELECT count(*) n FROM users').get().n,1);assert.equal(db.prepare('PRAGMA user_version').get().user_version,12);assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(),[]);
  }finally{db.close();rmSync(dir,{recursive:true,force:true});}
 });

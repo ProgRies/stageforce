@@ -8,7 +8,8 @@ import {resolve,extname} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {openDB} from './db.mjs';
 import {getSession,verifyPassword,createSession,limited,publicUser} from './auth.mjs';
-import {startChallenge,challengeUser,completeChallenge} from './mfa.mjs';
+import {startChallenge,challengeUser,completeChallenge,confirmCode} from './mfa.mjs';
+import {clientIP,logEvent,failuresSinceLastLogin,recentEvents,pruneEvents} from './security.mjs';
 import {Problem,listData,entity,history,search,save,createOrg,activitySave,contactSave,linkSave,reviewDone,stageImport,importPreview,confirmImport,timelinePosition} from './crm.mjs';
 import {inspectCSV,csvRecords,stageFastbill,fastbillBatches,fastbillRows,fastbillPreview,decideFastbill,deleteFastbillBatch,fetchFastbillPage} from './fastbill.mjs';
 import {parseEmail} from './email.mjs';
@@ -16,7 +17,7 @@ import {deleteOrganisation,mergeOrganisations} from './lifecycle.mjs';
 import {liveHub} from './live.mjs';
 import {locationSave,mapService} from './map.mjs';
 // Actions that only read, or only touch the caller's own settings and staging, are not announced to other tabs.
-const quiet=new Set(['appearanceSave','extensionStatus','extensionCreate','extensionRevoke','load','detail','history','search','imports','importPreview','importPosition','importDelete','message','check','messageStatus','threadStatus','meeting','lookup','callOpen','callDraft','mapSearch']);
+const quiet=new Set(['appearanceSave','extensionStatus','extensionCreate','extensionRevoke','load','detail','history','search','imports','importPreview','importPosition','importDelete','message','check','messageStatus','threadStatus','meeting','lookup','callOpen','callDraft','mapSearch','securityEvents']);
 const touched=(b,data)=>[b.id,b.other,b.into,b.organisationId,data?.entity?.id,data?.organisation?.id,data?.deleted];
 export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:3000',staticDir=resolve('dist'),map}={}){
  const url=new URL(origin);if(url.origin!==origin.replace(/\/$/,''))throw Error('APP_URL must be an origin without a path.');origin=url.origin;const secure=url.protocol==='https:';if(process.env.NODE_ENV==='production'&&!secure)throw Error('Production APP_URL must use HTTPS.');let parsing=0;const live=liveHub(db);map??=mapService({agent:`StageForce CRM (${origin})`});
@@ -41,15 +42,22 @@ export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:300
  }
  if(req.method==='POST'){
   if(req.headers.origin!==origin)throw new Problem('Unzulässiger Ursprung.',403,'forbidden');
-  if(path==='/api/login'){if(!String(req.headers['content-type']).startsWith('application/json'))throw new Problem('JSON erwartet.',415);const b=JSON.parse((await body(req,8192)).toString());const address=String(b.email||'').trim().toLowerCase();if(limited(db,'global-login',200)||limited(db,'login:'+address,10))throw new Problem('Zu viele Versuche. Bitte in zehn Minuten erneut versuchen.',429,'rate_limited');const user=db.prepare('SELECT * FROM users WHERE email=? COLLATE NOCASE AND active=1').get(address);const valid=await verifyPassword(b.password,user?.password_hash);if(!valid||!user)throw new Problem('Anmeldung fehlgeschlagen.',401,'unauthorized');const challenge=startChallenge(db,user);res.setHeader('Set-Cookie',challengeCookie(challenge.token));return success(res,challenge.setup?{mfa:'setup',email:user.email,...challenge.setup}:{mfa:'verify'});}
+  if(path==='/api/login'){if(!String(req.headers['content-type']).startsWith('application/json'))throw new Problem('JSON erwartet.',415);const b=JSON.parse((await body(req,8192)).toString());const address=String(b.email||'').trim().toLowerCase().slice(0,254),ip=clientIP(req);
+   // Limits per client address and per account, never one shared counter: a stranger can slow down their own guesses, not lock out the team.
+   if(limited(db,'login-ip:'+ip,30)||limited(db,'login:'+address+'|'+ip,10)||limited(db,'login-account:'+address,50,3600000))throw new Problem('Zu viele Versuche. Bitte in zehn Minuten erneut versuchen.',429,'rate_limited');
+   const user=db.prepare('SELECT * FROM users WHERE email=? COLLATE NOCASE AND active=1').get(address);const valid=await verifyPassword(b.password,user?.password_hash);if(!valid||!user){logEvent(db,{event:'password_failed',user:user||null,email:address,ip});throw new Problem('Anmeldung fehlgeschlagen.',401,'unauthorized');}const challenge=startChallenge(db,user);res.setHeader('Set-Cookie',challengeCookie(challenge.token));return success(res,challenge.setup?{mfa:'setup',email:user.email,...challenge.setup}:{mfa:'verify'});}
   if(path==='/api/login/mfa'){
    if(!String(req.headers['content-type']).startsWith('application/json'))throw new Problem('JSON erwartet.',415);const b=JSON.parse((await body(req,4096)).toString());
-   const challenge=challengeUser(db,readCookie(req,'stage_mfa'));if(!challenge)throw new Problem('Die Anmeldung ist abgelaufen. Bitte gib dein Passwort erneut ein.',401,'mfa_expired');
+   const challenge=challengeUser(db,readCookie(req,'stage_mfa')),ip=clientIP(req);if(!challenge)throw new Problem('Die Anmeldung ist abgelaufen. Bitte gib dein Passwort erneut ein.',401,'mfa_expired');
    if(limited(db,'mfa:'+challenge.id,10))throw new Problem('Zu viele Versuche. Bitte in zehn Minuten erneut versuchen.',429,'rate_limited');
    const result=completeChallenge(db,challenge,b.code);
-   if(!result){const left=challengeUser(db,readCookie(req,'stage_mfa'));if(!left||left.attempts>=5){res.setHeader('Set-Cookie',challengeCookie('',0));throw new Problem('Zu viele falsche Codes. Bitte gib dein Passwort erneut ein.',401,'mfa_expired');}throw new Problem('Der Code stimmt nicht.',401,'mfa_invalid');}
+   if(!result){logEvent(db,{event:'code_failed',user:challenge,ip});const left=challengeUser(db,readCookie(req,'stage_mfa'));if(!left||left.attempts>=5){res.setHeader('Set-Cookie',challengeCookie('',0));throw new Problem('Zu viele falsche Codes. Bitte gib dein Passwort erneut ein.',401,'mfa_expired');}throw new Problem('Der Code stimmt nicht.',401,'mfa_invalid');}
+   // Counted before this sign-in is logged, so the user sees what happened since their previous one.
+   const warnings=failuresSinceLastLogin(db,challenge.id);
+   if(result.recoveryCodes)logEvent(db,{event:'mfa_enrolled',user:challenge,ip});if(result.usedRecovery)logEvent(db,{event:'recovery_code_used',user:challenge,ip,detail:'noch '+result.recoveryLeft});
+   logEvent(db,{event:'login',user:challenge,ip,detail:result.recoveryCodes?'Einrichtung':result.usedRecovery?'Wiederherstellungscode':'Authenticator'});
    const session=createSession(db,result.user);res.setHeader('Set-Cookie',[cookie(session.token),challengeCookie('',0)]);
-   return success(res,{user:session.user,csrf:session.csrf,appearance:appearance(db,result.user),recoveryCodes:result.recoveryCodes,recoveryLeft:result.usedRecovery?result.recoveryLeft:undefined});
+   return success(res,{user:session.user,csrf:session.csrf,appearance:appearance(db,result.user),recoveryCodes:result.recoveryCodes,recoveryLeft:result.usedRecovery?result.recoveryLeft:undefined,security:warnings.passwords||warnings.codes?warnings:undefined});
   }
  }
  if(path.startsWith('/api/')){
@@ -59,7 +67,7 @@ export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:300
   if(req.method==='GET'&&path==='/api/session')return success(res,{user:publicUser(session),csrf:session.csrf,appearance:appearance(db,session)});
   if(req.method!=='POST')throw new Problem('Methode nicht erlaubt.',405);
   if(req.headers['x-csrf-token']!==session.csrf)throw new Problem('Sicherheitsprüfung fehlgeschlagen. Bitte neu anmelden.',403,'forbidden');
-  if(path==='/api/logout'){db.prepare('DELETE FROM sessions WHERE token_hash=?').run(session.token_hash);live.endSession(session.token_hash);res.setHeader('Set-Cookie',cookie('',0));return success(res,{});}
+  if(path==='/api/logout'){logEvent(db,{event:'logout',user:session,ip:clientIP(req)});db.prepare('DELETE FROM sessions WHERE token_hash=?').run(session.token_hash);live.endSession(session.token_hash);res.setHeader('Set-Cookie',cookie('',0));return success(res,{});}
   if(path==='/api/import'){if(parsing>=2||limited(db,'upload:'+session.id,20,60000))throw new Problem('Bitte kurz warten und erneut importieren.',429);parsing++;try{const raw=await body(req,10*1024*1024);let p;try{p=await parseEmail(raw,session.email);}catch(e){throw new Problem(e.message||'E-Mail konnte nicht gelesen werden.');}return success(res,stageImport(db,session,p));}finally{parsing--;}}
   if(path==='/api/fastbill'){
    if(!String(req.headers['content-type']).startsWith('application/json'))throw new Problem('JSON erwartet.',415);
@@ -85,8 +93,13 @@ export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:300
   switch(b.action){
    case 'appearanceSave':data=saveAppearance(db,session,b);break;
    case 'extensionStatus':data=extensionStatus(db,session);break;
-   case 'extensionCreate':data=extensionCreate(db,session);break;
-   case 'extensionRevoke':data=extensionRevoke(db,session);break;
+   case 'extensionCreate':{
+    // A browser key skips the sign-in for 90 days, so it needs a fresh code: a stolen session cookie alone cannot mint one.
+    if(limited(db,'key-code:'+session.id,5))throw new Problem('Zu viele Versuche. Bitte in zehn Minuten erneut versuchen.',429,'rate_limited');
+    if(!confirmCode(db,session.id,b.code)){logEvent(db,{event:'key_code_failed',user:session,ip:clientIP(req)});throw new Problem('Der Code stimmt nicht oder wurde schon benutzt. Bitte den nächsten Code aus der Authenticator-App eingeben.',403,'mfa_invalid');}
+    data=extensionCreate(db,session);logEvent(db,{event:'key_created',user:session,ip:clientIP(req)});break;}
+   case 'extensionRevoke':data=extensionRevoke(db,session);logEvent(db,{event:'key_revoked',user:session,ip:clientIP(req)});break;
+   case 'securityEvents':data={items:recentEvents(db,session.id)};break;
    case 'load':data=listData(db);break;
    case 'detail':data={entity:entity(db,b.id,true),history:history(db,b.id,0,b.historyKind||'all')};break;
    case 'history':data=history(db,b.id,b.offset,b.kind||'all');break;
@@ -119,7 +132,7 @@ export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:300
  if(req.method!=='GET'&&req.method!=='HEAD')throw new Problem('Methode nicht erlaubt.',405);
  const rel=path==='/index.html'||path==='/'?'index.html':path.slice(1);if(rel!=='index.html'&&!rel.startsWith('assets/'))throw new Problem('Nicht gefunden.',404);const file=resolve(staticDir,rel);if(!file.startsWith(staticDir+'/'))throw new Problem('Nicht gefunden.',404);let bytes;try{bytes=await readFile(file);}catch{throw new Problem('Nicht gefunden.',404);}const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml'};res.writeHead(200,{'Content-Type':types[extname(file)]||'application/octet-stream','Cache-Control':rel==='index.html'?'no-store':'public, max-age=31536000, immutable'});res.end(req.method==='HEAD'?undefined:bytes);
  }catch(e){if(e instanceof SyntaxError)return json(res,400,{status:'invalid',message:'Ungültige Eingabe.'});if(!(e instanceof Problem))console.error('Request failed:',e.code||e.name);if(!res.headersSent)json(res,e.http||500,{status:e.code||'error',message:e instanceof Problem?e.message:'Die Anfrage konnte nicht verarbeitet werden.'});else res.end();}});
- server.requestTimeout=30000;server.headersTimeout=15000;const cleanup=setInterval(()=>{db.prepare('DELETE FROM email_imports WHERE expires_at<?').run(Date.now());db.prepare('DELETE FROM sessions WHERE expires_at<?').run(Date.now());},60000);cleanup.unref();server.on('close',()=>clearInterval(cleanup));
+ server.requestTimeout=30000;server.headersTimeout=15000;const cleanup=setInterval(()=>{db.prepare('DELETE FROM email_imports WHERE expires_at<?').run(Date.now());db.prepare('DELETE FROM sessions WHERE expires_at<?').run(Date.now());pruneEvents(db);},60000);cleanup.unref();server.on('close',()=>clearInterval(cleanup));
  // Open live streams would otherwise keep close() waiting forever.
  const close=server.close.bind(server);server.close=cb=>{live.close();return close(cb);};server.live=live;return server;
 }
