@@ -86,7 +86,50 @@ The browser renders email content as text, never as sender-provided HTML. No rem
 
 ## Backups and restore
 
-Use the documented CLI `backup` command for a consistent online backup. Schedule it through your server's existing backup tooling and keep encrypted/restricted copies off the CRM host. This release supplies the backup command, not an automatic backup schedule.
+### Automatic snapshots
+
+The running application takes a consistent SQLite snapshot every `SNAPSHOT_INTERVAL_HOURS` (default 6) into `/app/data/snapshots/` and keeps the newest `SNAPSHOT_KEEP` healthy ones (default 28, about one week). No extra container or host cron job is needed. The schedule is based on the newest snapshot's age, so restarts neither skip nor duplicate a run; the first check happens one minute after startup. Set `SNAPSHOT_INTERVAL_HOURS=0` in `.env` to disable it.
+
+Each run uses SQLite's online backup API, so it is safe while colleagues are working. The copy is converted into a single self-contained file (no `-wal`/`-shm` companions) and checked with `PRAGMA integrity_check` and `PRAGMA foreign_key_check`. Only a copy that passes gets a `crm-<UTC time>.sqlite.json` manifest with its SHA-256 hash, size, schema version and row counts. Copies that fail are deleted and never count as healthy. The outcome of the last run, including any error, is in `/app/data/snapshots/last-run.json` and the container log.
+
+Snapshots live in the same Docker volume as the database. They protect against mistakes and corrupt writes, not against losing the server or its disk, so copy them off the host with your backup tool.
+
+### Fetching the latest healthy snapshot
+
+```sh
+docker compose exec -T crm node server/cli.mjs snapshot:latest --stdout > stageforce-latest.sqlite
+```
+
+`snapshot:latest` re-checks the hash and SQLite integrity of each snapshot, newest first, and returns the first one that still passes. It exits non-zero with a message on stderr if none passes, so a backup tool can rely on the exit code. Options:
+
+| Command | Output |
+| --- | --- |
+| `snapshot:latest` | Path inside the container, e.g. `/app/data/snapshots/crm-20261026T120000Z.sqlite` |
+| `snapshot:latest --stdout` | The SQLite file itself, for piping into a backup tool |
+| `snapshot:latest --json` | Manifest: file, path, created_at, bytes, sha256, schema, organisations, users |
+| `--max-age-hours N` | Also fail if the latest healthy snapshot is older than N hours (alert on a stalled schedule) |
+| `snapshot` | Take, verify and rotate a snapshot now; prints its path |
+| `snapshot:list` | All snapshots with time, size and health |
+
+Always pass `-T` with `--stdout` so Docker does not allocate a terminal and alter the binary stream. A nightly host cron job with a stale-schedule guard could look like:
+
+```sh
+cd /srv/stageforce && docker compose exec -T crm node server/cli.mjs snapshot:latest --stdout --max-age-hours 12 > /backup/stageforce-$(date +%F).sqlite
+```
+
+### Encrypting snapshots before they leave the server
+
+Snapshots contain customer data, password hashes and Gmail key hashes. Encrypt them on the host before handing them to off-site storage. With [age](https://age-encryption.org) and a public key whose private key is kept off the server:
+
+```sh
+docker compose exec -T crm node server/cli.mjs snapshot:latest --stdout --max-age-hours 12 | age -r age1yourpublickey... > /backup/stageforce-$(date +%F).sqlite.age
+```
+
+To restore, decrypt with `age -d -i key.txt stageforce-....sqlite.age > known-good.sqlite` on a trusted machine and follow the restore steps below. Only the public key is on the server, so a compromised server cannot read older encrypted backups. If your backup tool already encrypts (restic, Borg), pipe the `--stdout` output into it instead.
+
+### Manual backup and restore
+
+The CLI `backup FILE` command still writes a one-off consistent backup to any path, for example before an update.
 
 For a restore, first make a fresh backup of the current instance and stop it. From the source directory, with a known-good backup in a private host path:
 
@@ -96,7 +139,7 @@ docker compose run --rm --no-deps --entrypoint sh -v /absolute/private/path/know
 docker compose up -d
 ```
 
-Removing WAL/SHM files is appropriate only for this stopped-instance restore from a consistent backup. Never remove them from a running application. The backup includes users and Gmail keys, so restore also restores accounts/session/key state; reset affected passwords if restoring after an account compromise.
+A snapshot from `/app/data/snapshots/` can be restored the same way after copying it out with `docker compose cp`. Removing WAL/SHM files is appropriate only for this stopped-instance restore from a consistent backup. Never remove them from a running application. The backup includes users and Gmail keys, so restore also restores accounts/session/key state; reset affected passwords if restoring after an account compromise.
 
 ## Updates
 

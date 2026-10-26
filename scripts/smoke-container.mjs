@@ -9,6 +9,7 @@ try{
  for(let i=0;i<30;i++){try{if((await fetch(base+'/healthz')).ok)break;}catch{}if(i===29)throw Error('Container did not become healthy');await new Promise(r=>setTimeout(r,500));}
  docker(['exec','-i',name,'node','server/cli.mjs','user:add','demo@example.test','Demo','--password-stdin'],{input:password+'\n'});
  docker(['exec',name,'node','server/cli.mjs','demo']);
+ docker(['exec',name,'node','server/cli.mjs','snapshot']);const streamed=execFileSync('docker',['exec',name,'node','server/cli.mjs','snapshot:latest','--stdout','--max-age-hours','1'],{stdio:['ignore','pipe','pipe']});if(streamed.subarray(0,16).toString()!=='SQLite format 3\0')throw Error('Snapshot stream is not a SQLite database');
  docker(['restart',name]);
  // Docker may assign a new ephemeral host port when the container restarts.
  base=address();

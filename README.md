@@ -97,7 +97,10 @@ docker compose exec crm node server/cli.mjs user:disable colleague@example.com
 docker compose exec crm node server/cli.mjs user:list
 docker compose exec crm node server/cli.mjs backup /app/data/backups/crm-before-update.sqlite
 docker compose cp crm:/app/data/backups/crm-before-update.sqlite ./crm-before-update.sqlite
+docker compose exec -T crm node server/cli.mjs snapshot:latest --stdout > stageforce-latest.sqlite
 ```
+
+The server also takes verified snapshots every 6 hours by default and keeps the newest 28; `snapshot:latest` returns the newest one that still passes its integrity check. See [automatic snapshots](docs/deployment.md#automatic-snapshots).
 
 Backups contain customer data. Put them in your existing restricted backup system. The CLI uses SQLite's consistent online backup API; do not copy the live `.sqlite` file alone while the application is writing. Restore steps: [docs/deployment.md](docs/deployment.md).
 
