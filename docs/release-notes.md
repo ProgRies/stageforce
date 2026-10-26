@@ -1,3 +1,12 @@
+## Unreleased · extension 0.4.20
+
+Rebuild the CRM and reload the extension in `chrome://extensions`. No data change; the CRM adds a database index on start.
+
+- Emails a colleague already saved are now recognised in your mailbox too. Gmail gives each mailbox its own ids, so the copy is matched by sender, subject (ignoring Re:/AW:), the minute it was sent and at least one shared recipient. The button then says "Already in StageForce", the popup names who saved it, and saving again adds no second copy.
+- The inbox list's **✓ CRM** mark also appears when a colleague saved the latest email of a conversation, so you can see which emails are still missing. For this, the latest email's sender, time and subject are sent to the CRM; only a yes or no comes back.
+- Dates with spelled-out months ("Mo., 20. Okt. 2026, 10:00", "Mon, Oct 20, 2026, 10:00 AM") are now read too, which also prefills the date for English Gmail.
+- Limits: matching needs both Gmail accounts to show the same time zone, and a subject edited before saving is not matched.
+
 ## Unreleased · Call card only where you called · extension 0.4.19
 
 Rebuild the CRM and reload the extension. No database change.

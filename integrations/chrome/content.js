@@ -140,6 +140,8 @@ const callWatchers=new Set();
 const callDock=globalThis.stageForceCallCard.create({api:payload=>api(payload),theme:()=>dockTheme||(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'),onChange:()=>{for(const f of callWatchers)f();},onSaved:(call,r)=>{for(const f of callWatchers)f(r);},onOpen:id=>send({type:'open',organisationId:id}).catch(()=>{})});
 async function send(message){try{const r=await chrome.runtime.sendMessage(message);if(!r?.ok)throw Object.assign(new Error(r?.error||'Extension unavailable. Refresh Gmail.'),{code:r?.code||'request_failed'});return r.data;}catch(error){if(/Extension context invalidated|Receiving end does not exist|Extension unavailable/.test(error.message))throw Object.assign(new Error('The extension was reloaded. Copy any unsaved edits, then refresh Gmail.'),{code:'reload_required'});throw error;}}
 const api=payload=>send({type:'api',payload});
+// What a colleague's copy of the same email shares: sender, recipients, subject and the minute it was sent.
+function sameKey(d){return{from:{email:d.from.email,name:''},recipients:d.visibleRecipients.slice(0,100).map(email=>({email,name:''})),subject:d.subject,sentAt:globalThis.stageForceDate(d.timestampRaw)?.toISOString()};}
 async function messageFingerprint(d){const data='extension-v1:'+JSON.stringify([d.from.email,d.timestampRaw,d.subject,d.bodyText]);const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(data));return[...new Uint8Array(bytes)].map(v=>v.toString(16).padStart(2,'0')).join('');}
 // Gmail HTML layouts leave indentation, wide gaps and stacked blank lines in the text. Tidy what the user reviews and saves; bodyText stays raw for dedupe.
 function readableBody(text){return String(text||'').replace(/\u00a0/g,' ').split('\n').map(line=>line.replace(/[ \t]{2,}/g,' ').trim()).join('\n').replace(/\n{3,}/g,'\n\n').trim();}
@@ -318,7 +320,7 @@ async function open(n){
   const items=[];
   for(const m of others){
    const od=extract(m);if(!od.gmailMessageId||od.gmailMessageId===d.gmailMessageId||!od.from.email)continue;
-   try{const r=await api({action:'messageStatus',mailbox,gmailMessageId:od.gmailMessageId,legacyFingerprint:await messageFingerprint(od)});if(r.saved){setMessageButton(m,'saved');continue;}}catch{continue;}
+   try{const r=await api({action:'messageStatus',mailbox,gmailMessageId:od.gmailMessageId,legacyFingerprint:await messageFingerprint(od),...sameKey(od)});if(r.saved){setMessageButton(m,'saved');continue;}}catch{continue;}
    const date=globalThis.stageForceDate(od.timestampRaw);items.push({n:m,d:od,date,checked:!!date,requestId:crypto.randomUUID(),done:false});
   }
   if(!active)return;conversation=items;drawConversation();
@@ -360,8 +362,8 @@ async function open(n){
    close();
   }catch(e){action.classList.remove('working');if(active){connectionError(e);$('#error').textContent='Save not confirmed. Your draft is still open. '+e.message;busy=false;sh.querySelectorAll('input,textarea,select').forEach(e=>e.disabled=false);if(/inzwischen geändert/.test(e.message))await lookup();controls();}}
  }
- async function loadSaved(){if(!$('#mailbox').value)return;const r=await popupApi({action:'messageStatus',mailbox:$('#mailbox').value,gmailMessageId:d.gmailMessageId,detail:true,legacyFingerprint:await messageFingerprint(d)});if(!active||!r.saved)return;
-  savedMessage=r.message;selected=r.organisation;$('#title').textContent='Already in StageForce';$('#org').value=selected.name;$('#org').readOnly=true;$('#subject').value=savedMessage.subject;$('#subject').readOnly=true;setBody(savedMessage.body);$('#date').value=savedMessage.timestamp?localInput(new Date(savedMessage.timestamp)):'';$('#date').readOnly=true;$('#mailbox').readOnly=true;$('#direction').value=savedMessage.direction;$('#direction').disabled=true;$('.optional').classList.add('hidden');$('#quoted-toggle').classList.add('hidden');showAttachments(savedMessage.attachments);renderContacts(r.participants);$('#save').classList.add('hidden');$('#save-open').textContent='Open in CRM ↗';$('#save-open').onclick=()=>send({type:'open',organisationId:selected.id}).catch(e=>$('#error').textContent=e.message);$('#error').textContent='';
+ async function loadSaved(){if(!$('#mailbox').value)return;const r=await popupApi({action:'messageStatus',mailbox:$('#mailbox').value,gmailMessageId:d.gmailMessageId,detail:true,legacyFingerprint:await messageFingerprint(d),...sameKey(d)});if(!active||!r.saved)return;
+  savedMessage=r.message;selected=r.organisation;$('#title').textContent='Already in StageForce';$('#org').value=selected.name;$('#org').readOnly=true;$('#subject').value=savedMessage.subject;$('#subject').readOnly=true;setBody(savedMessage.body);$('#date').value=savedMessage.timestamp?localInput(new Date(savedMessage.timestamp)):'';$('#date').readOnly=true;$('#mailbox').readOnly=true;$('#direction').value=savedMessage.direction;$('#direction').disabled=true;$('.optional').classList.add('hidden');$('#quoted-toggle').classList.add('hidden');showAttachments(savedMessage.attachments);renderContacts(r.participants);$('#save').classList.add('hidden');$('#save-open').textContent='Open in CRM ↗';$('#save-open').onclick=()=>send({type:'open',organisationId:selected.id}).catch(e=>$('#error').textContent=e.message);$('#error').textContent='';if(r.savedBy?.length)$('#org-status').textContent='Saved by '+r.savedBy.join(', ');
   setMessageButton(n,'saved');
  }
  $('#save').title='Save & Continue · '+(/Mac/.test(navigator.platform)?'⌘':'Ctrl')+'+Enter';$('#save').onclick=()=>save(false);$('#save-open').onclick=()=>save(true);
@@ -475,10 +477,12 @@ function setButtonState(b,state,celebrate=false,detail=''){
  const [icon,label,title]=states[state];b.dataset.state=state;b.sfRevision=(b.sfRevision||0)+1;b.classList.toggle('celebrate',celebrate);b.querySelector('.symbol').textContent=icon;b.querySelector('.label').textContent=label;b.title=detail||title;
 }
 function buttonIssue(b,error){const message=error?.message||'Check the StageForce connection.';const state=error?.code==='connection_required'?'disconnected':/Connect Stage Force first|Connect your extension|Connect Stage Force using/.test(message)?'disconnected':/unavailable|Failed to fetch|timeout|timed out|aborted/i.test(message)?'offline':'attention';setButtonState(b,state,false,message);}
-// Inbox rows get a small mark when their conversation is in StageForce. Only Gmail ids are sent and only a yes/no comes back, so no client data is put into the page.
+// Inbox rows get a small mark when their conversation is in StageForce, also when a colleague saved its latest email. Gmail ids and the latest email's sender, minute and subject are sent; only a yes/no comes back, so no CRM data is put into the page.
 const rowStatus=new Map();let rowsBusy=false,rowsPausedUntil=0;
 const rowKey=(mailbox,id)=>mailbox.toLowerCase()+'|'+id;
 function rowIds(r){const attr=(s,a)=>r.querySelector(s)?.getAttribute(a)||r.getAttribute(a)||'';return unique([attr('[data-thread-id]','data-thread-id').replace(/^#/,''),attr('[data-legacy-thread-id]','data-legacy-thread-id'),attr('[data-legacy-last-message-id]','data-legacy-last-message-id')]).filter(v=>v.length<=200&&/^[\w:.-]+$/.test(v));}
+// The latest message of a row, so an email a colleague saved is found in this mailbox too.
+function rowLatest(r){const sentAt=globalThis.stageForceDate(r.querySelector('.xW [title],td.xW span[title]')?.getAttribute('title'))?.toISOString(),subject=text(r.querySelector('.bog'));const from=unique([...r.querySelectorAll('.yX [email],.yW [email]')].map(e=>String(e.getAttribute('email')).toLowerCase())).slice(0,10);return sentAt&&subject&&from.length?{from,sentAt,subject:subject.slice(0,1000)}:null;}
 function rowSaved(mailbox,ids){return ids.some(v=>rowStatus.get(rowKey(mailbox,v))?.saved);}
 function rowSavedNow(m){const mailbox=account();if(!mailbox)return;for(const v of [m.gmailThreadId,m.gmailMessageId])if(v)rowStatus.set(rowKey(mailbox,String(v).replace(/^#/,'')),{saved:true,at:Date.now()});markInbox();}
 function markRow(r){
@@ -491,11 +495,11 @@ async function markInbox(){
  if(rowsBusy||document.hidden||Date.now()<rowsPausedUntil)return;
  const rows=[...document.querySelectorAll('tr.zA')].filter(visible);if(!rows.length)return;
  const mailbox=account();if(!mailbox)return;
- const now=Date.now(),wanted=new Set();
- for(const r of rows){const ids=rowIds(r);if(rowSaved(mailbox,ids)){markRow(r);continue;}for(const v of ids){const s=rowStatus.get(rowKey(mailbox,v));if(!s||now-s.at>60000)wanted.add(v);}}
+ const now=Date.now(),wanted=new Set(),latest=new Map();
+ for(const r of rows){const ids=rowIds(r);if(rowSaved(mailbox,ids)){markRow(r);continue;}let stale=false;for(const v of ids){const s=rowStatus.get(rowKey(mailbox,v));if(!s||now-s.at>60000){wanted.add(v);stale=true;}}const row=stale&&ids[0]&&rowLatest(r);if(row&&latest.size<150)latest.set(ids[0],{id:ids[0],...row});}
  if(!wanted.size)return;
  const ids=[...wanted].slice(0,150);rowsBusy=true;
- try{const r=await api({action:'threadStatus',mailbox,ids});const saved=new Set(Array.isArray(r?.saved)?r.saved:[]);for(const v of ids)rowStatus.set(rowKey(mailbox,v),{saved:saved.has(v),at:Date.now()});}
+ try{const r=await api({action:'threadStatus',mailbox,ids,rows:[...latest.values()].filter(row=>ids.includes(row.id))});const saved=new Set(Array.isArray(r?.saved)?r.saved:[]);for(const v of ids)rowStatus.set(rowKey(mailbox,v),{saved:saved.has(v),at:Date.now()});}
  catch{rowsPausedUntil=Date.now()+60000;return;}
  finally{rowsBusy=false;}
  for(const r of rows)if(r.isConnected&&rowSaved(mailbox,rowIds(r)))markRow(r);
@@ -524,7 +528,7 @@ async function drainChecks(){
   try{
    if(!mailbox){await send({type:'status'});if(b.sfRevision===revision)setButtonState(b,'attention',false,'Open to confirm your Gmail mailbox.');continue;}
    let r=await api({action:'messageStatus',mailbox,gmailMessageId:id});
-   if(!r.saved){const legacyFingerprint=await messageFingerprint(extract(n));r=await api({action:'messageStatus',mailbox,gmailMessageId:id,legacyFingerprint});}
+   if(!r.saved){const m=extract(n),legacyFingerprint=await messageFingerprint(m);r=await api({action:'messageStatus',mailbox,gmailMessageId:id,legacyFingerprint,...sameKey(m)});}
    if(b.sfRevision===revision)setButtonState(b,r.saved?'saved':'ready');
   }catch(error){if(b.sfRevision===revision)buttonIssue(b,error);}
  }finally{b.sfQueued=false;}}}finally{checkingButtons=false;}

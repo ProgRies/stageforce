@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS review_issues(id TEXT PRIMARY KEY,organisation_id TEX
 CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY,dedupe_key TEXT NOT NULL UNIQUE,rfc_message_id TEXT,subject TEXT NOT NULL DEFAULT '',sender_json TEXT NOT NULL,recipients_json TEXT NOT NULL,sent_at TEXT,direction TEXT NOT NULL CHECK(direction IN ('incoming','outgoing')),body TEXT NOT NULL,attachments_json TEXT NOT NULL DEFAULT '[]');
 CREATE TABLE IF NOT EXISTS message_sources(message_id TEXT NOT NULL REFERENCES messages(id),user_id TEXT NOT NULL REFERENCES users(id),mailbox TEXT NOT NULL,source_url TEXT NOT NULL DEFAULT '',PRIMARY KEY(message_id,user_id,mailbox));
 CREATE TABLE IF NOT EXISTS activities(id TEXT PRIMARY KEY,organisation_id TEXT NOT NULL REFERENCES organisations(id),kind TEXT NOT NULL,occurred_on TEXT,created_at TEXT NOT NULL,author_id TEXT REFERENCES users(id),author_label TEXT,body TEXT NOT NULL DEFAULT '',is_contact INTEGER NOT NULL DEFAULT 0 CHECK(is_contact IN (0,1)),message_id TEXT REFERENCES messages(id),legacy_json TEXT);
+CREATE INDEX IF NOT EXISTS messages_sent ON messages(sent_at);
 CREATE INDEX IF NOT EXISTS activities_org_date ON activities(organisation_id,occurred_on DESC,created_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS activity_message ON activities(message_id) WHERE message_id IS NOT NULL;
 CREATE TABLE IF NOT EXISTS source_references(id TEXT PRIMARY KEY,organisation_id TEXT NOT NULL REFERENCES organisations(id),activity_id TEXT REFERENCES activities(id),contact_id TEXT REFERENCES contacts(id),payload_json TEXT NOT NULL);
