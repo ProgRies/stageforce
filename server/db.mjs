@@ -8,8 +8,8 @@ export function openDB(path=resolve(process.env.DATA_DIR||'data','crm.sqlite')){
  if(path!==':memory:')mkdirSync(dirname(path),{recursive:true,mode:0o700});
  const db=new DatabaseSync(path,{timeout:5000});
  db.exec('PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;');
- const version=db.prepare('PRAGMA user_version').get().user_version;if(version>11)throw Error('Database is newer than this application. Upgrade the application.');
- transaction(db,()=>{db.exec(readFileSync(new URL('./schema.sql',import.meta.url),'utf8'));db.exec("INSERT OR IGNORE INTO schema_versions VALUES(11,datetime('now')); PRAGMA user_version=11");
+ const version=db.prepare('PRAGMA user_version').get().user_version;if(version>12)throw Error('Database is newer than this application. Upgrade the application.');
+ transaction(db,()=>{db.exec(readFileSync(new URL('./schema.sql',import.meta.url),'utf8'));db.exec("INSERT OR IGNORE INTO schema_versions VALUES(12,datetime('now')); PRAGMA user_version=12");
   // Sessions and browser keys from before MFA were never confirmed with a second factor: everyone signs in again once.
   if(version>0&&version<10)db.exec('DELETE FROM sessions; DELETE FROM extension_keys;');});
  if(path!==':memory:')chmodSync(path,0o600);return db;

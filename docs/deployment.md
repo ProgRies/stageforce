@@ -8,7 +8,8 @@ Use the same StageForce application and SQLite database on one server, with one 
 
 Prepare a separate production Compose configuration before deploying:
 
-- Build the reviewed source into a pinned image.
+- Build the reviewed source into a pinned image, and set `CRM_IMAGE` to its exact version. Never deploy a moving tag such as `latest`.
+- Keep `TRUST_PROXY=1` (the production default) when Traefik sits in front: sign-in limits count per client address, which the proxy appends to `X-Forwarded-For`. Use `TRUST_PROXY=0` only if clients connect to the container directly; without a proxy a trusted header could be forged.
 - Set `NODE_ENV=production`, `APP_URL=https://<your-crm-host>` and the persistent `DATA_DIR`.
 - Set `INTERNAL_DOMAINS=stage.bio,jaimo-solutions.com` (comma separated). Addresses on these domains, aliases like billing@ included, count as colleagues: they are never suggested as client contacts, and mail sent from them is filed as sent. CRM users' own domains always count.
 - Put the service behind your HTTPS reverse proxy with a valid certificate. Do not expose the development port publicly.
@@ -49,3 +50,18 @@ docker compose exec crm node server/cli.mjs user:list
 Passwords are entered at a hidden prompt and hashed with scrypt. Password reset and account disabling revoke sessions and extension keys. Session expiry is seven days; extension key expiry is 90 days. The current design uses one active extension key per CRM user.
 
 Every sign-in needs a TOTP code from an authenticator app (or a single-use recovery code). New users set the app up on their first sign-in; they cannot reach the CRM before that. If a phone is lost and the recovery codes are gone, `user:mfa-reset` removes the old authenticator, ends the user's sessions and revokes their extension key; the next sign-in sets up a new app. Check identity out of band before resetting, because the reset leaves the password as the only factor until the user enrols again. `user:list` shows who has set up the app and how many recovery codes are left.
+
+Creating a browser-extension key asks for a fresh authenticator code, because the key signs the extension in for 90 days without one.
+
+Sign-in limits: 30 attempts per client address and 10 per account and address within ten minutes, and 50 per account within an hour. There is no team-wide limit, so one address cannot lock everybody out.
+
+```sh
+docker compose exec crm node server/cli.mjs security:log                       # latest 50 events
+docker compose exec crm node server/cli.mjs security:log colleague@example.com 100
+```
+
+Security events (sign-ins, wrong passwords and codes, recovery-code use, MFA set-up and resets, browser keys created or revoked, CLI account changes) are kept for 90 days with time, account and client address. Each user sees their own under Einstellungen → Anmeldeaktivität, and the first screen after signing in warns about wrong passwords or codes since their previous sign-in.
+
+## GitHub account and repository
+
+Whoever can push to `main` and publish a release controls what the server can run. Turn on two-factor authentication for every account with write access, and protect `main` (Settings → Branches: require a pull request before merging, block force pushes and deletion).

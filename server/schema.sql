@@ -64,3 +64,8 @@ CREATE TABLE IF NOT EXISTS login_challenges(token_hash TEXT PRIMARY KEY,user_id 
 
 -- Version 11: an optional map pin per organisation.
 CREATE TABLE IF NOT EXISTS organisation_locations(organisation_id TEXT PRIMARY KEY REFERENCES organisations(id) ON DELETE CASCADE,lat REAL NOT NULL CHECK(lat BETWEEN -90 AND 90),lng REAL NOT NULL CHECK(lng BETWEEN -180 AND 180),updated_at TEXT NOT NULL);
+
+-- Version 12: security events (sign-ins, wrong passwords and codes, MFA and browser-key changes), kept 90 days.
+CREATE TABLE IF NOT EXISTS security_events(id INTEGER PRIMARY KEY,at INTEGER NOT NULL,user_id TEXT REFERENCES users(id) ON DELETE CASCADE,email TEXT NOT NULL DEFAULT '',ip TEXT NOT NULL DEFAULT '',event TEXT NOT NULL,detail TEXT NOT NULL DEFAULT '');
+CREATE INDEX IF NOT EXISTS security_events_user ON security_events(user_id,at);
+CREATE INDEX IF NOT EXISTS security_events_at ON security_events(at);

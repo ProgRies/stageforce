@@ -7,6 +7,15 @@ Rebuild the CRM and reload the extension in `chrome://extensions`. No data chang
 - Dates with spelled-out months ("Mo., 20. Okt. 2026, 10:00", "Mon, Oct 20, 2026, 10:00 AM") are now read too, which also prefills the date for English Gmail.
 - Limits: matching needs both Gmail accounts to show the same time zone, and a subject edited before saving is not matched.
 
+## Unreleased · Security hardening
+
+Rebuild the CRM. The CRM adds one table on start (security events); no data is changed. Production: pin `CRM_IMAGE` to an exact version and keep `TRUST_PROXY=1` behind Traefik (see docs/deployment.md).
+
+- Creating a browser-extension key now asks for a fresh code from the authenticator app. A stolen session alone can no longer mint a 90-day key.
+- Sign-in limits count per client address and per account. The shared team-wide limit is gone, so nobody can lock the whole team out by sending wrong passwords.
+- Sign-ins, wrong passwords and codes, recovery-code use, MFA and key changes are recorded for 90 days. Einstellungen → Anmeldeaktivität shows your own; `cli.mjs security:log` shows everyone's. After signing in you are warned about wrong passwords or codes since your previous sign-in.
+- Releases no longer publish a `latest` image tag; servers run the exact version they name.
+
 ## Unreleased · Call card only where you called · extension 0.4.19
 
 Rebuild the CRM and reload the extension. No database change.

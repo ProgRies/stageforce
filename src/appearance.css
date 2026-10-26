@@ -111,3 +111,12 @@
 
 [data-theme="dark"] .settings-key input{background:var(--surface-input);color:var(--ink);border-color:var(--line)}
 .appearance-sync-error{font-size:11px;color:var(--amber);max-width:160px}
+.settings-code{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+.settings-code input{font-size:15px;letter-spacing:.12em;font-variant-numeric:tabular-nums}
+.settings-extension summary svg{vertical-align:-2px}
+.security-events{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:8px;max-height:220px;overflow:auto}
+.security-events li{display:flex;flex-direction:column;gap:1px;font-size:12px}
+.security-events li small{margin-top:0}
+.security-events li.warn span{font-weight:600}
+.security-events li.warn span::before{content:"⚠ "}
+[data-theme="dark"] .settings-code input{background:var(--surface-input);color:var(--ink);border-color:var(--line)}
