@@ -84,7 +84,7 @@ test('upgrading an existing database signs everyone out and revokes browser keys
  const dir=mkdtempSync(join(tmpdir(),'stage-mfa-'));const path=join(dir,'crm.sqlite');let db=openDB(path);
  try{const id=await addUser(db,'old@example.test','Old',password);const user=db.prepare('SELECT * FROM users WHERE id=?').get(id);
   db.exec('DROP TABLE user_mfa; DROP TABLE mfa_recovery_codes; DROP TABLE login_challenges; PRAGMA user_version=9');createSession(db,user);extensionCreate(db,user);db.close();
-  db=openDB(path);assert.equal(db.prepare('PRAGMA user_version').get().user_version,11);assert.equal(db.prepare('SELECT count(*) n FROM sessions').get().n,0);assert.equal(db.prepare('SELECT count(*) n FROM extension_keys').get().n,0);
+  db=openDB(path);assert.equal(db.prepare('PRAGMA user_version').get().user_version,12);assert.equal(db.prepare('SELECT count(*) n FROM sessions').get().n,0);assert.equal(db.prepare('SELECT count(*) n FROM extension_keys').get().n,0);
   enableMfa(db,id,newSecret());createSession(db,user);db.close();db=openDB(path);assert.equal(db.prepare('SELECT count(*) n FROM sessions').get().n,1,'later restarts keep sessions');
  }finally{db.close();rmSync(dir,{recursive:true,force:true});}
 });

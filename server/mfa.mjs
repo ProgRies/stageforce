@@ -46,3 +46,9 @@ export function completeChallenge(db,challenge,code,time=Date.now()){return tran
   if(m&&!/^\d{6}$/.test(input)){const r=db.prepare('UPDATE mfa_recovery_codes SET used_at=? WHERE user_id=? AND code_hash=? AND used_at IS NULL').run(time,c.user_id,hashToken(normalRecovery(input)));if(r.changes)return done({usedRecovery:true,recoveryLeft:recoveryLeft(db,c.user_id)});}
  }
  db.prepare('UPDATE login_challenges SET attempts=attempts+1 WHERE token_hash=?').run(c.token_hash);return null;});}
+// A fresh authenticator code for a sensitive step inside a session (creating a browser key). Recovery codes do not count,
+// and a code already used for the sign-in is refused, so a stolen session cookie alone cannot pass.
+export function confirmCode(db,userId,code,time=Date.now()){return transaction(db,()=>{
+ const m=db.prepare('SELECT * FROM user_mfa WHERE user_id=?').get(userId);const step=m&&matchTotp(m.secret,String(code||'').replace(/\s/g,''),time);
+ if(step===null||step===undefined||step<=m.last_step)return false;
+ db.prepare('UPDATE user_mfa SET last_step=? WHERE user_id=?').run(step,userId);return true;});}
