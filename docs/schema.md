@@ -1,56 +1,59 @@
-# Database and migration
+# Database
 
-`server/schema.sql` is the executable schema. Tables use foreign keys and stable text IDs. `PRAGMA user_version` tracks the schema version; future application versions must introduce an explicit versioned migration before changing a deployed database. An older binary refuses a newer schema. Current version: 11. Version 11 added `organisation_locations`. Version 3 added FastBill import tables; version 4 added `activity_contacts`; version 6 replaces legacy integration credentials. Startup applies these additive changes in a transaction and preserves existing CRM data. Back up before upgrading. Older binaries refuse newer databases; rollback requires restoring the pre-upgrade backup.
+StageForce keeps everything in one SQLite file, `DATA_DIR/crm.sqlite` (`/app/data/crm.sqlite` in the container). `server/schema.sql` is the executable schema; `server/db.mjs` applies it on every start.
 
-| Table | Purpose / relationship |
+The current schema version is **13** (`PRAGMA user_version`). Startup brings an older database up to 13 in one transaction and keeps all existing data. An application refuses a database newer than itself, so a rollback after an upgrade needs the backup taken before it. Back up before every update.
+
+## Tables
+
+| Table | Purpose |
 | --- | --- |
-| organisations | Scalar master data, status, phase, owner, summary, last contact, FastBill URL, optimistic version |
-| contacts | Person/team name and role |
-| organisation_contacts | Organisation ↔ contact membership; at most one primary contact per organisation |
-| contact_addresses | Multiple email addresses/phone numbers per contact; primary address ordered first |
-| activities | One interaction/note per row; linked organisation and optional signed-in author/message |
-| meeting_refs | One row per detected video-call invitation per organisation; points at its Meeting activity so updated or cancelled invitations change that entry instead of adding another |
-| meeting_status | Marks a Meeting activity as cancelled; planned meetings are Meeting activities dated in the future |
-| activity_contacts | Explicitly reviewed email/call activity ↔ contact associations; no backfill/inferred links for old messages |
-| messages | Approved text, subject, participants, sent timestamp, direction, attachment metadata and unique deduplication key |
-| message_sources | Mailbox owner and optional original URL; multiple colleagues may reference one message |
-| followups | Next action and due date; at most one current follow-up per organisation in v0.1 |
-| organisation_locations | Optional map pin (latitude/longitude) per organisation; kept on merge when the target has none, removed with the organisation |
-| organisation_links | One relationship per sorted organisation-ID pair, with a free-text note |
-| review_issues | Open/resolved review text; missing-phone/FastBill checks are additionally computed |
-| source_references | Original provenance attached to an organisation, contact or activity |
-| audit_log | Author, timestamp and structured before/after values for organisation edits; contact/link/import events |
-| users / sessions | Local accounts, salted scrypt password hashes, hashed opaque session tokens and CSRF tokens |
-| email_imports | Per-user, short-lived review payload; removed on confirmation/discard/expiry |
-| fastbill_batches / fastbill_rows | Per-user review runs and whitelisted source payloads; deleting a run cascades to staged rows |
-| fastbill_decisions | Account-scoped fingerprints, applied/ignored decision, reviewer, target and note; survives run deletion |
-| fastbill_mappings | Account-scoped customer ID/number to organisation associations; many-to-many, never an automatic merge |
-| requests | Idempotency receipts for saves and email confirmations |
-| migrations / migration_archive | Report and original rows of the retired spreadsheet migration, kept as provenance |
-| search_docs | SQLite FTS5 index; derived, not authoritative customer data |
+| organisations | Name, status, phase, type, place, website, owner (user id), last contact, FastBill URL and an optimistic version number for concurrent edits |
+| contacts | Person or team name and role |
+| organisation_contacts | Which contacts belong to which organisation; a contact can belong to several |
+| contact_addresses | Email addresses and phone numbers per contact, in order |
+| organisation_links | One relationship between two organisations, with a note |
+| organisation_locations | Optional map pin (latitude, longitude) per organisation |
+| activities | Timeline entries: emails, calls, meetings and notes, with date, author and whether it counts as client contact |
+| activity_contacts | Contacts linked to an email, call or meeting |
+| meeting_refs | Links a meeting entry to the invitation it came from (join link or title), so updates and cancellations change that entry |
+| meeting_status | Marks a meeting as cancelled |
+| messages | Saved email: reviewed text, subject, participants, time, direction, attachment names and a unique duplicate key |
+| message_originals | The full loaded text of a saved email, kept beside the stored reply |
+| message_sources | Which user and mailbox saved an email; several colleagues can reference one email |
+| extension_message_refs | Mailbox plus Gmail message id → saved email |
+| extension_thread_refs | Mailbox plus Gmail conversation id → saved emails, so later emails of a conversation find the organisation |
+| followups | The open follow-up (next action and due date) per organisation |
+| review_issues | Open and closed Prüfen points |
+| call_attempts | A started call: user, organisation, contact, number, time, direction, and the timeline entry once saved |
+| call_drafts | The note of a call that is still open, so the call card can be resumed anywhere |
+| call_reservations | Which user holds an organisation on today's call list |
+| source_references | Where imported data came from |
+| audit_log | Every change with author, time and before/after values |
+| search_docs | Full-text search index (FTS5), rebuilt from the tables above |
+| requests | Idempotency receipts, so a retried save is not stored twice |
+| email_imports | .eml uploads waiting for review, removed after confirmation or 24 hours |
+| fastbill_batches, fastbill_rows | Per-user FastBill import runs and their staged rows |
+| fastbill_decisions | Shared decisions (added, assigned, not relevant) per FastBill account and row fingerprint |
+| fastbill_mappings | Confirmed FastBill customer id/number → organisation |
+| users | Accounts: email, name, scrypt password hash, active, must change password |
+| sessions | Hashed session tokens with CSRF token, kind (browser or phone app), label, expiry and last use |
+| login_challenges | The short step between password and authenticator code |
+| login_limits | Sign-in attempt counters |
+| user_mfa | Authenticator secret per user |
+| mfa_recovery_codes | Hashed single-use recovery codes |
+| extension_keys | One hashed, expiring browser-extension key per user |
+| security_events | Sign-ins, failures and key or MFA changes, kept 90 days |
+| user_appearance | Light, dark or system theme per user |
+| schema_versions | When each schema version was applied |
+| migrations, migration_archive | Provenance of the original spreadsheet import, kept read-only in databases that had it |
 
-Dates in existing records remain ISO date-only values. An unknown legacy date stays NULL. New email messages retain their timestamp where available; the reviewed activity date is interpreted as the business date in Europe/Berlin. Recording time and event date are separate. Existing `last_contact` values are carried over; internal CRM cleanup events do not become client interactions.
+## Dates and order
 
-Names and email addresses are not assumed to be globally unique person IDs. Agency contacts can belong to multiple organisations in the schema. The initial contact editor creates contacts within the selected organisation; the first release does not offer cross-organisation person merging. Shared mailboxes never force automatic merges.
+Event dates are business dates in Europe/Berlin. Emails also keep their exact send time, and calls the time they were started. The timeline sorts by event date, then exact time, then recording order; an unknown date stays unknown. A planned meeting is a meeting entry dated in the future and counts as contact only once its day has come.
 
-The one-time spreadsheet migration (`cli migrate`) has been removed. Its `migrations` and `migration_archive` rows stay in existing databases as provenance. New organisations enter the CRM only by hand, from an email import, or one at a time from the FastBill review queue.
+## Contacts and duplicates
 
-The UI loads a compact organisation list and queries the full-text index for deeper matches. History is paged in batches of 40; email bodies are fetched on expansion. No attachments or mailbox mirror are stored. Search-index updates and business writes share the same transaction.
+Names and email addresses are not treated as unique person ids, and nothing merges contacts or organisations automatically. Shared mailboxes never force a match. Organisations are merged only by hand (Organisation verwalten → Zusammenführen).
 
-Communication history and internal notes are separately filtered and paginated. Both use the reviewed event date, then the original email timestamp when present, then recording order. The wizard computes the proposed position from all communication rows, not just the first page. Unknown dates remain unknown; calls without a time sort after timed emails on the same date. Email import explicitly whitelists status, phase and follow-up changes, so it cannot override the last-contact date directly.
-
-## Schema 6: browser extension
-
-Adds `extension_keys` (one hashed, revocable, expiring credential per user). Removes obsolete Gmail add-on credentials. CRM records, contacts and messages are preserved. Existing databases require a backup before upgrade; rollback needs the matching pre-upgrade database.
-
-## Schema 7: durable identity and calls
-
-`extension_message_refs` maps mailbox plus stable Gmail identifier to a stored message. `call_attempts` records the click timestamp, dialled number, user, organisation/contact and optional source message. Save links it to one activity; cancel deletes the pending row. `call_drafts` keeps the note of a call that is still open (one row per unsaved attempt, removed on save or discard), so the floating call card can be resumed in another tab, the CRM or Gmail. Existing data is preserved. Timed calls sort by original click time alongside email timestamps. Calls do not imply successful contact.
-
-## Schema 8: appearance
-
-`user_appearance` stores each user’s light, dark or system preference. CRM settings save the preference through the authenticated API; the extension reads it when opening its popup.
-
-## Schema 9: personal call lists
-
-`call_reservations` holds the organisations on a user's call list for one Berlin calendar day (one holder per organisation and day). `organisations.owner` ("Zuständig intern") now stores a user ID; older free-text values that match a user's name or email are treated as that user, anything else counts as unowned. A user's call list only draws from organisations they own or nobody owns and no colleague holds today, and the first saved call to an unowned organisation makes the caller its owner. Existing data is preserved.
+New organisations come from the CRM, the browser extension, the phone app, an .eml upload or the FastBill review, one at a time.

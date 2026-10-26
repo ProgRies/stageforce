@@ -70,6 +70,21 @@ Each colleague creates a key in the hosted CRM (gear → **Browser-Erweiterung v
 
 The container runs as the unprivileged `node` user (UID 1000). Every write (database, snapshots, map tile cache) goes to `/app/data`; the root filesystem is read-only, with a bounded `/tmp`.
 
+## Admin quick reference
+
+| Situation | Command (in the deployment directory) |
+| --- | --- |
+| New colleague | `docker compose exec crm node server/cli.mjs user:add EMAIL "NAME" --temporary`, then share the starting password directly |
+| Forgotten password | `… user:password EMAIL --temporary` |
+| Lost phone and recovery codes | `… user:mfa-reset EMAIL` (check identity first) |
+| Colleague leaves | `… user:disable EMAIL` |
+| Who has set up two-factor sign-in | `… user:list` |
+| Suspicious sign-ins | `… security:log [EMAIL] [COUNT]` |
+| Are snapshots running | `… snapshot:list`, or `docker compose exec crm cat /app/data/snapshots/last-run.json` |
+| Backup before an update | `… backup /app/data/backups/before-update.sqlite` |
+
+`…` stands for `docker compose exec crm node server/cli.mjs`. Details follow below.
+
 ## Accounts
 
 ```sh
@@ -132,7 +147,7 @@ cd /srv/stageforce && docker compose exec -T crm node server/cli.mjs snapshot:la
 
 ### Encrypting snapshots before they leave the server
 
-Snapshots contain customer data, password hashes and Gmail key hashes. Encrypt them on the host before handing them to off-site storage. With [age](https://age-encryption.org) and a public key whose private key is kept off the server:
+Snapshots contain customer data, password hashes, authenticator secrets and extension key hashes. Encrypt them on the host before handing them to off-site storage. With [age](https://age-encryption.org) and a public key whose private key is kept off the server:
 
 ```sh
 docker compose exec -T crm node server/cli.mjs snapshot:latest --stdout --max-age-hours 12 | age -r age1yourpublickey... > /backup/stageforce-$(date +%F).sqlite.age
@@ -191,7 +206,7 @@ Startup migrates the database schema automatically. For a rollback after a schem
 
 ## Move local work to the server
 
-Use the full local SQLite database, not the original spreadsheet snapshot. It keeps organisations, contacts, history, accounts, password hashes and MFA set-ups. On your Mac, in the repository folder:
+Use a backup of the full local SQLite database. It keeps organisations, contacts, history, accounts, password hashes and MFA set-ups. On your Mac, in the repository folder:
 
 ```sh
 docker compose -f compose.local.yaml exec crm node server/cli.mjs backup /app/data/transfer.sqlite
