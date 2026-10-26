@@ -7,7 +7,8 @@ type Mode=Theme|'system';
 function preference(key:string,fallback:string){try{return localStorage.getItem(key)||fallback;}catch{return fallback;}}
 const modeValue=(value:unknown):Mode=>value==='light'||value==='dark'?value:'system';
 const AppearanceContext=createContext({theme:'light' as Theme,mode:'system' as Mode,paused:false,syncError:'',setMode:(_mode:Mode)=>{},toggleMotion:()=>{}});
-export function AppearanceProvider({children}:{children:ReactNode}){
+// The phone app passes backdrop="always": the same signal animation in light and dark. The desktop keeps it for dark mode only.
+export function AppearanceProvider({children,backdrop='dark'}:{children:ReactNode;backdrop?:'dark'|'always'}){
  const [mode,setModeState]=useState<Mode>(()=>modeValue(preference('stageforce-appearance','system')));
  const [systemDark,setSystemDark]=useState(()=>window.matchMedia('(prefers-color-scheme: dark)').matches);
  const [paused,setPaused]=useState(()=>preference('stageforce-motion','on')==='off'),[syncError,setSyncError]=useState('');
@@ -24,8 +25,9 @@ export function AppearanceProvider({children}:{children:ReactNode}){
   window.addEventListener('storage',sync);window.addEventListener('appearance-session',session);window.addEventListener('appearance-logout',logout);window.addEventListener('session-expired',logout);
   return()=>{media.removeEventListener('change',update);window.removeEventListener('storage',sync);window.removeEventListener('appearance-session',session);window.removeEventListener('appearance-logout',logout);window.removeEventListener('session-expired',logout);};
  },[]);
- return <AppearanceContext.Provider value={{theme,mode,paused,syncError,setMode,toggleMotion:()=>setPaused(p=>!p)}}><SignalBackdrop active={theme==='dark'} paused={paused}/>{children}</AppearanceContext.Provider>;
+ return <AppearanceContext.Provider value={{theme,mode,paused,syncError,setMode,toggleMotion:()=>setPaused(p=>!p)}}><SignalBackdrop active={backdrop==='always'||theme==='dark'} paused={paused} tone={theme}/>{children}</AppearanceContext.Provider>;
 }
+export const useAppearance=()=>useContext(AppearanceContext);
 export function AppearanceControls(){
  const {theme,mode,paused,syncError,setMode,toggleMotion}=useContext(AppearanceContext);
  const motionLabel=paused?'Hintergrundanimation fortsetzen':'Hintergrundanimation pausieren';

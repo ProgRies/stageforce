@@ -8,8 +8,12 @@ export function openDB(path=resolve(process.env.DATA_DIR||'data','crm.sqlite')){
  if(path!==':memory:')mkdirSync(dirname(path),{recursive:true,mode:0o700});
  const db=new DatabaseSync(path,{timeout:5000});
  db.exec('PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;');
- const version=db.prepare('PRAGMA user_version').get().user_version;if(version>12)throw Error('Database is newer than this application. Upgrade the application.');
- transaction(db,()=>{db.exec(readFileSync(new URL('./schema.sql',import.meta.url),'utf8'));db.exec("INSERT OR IGNORE INTO schema_versions VALUES(12,datetime('now')); PRAGMA user_version=12");
+ const version=db.prepare('PRAGMA user_version').get().user_version;if(version>13)throw Error('Database is newer than this application. Upgrade the application.');
+ transaction(db,()=>{db.exec(readFileSync(new URL('./schema.sql',import.meta.url),'utf8'));db.exec("INSERT OR IGNORE INTO schema_versions VALUES(13,datetime('now')); PRAGMA user_version=13");
+  // Version 13: sessions know their kind (a browser tab or the phone app), a label and their last use; calls know their direction.
+  const has=(table,column)=>db.prepare(`PRAGMA table_info(${table})`).all().some(c=>c.name===column);
+  if(!has('sessions','kind'))db.exec("ALTER TABLE sessions ADD COLUMN kind TEXT NOT NULL DEFAULT 'web'; ALTER TABLE sessions ADD COLUMN label TEXT NOT NULL DEFAULT ''; ALTER TABLE sessions ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0; ALTER TABLE sessions ADD COLUMN last_used_at INTEGER NOT NULL DEFAULT 0;");
+  if(!has('call_attempts','direction'))db.exec("ALTER TABLE call_attempts ADD COLUMN direction TEXT NOT NULL DEFAULT 'out'");
   // Sessions and browser keys from before MFA were never confirmed with a second factor: everyone signs in again once.
   if(version>0&&version<10)db.exec('DELETE FROM sessions; DELETE FROM extension_keys;');});
  if(path!==':memory:')chmodSync(path,0o600);return db;

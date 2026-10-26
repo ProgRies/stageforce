@@ -1,3 +1,13 @@
+## Unreleased · Phone app for logging calls
+
+Rebuild the CRM. On start the CRM adds columns to sessions and calls (session kind, label, last use; call direction); no data is changed. Then install the app on the iPhone as described in docs/mobile-app.md.
+
+- New phone app at `/m/`, installable on the iPhone home screen. It opens on "Wer ruft an?": search by name, organisation or the last digits of a number, pick the person, type the note, tap the result.
+- A caller who is not in the CRM can be created during the call ("Neuer Lead"). Organisations created this way always appear in Prüfen until someone checks them.
+- New result for answered calls: "Gespräch geführt" logs the call without changing the planned follow-up. "Nicht erreicht" is not offered for calls that came in.
+- The phone signs in once with password and code and then stays signed in for 90 days from its last use. Einstellungen → Handy-App lists signed-in phones and signs them out.
+- The desktop page, its styles and its call card are unchanged.
+
 ## Unreleased · extension 0.4.20
 
 Rebuild the CRM and reload the extension in `chrome://extensions`. No data change; the CRM adds a database index on start.
