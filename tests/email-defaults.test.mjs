@@ -135,13 +135,14 @@ test('a colleague\'s email logged from your mailbox is sent, names its sender an
  const {db,user,action}=await setup();try{
   await addUser(db,'sam@team.test','Sam Colleague','long-password-1234');
   const org=createOrg(db,user,'Client');addContact(db,org.id,{name:'Pat',e_mails:['pat@client.test']});
-  const mail=(n,from)=>({action:'save',confirmed:true,requestId:randomUUID(),mailbox,gmailThreadId:'t'+n,gmailMessageId:'m'+n,from,recipients:[{email:'pat@client.test',name:'Pat'},{email:mailbox,name:''}],originalSubject:'Offer '+n,subject:'Offer '+n,body:'Hi Pat',originalBody:'Hi Pat',timestamp:'2026-10-2'+n+'T09:00:00Z',timestampRaw:'',sourceUrl:'https://mail.google.com/mail/u/0/#inbox/'+n,contactEmails:[]});
+  const mail=(n,from)=>({action:'save',confirmed:true,requestId:randomUUID(),mailbox,gmailThreadId:'t'+n,gmailMessageId:'m'+n,from,recipients:[{email:'pat@client.test',name:'Pat'},{email:mailbox,name:''}],originalSubject:'Offer '+n,subject:'Offer '+n,body:'Hi Pat,\n\n  here is the offer.',originalBody:'Hi Pat,\n\n  here is the offer.',timestamp:'2026-10-2'+n+'T09:00:00Z',timestampRaw:'',sourceUrl:'https://mail.google.com/mail/u/0/#inbox/'+n,contactEmails:[]});
   const colleague={name:'Sam Colleague',email:'sam@team.test'};
   assert.equal(action({action:'lookup',mailbox,from:colleague,recipients:[{email:'pat@client.test',name:'Pat'},{email:mailbox,name:''}]}).direction,'outgoing');
   let version=action({...mail(1,colleague),organisationId:org.id,version:getOrg(db,org.id).version}).organisation.version;
   action({...mail(2,{name:'Alex',email:mailbox}),organisationId:org.id,version});
   const items=history(db,org.id,0,'communication').items,by=subject=>items.find(i=>i.subject===subject);
   assert.equal(by('Offer 1').direction,'outgoing');assert.equal(by('Offer 1').sent_by,'Sam Colleague');assert.equal(by('Offer 1').autor_name,'Alex');
-  assert.equal(by('Offer 2').sent_by,'');assert.equal(by('Offer 2').autor_name,'Alex');
+  assert.equal(by('Offer 1').sender_name,'Sam Colleague');assert.equal(by('Offer 1').preview,'Hi Pat, here is the offer.');
+  assert.equal(by('Offer 2').sent_by,'');assert.equal(by('Offer 2').sender_name,'Alex');assert.equal(by('Offer 2').autor_name,'Alex');
  }finally{db.close();}
 });
