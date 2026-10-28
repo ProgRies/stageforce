@@ -18,8 +18,9 @@ import {parseEmail} from './email.mjs';
 import {deleteOrganisation,mergeOrganisations} from './lifecycle.mjs';
 import {liveHub} from './live.mjs';
 import {locationSave,mapService} from './map.mjs';
+import {calendar} from './calendar.mjs';
 // Actions that only read, or only touch the caller's own settings and staging, are not announced to other tabs.
-const quiet=new Set(['appearanceSave','passwordChange','extensionStatus','extensionCreate','extensionRevoke','load','detail','history','search','imports','importPreview','importPosition','importDelete','message','check','messageStatus','threadStatus','meeting','lookup','callOpen','callDraft','mapSearch','securityEvents','mobileHome','mobileSearch','mobileDevices','mobileDeviceRevoke']);
+const quiet=new Set(['calendar','appearanceSave','passwordChange','extensionStatus','extensionCreate','extensionRevoke','load','detail','history','search','imports','importPreview','importPosition','importDelete','message','check','messageStatus','threadStatus','meeting','lookup','callOpen','callDraft','mapSearch','securityEvents','mobileHome','mobileSearch','mobileDevices','mobileDeviceRevoke']);
 // The phone app names the device it was signed in on, so the list under Einstellungen says which phone is which.
 const deviceLabel=req=>{const ua=String(req.headers['user-agent']||'');return /iPhone/.test(ua)?'iPhone':/iPad/.test(ua)?'iPad':/Android/.test(ua)?'Android-Handy':'Handy';};
 const touched=(b,data)=>[b.id,b.other,b.into,b.organisationId,data?.entity?.id,data?.organisation?.id,data?.deleted];
@@ -118,6 +119,7 @@ export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:300
    case 'extensionRevoke':data=extensionRevoke(db,session);logEvent(db,{event:'key_revoked',user:session,ip:clientIP(req)});break;
    case 'securityEvents':data={items:recentEvents(db,session.id)};break;
    case 'load':data=listData(db);break;
+   case 'calendar':data=calendar(db,session,b);break;
    case 'detail':data={entity:entity(db,b.id,true),history:history(db,b.id,0,b.historyKind||'all')};break;
    case 'history':data=history(db,b.id,b.offset,b.kind||'all');break;
    case 'search':data={ids:search(db,b.query)};break;

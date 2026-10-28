@@ -24,6 +24,7 @@ The current schema version is **13** (`PRAGMA user_version`). Startup brings an 
 | extension_message_refs | Mailbox plus Gmail message id → saved email |
 | extension_thread_refs | Mailbox plus Gmail conversation id → saved emails, so later emails of a conversation find the organisation |
 | followups | The open follow-up (next action and due date) per organisation |
+| followup_times | Optional time of a follow-up, valid only while its stored date equals the follow-up's date. A separate table, added within version 13, so older images keep working on the same database |
 | review_issues | Open and closed Prüfen points |
 | call_attempts | A started call: user, organisation, contact, number, time, direction, and the timeline entry once saved |
 | call_drafts | The note of a call that is still open, so the call card can be resumed anywhere |

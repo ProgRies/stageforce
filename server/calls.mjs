@@ -1,7 +1,7 @@
 import {uid,now,transaction,reindex} from './db.mjs';
 import {formatPhone,CALL_OUTCOMES,BOOKING_URL,addDays,validDate,todayBerlin} from '../src/domain.ts';
 import {claimOnCall} from './leads.mjs';
-import {Problem,getOrg,contacts,createOrg,addContact,audit,addActivity,assertVersion} from './crm.mjs';
+import {Problem,getOrg,contacts,createOrg,addContact,audit,addActivity,assertVersion,followUpTime,setFollowUpTime,plannedCall} from './crm.mjs';
 const field=(v,max=1000)=>{if(typeof v!=='string'||v.length>max||v.includes('\0'))throw new Problem('Invalid field.');return v.trim();};
 export const dialNumber=value=>{const s=formatPhone(field(value,100)).replace(/[^+\d]/g,'');if(!/^\+?\d{6,15}$/.test(s))throw new Problem('Check the phone number.');return s;};
 export function mergePhones(db,user,orgId,contact,phones){
@@ -59,7 +59,7 @@ const OUTCOMES=Object.entries(CALL_OUTCOMES).map(([key,o])=>({key,label:o.label,
 const TALKED={label:'Gespräch geführt',contacted:true};
 const INCOMING=[{key:'talked',label:TALKED.label,next:'Wiedervorlage bleibt'},...OUTCOMES.filter(o=>o.key!=='not_reached')];
 const safeDial=p=>{try{return p?dialNumber(p):'';}catch{return'';}};
-function callView(db,r){const o=getOrg(db,r.organisation_id);return{callId:r.id,organisation:{id:o.id,name:o.name,version:String(o.version)},contact:contacts(db,o.id).find(c=>c.id===r.contact_id),phone:r.phone,dial:safeDial(r.phone),direction:r.direction==='in'?'in':'out',startedAt:r.started_at,notes:db.prepare('SELECT notes FROM call_drafts WHERE call_id=?').get(r.id)?.notes||'',outcomes:r.direction==='in'?INCOMING:OUTCOMES,bookingUrl:BOOKING_URL,followUp:db.prepare('SELECT due_date FROM followups WHERE organisation_id=? AND completed_at IS NULL').get(o.id)?.due_date||null};}
+function callView(db,r){const o=getOrg(db,r.organisation_id);return{callId:r.id,organisation:{id:o.id,name:o.name,version:String(o.version)},contact:contacts(db,o.id).find(c=>c.id===r.contact_id),phone:r.phone,dial:safeDial(r.phone),direction:r.direction==='in'?'in':'out',startedAt:r.started_at,notes:db.prepare('SELECT notes FROM call_drafts WHERE call_id=?').get(r.id)?.notes||'',outcomes:r.direction==='in'?INCOMING:OUTCOMES,bookingUrl:BOOKING_URL,...plannedCall(db,o.id)};}
 // An unsaved call from the last twelve hours is still open; older attempts were abandoned and are left alone.
 const openAttempt=(db,user)=>db.prepare('SELECT * FROM call_attempts WHERE user_id=? AND activity_id IS NULL AND started_at>? ORDER BY started_at DESC LIMIT 1').get(user.id,new Date(Date.now()-12*3600000).toISOString());
 export function openCall(db,user){const row=openAttempt(db,user);return{call:row?callView(db,row):null};}
@@ -73,13 +73,15 @@ export function saveCall(db,user,b){return transaction(db,()=>{
  const note=field(b.notes||'',12000),date=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Berlin',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(call.started_at));
  const incoming=call.direction==='in';if(b.outcome!=null&&!Object.hasOwn(CALL_OUTCOMES,b.outcome)&&!(incoming&&b.outcome==='talked'))throw new Problem('Unknown call result.');const outcome=b.outcome==null?null:b.outcome==='talked'?TALKED:CALL_OUTCOMES[b.outcome];
  let due=null;if(outcome?.days!=null){due=b.outcome==='callback'&&b.callbackDate?field(b.callbackDate,10):addDays(todayBerlin(),outcome.days);if(!validDate(due)||due<todayBerlin())throw new Problem('Check the call-back date.');}
+ // "Später anrufen" may come with a time; every other result sets a date without one.
+ const time=b.outcome==='callback'?followUpTime(b.callbackTime):'';
  // "Behalten" on the card: a call before the planned date leaves that date (and its next step) as it is; the result still sets phase and Prüfen.
  const planned=db.prepare('SELECT due_date FROM followups WHERE organisation_id=? AND completed_at IS NULL').get(call.organisation_id)?.due_date;
  const keep=b.keepFollowUp===true&&due!==null&&b.outcome!=='callback'&&!!planned&&planned>todayBerlin();if(keep)due=null;
  const aid=addActivity(db,call.organisation_id,user,{type:outcome?'Anruf · '+outcome.label:'Anruf gestartet',text:(incoming?'Eingehender Anruf · ':'')+(note||(outcome?outcome.label:'Anruf gestartet · keine Notiz')),date,contacted:!!outcome?.contacted});
- if(outcome?.days!=null)applyOutcome(db,user,call.organisation_id,outcome,due);
+ if(outcome?.days!=null){applyOutcome(db,user,call.organisation_id,outcome,due);if(due!==null)setFollowUpTime(db,call.organisation_id,time);}
  db.prepare('INSERT INTO activity_contacts VALUES(?,?)').run(aid,call.contact_id);db.prepare('UPDATE call_attempts SET activity_id=? WHERE id=?').run(aid,call.id);db.prepare('DELETE FROM call_drafts WHERE call_id=?').run(call.id);
- audit(db,call.organisation_id,user,'call',{activityId:aid,outcome:b.outcome??null,due,...(keep?{keptFollowUp:planned}:{}),contactId:call.contact_id,phone:call.phone,startedAt:call.started_at,sourceMessageId:call.source_message_id,direction:call.direction});
+ audit(db,call.organisation_id,user,'call',{activityId:aid,outcome:b.outcome??null,due,...(time?{time}:{}),...(keep?{keptFollowUp:planned}:{}),contactId:call.contact_id,phone:call.phone,startedAt:call.started_at,sourceMessageId:call.source_message_id,direction:call.direction});
  claimOnCall(db,user,call.organisation_id);
  db.prepare('UPDATE organisations SET version=version+1,updated_at=? WHERE id=?').run(now(),call.organisation_id);reindex(db,call.organisation_id);return{saved:true,organisation:{id:call.organisation_id,version:String(getOrg(db,call.organisation_id).version)}};
  });}
