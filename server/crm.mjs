@@ -35,7 +35,9 @@ export function upcomingMeetings(db,id=null){const out=new Map();for(const a of 
 export function settleMeetings(db){const today=todayBerlin();for(const a of db.prepare("SELECT id,organisation_id,occurred_on FROM activities WHERE kind='Meeting' AND is_contact=0 AND occurred_on<=? AND id NOT IN (SELECT activity_id FROM meeting_status)").all(today)){db.prepare('UPDATE activities SET is_contact=1 WHERE id=?').run(a.id);db.prepare('UPDATE organisations SET last_contact=CASE WHEN last_contact IS NULL OR last_contact<? THEN ? ELSE last_contact END WHERE id=?').run(a.occurred_on,a.occurred_on,a.organisation_id);}}
 export function setMeetingCancelled(db,activityId,cancelled){if(cancelled)db.prepare('INSERT OR IGNORE INTO meeting_status VALUES(?,?)').run(activityId,now());else db.prepare('DELETE FROM meeting_status WHERE activity_id=?').run(activityId);db.prepare('UPDATE activities SET is_contact=0 WHERE id=? AND ?').run(activityId,cancelled?1:0);}
 const communicationSQL="(a.message_id IS NOT NULL OR a.kind='Kontakt' OR a.kind='Notiz' OR lower(a.kind) LIKE '%mail%' OR lower(a.kind) LIKE '%telefon%' OR lower(a.kind) LIKE '%anruf%' OR lower(a.kind) LIKE '%phone%' OR lower(a.kind) LIKE '%call%' OR lower(a.kind) LIKE '%meeting%')";
-const historyOrder="a.occurred_on DESC, COALESCE(m.sent_at, ca.started_at, CASE WHEN a.kind='Notiz' THEN a.created_at ELSE '' END) DESC, a.created_at DESC, a.rowid DESC";
+// Calls logged by hand (or turned from a note) carry the same outcome as a talked incoming call, but no call attempt.
+export const MANUAL_CALL='Anruf · Gespräch geführt';
+const historyOrder=`a.occurred_on DESC, COALESCE(m.sent_at, ca.started_at, CASE WHEN a.kind IN ('Notiz','${MANUAL_CALL}') THEN a.created_at ELSE '' END) DESC, a.created_at DESC, a.rowid DESC`;
 const firstSender=a=>{try{const s=JSON.parse(a.sender_json||'[]')[0];return s?.email?s:null;}catch{return null;}};
 const sender=a=>{const s=firstSender(a);return s?contactName(s.name,s.email):'';};
 // A colleague's email logged from someone else's mailbox names its sender; "Erfasst von" alone would read as if the logger sent it.
@@ -66,7 +68,7 @@ export function applyFields(db,id,fields){for(const[c0,value]of Object.entries(f
  if('16'in fields||'17'in fields||'11'in fields){let f=db.prepare('SELECT * FROM followups WHERE organisation_id=? AND completed_at IS NULL').get(id);const text=fields[16]??f?.text??'',due=fields[17]??f?.due_date??'',owner=fields[11]??f?.owner??'';if(f)db.prepare('UPDATE followups SET text=?,due_date=?,owner=? WHERE id=?').run(text,due||null,owner,f.id);else if(text||due)db.prepare('INSERT INTO followups VALUES(?,?,?,?,?,NULL)').run(uid(),id,text,due||null,owner);}
  if('19'in fields){db.prepare('UPDATE review_issues SET resolved_at=? WHERE organisation_id=? AND resolved_at IS NULL').run(now(),id);if(fields[19])db.prepare('INSERT INTO review_issues VALUES(?,?,?,NULL)').run(uid(),id,fields[19]);}
 }
-export function save(db,user,b){const fields=fieldsValidated(b.fields);let note=b.note;if(note){if(!['Notiz','Meeting'].includes(note.type)||!validDate(note.date)||note.date>(note.type==='Meeting'?latestMeeting():todayBerlin()))throw new Problem('Ungültige Notiz oder Datum.');note={...note,text:str(note.text),contacted:note.type==='Meeting'&&note.date<=todayBerlin()};if(!note.text)throw new Problem('Notiz ist leer.');}
+export function save(db,user,b){const fields=fieldsValidated(b.fields);let note=b.note;if(note){if(!['Notiz','Anruf','Meeting'].includes(note.type)||!validDate(note.date)||note.date>(note.type==='Meeting'?latestMeeting():todayBerlin()))throw new Problem('Ungültige Notiz oder Datum.');note={type:note.type==='Anruf'?MANUAL_CALL:note.type,date:note.date,text:str(note.text),contacted:note.type==='Anruf'||note.type==='Meeting'&&note.date<=todayBerlin()};if(!note.text)throw new Problem('Notiz ist leer.');}
  if(typeof b.requestId!=='string'||b.requestId.length>100)throw new Problem('Anfrage-ID fehlt.');
  return transaction(db,()=>{const prior=db.prepare('SELECT * FROM requests WHERE id=?').get(b.requestId);if(prior){if(prior.user_id!==user.id||prior.organisation_id!==b.id)throw new Problem('Anfrage-ID bereits verwendet.',409);return{entity:entity(db,b.id,true),alreadySaved:true};}const o=getOrg(db,b.id);assertVersion(o,b.version);if('11'in fields)validOwner(db,fields[11]);if(!Object.keys(fields).length&&!note)throw new Problem('Keine Änderung.');const before=entity(db,b.id).values;applyFields(db,b.id,fields);if(note)addActivity(db,b.id,user,note);const changes=Object.fromEntries(Object.entries(fields).map(([c,v])=>[HEADERS[+c],{from:before[+c],to:v}]));audit(db,b.id,user,'update',changes);if(Object.keys(fields).length)addActivity(db,b.id,user,{type:'CRM-Änderung',text:Object.keys(changes).join(', '),date:todayBerlin()});db.prepare('UPDATE organisations SET version=version+1,updated_at=? WHERE id=?').run(now(),b.id);db.prepare('INSERT INTO requests VALUES(?,?,?,?)').run(b.requestId,user.id,b.id,now());reindex(db,b.id);return{entity:entity(db,b.id,true)};});}
 export function createOrg(db,user,name){name=str(name,500);if(!name)throw new Problem('Name erforderlich.');return transaction(db,()=>{const id='STG-'+uid();db.prepare('INSERT INTO organisations(id,name,created_at,updated_at) VALUES(?,?,?,?)').run(id,name,now(),now());audit(db,id,user,'create',{name});reindex(db,id);return entity(db,id,true);});}
@@ -78,23 +80,27 @@ export function activitySave(db,user,b){
   if(!activity)throw new Problem('Aktivität nicht gefunden.',404,'not_found');
   const isNote=['Notiz','Meeting'].includes(activity.kind);
   if(activity.message_id||(!isNote&&!/telefon|anruf|phone|call/i.test(activity.kind)))throw new Problem('Nur Anrufnotizen, Meetings und Notizen können bearbeitet werden.');
-  const next=text||(isNote?'':activity.kind.startsWith('Anruf · ')?activity.kind.slice(8):'Anruf gestartet · keine Notiz');
+  // A note can be turned into a logged call (one way: it then counts as contact on its date).
+  if(b.kind!==undefined&&(b.kind!=='Anruf'||activity.kind!=='Notiz'&&activity.kind!==MANUAL_CALL))throw new Problem('Nur Notizen können in einen Anruf umgewandelt werden.');
+  const kind=b.kind==='Anruf'?MANUAL_CALL:activity.kind,toCall=kind!==activity.kind;
+  const next=text||(activity.kind==='Notiz'||activity.kind==='Meeting'?'':kind.startsWith('Anruf · ')?kind.slice(8):'Anruf gestartet · keine Notiz');
   if(!next)throw new Problem('Notiz ist leer.');
   // Meetings also take a new date (planned ones up to two years ahead) and a cancelled mark.
   const meeting=activity.kind==='Meeting',wasCancelled=meeting&&!!db.prepare('SELECT 1 FROM meeting_status WHERE activity_id=?').get(activity.id);
   const date=meeting&&b.date!==undefined?str(b.date,10):activity.occurred_on,cancelled=meeting&&b.cancelled!==undefined?b.cancelled===true:wasCancelled;
   if(!meeting&&(b.date!==undefined||b.cancelled!==undefined))throw new Problem('Nur Meetings haben ein Datum zum Ändern.');
   if(meeting&&date!==activity.occurred_on&&(!validDate(date)||date>latestMeeting()))throw new Problem('Ungültiges Datum.');
-  const result=()=>({entity:entity(db,b.id,true),activityId:activity.id,text:next,date,cancelled});
-  const changed=activity.body!==next||date!==activity.occurred_on||cancelled!==wasCancelled;
+  const result=()=>({entity:entity(db,b.id,true),activityId:activity.id,kind,text:next,date,cancelled});
+  const changed=activity.body!==next||date!==activity.occurred_on||cancelled!==wasCancelled||toCall;
   if(typeof b.originalText!=='string'||activity.body!==b.originalText){
    if(activity.body===next&&!changed)return result();
    throw new Problem('Diese Notiz wurde inzwischen geändert. Bitte den aktuellen Stand laden und erneut prüfen.',409,'conflict');
   }
   if(changed){
    db.prepare('UPDATE activities SET body=?,occurred_on=? WHERE id=?').run(next,date,activity.id);
+   if(toCall){db.prepare('UPDATE activities SET kind=?,is_contact=1 WHERE id=?').run(kind,activity.id);if(date)db.prepare('UPDATE organisations SET last_contact=CASE WHEN last_contact IS NULL OR last_contact<? THEN ? ELSE last_contact END WHERE id=?').run(date,date,b.id);}
    if(meeting){setMeetingCancelled(db,activity.id,cancelled);db.prepare('UPDATE activities SET is_contact=0 WHERE id=?').run(activity.id);settleMeetings(db);}
-   audit(db,b.id,user,'activity_edit',{activityId:activity.id,from:activity.body,to:next,...(date!==activity.occurred_on?{date:{from:activity.occurred_on,to:date}}:{}),...(cancelled!==wasCancelled?{cancelled}:{})});
+   audit(db,b.id,user,'activity_edit',{activityId:activity.id,from:activity.body,to:next,...(date!==activity.occurred_on?{date:{from:activity.occurred_on,to:date}}:{}),...(cancelled!==wasCancelled?{cancelled}:{}),...(toCall?{kind:{from:activity.kind,to:kind}}:{})});
    db.prepare('UPDATE organisations SET version=version+1,updated_at=? WHERE id=?').run(now(),b.id);
    reindex(db,b.id);
   }
