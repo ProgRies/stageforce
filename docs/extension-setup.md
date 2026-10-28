@@ -1,6 +1,6 @@
 # Browser extension for Gmail
 
-The Chrome extension in `integrations/chrome` (version 0.4.20) connects Gmail to the CRM. It adds an **Add to StageForce** button to every opened email, saves the emails, contacts and meetings you confirm, and starts calls. Gmail stays your mailbox: the extension only acts when you click, and it talks to the CRM's API with your personal key. It needs no Google sign-in.
+The Chrome extension in `integrations/chrome` (version 0.4.21) connects Gmail to the CRM. It adds an **Add to StageForce** button to every opened email, saves the emails, contacts and meetings you confirm, and starts calls. Gmail stays your mailbox: the extension only acts when you click, and it talks to the CRM's API with your personal key. It needs no Google sign-in.
 
 ## Install and connect
 
