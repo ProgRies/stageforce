@@ -69,3 +69,7 @@ CREATE TABLE IF NOT EXISTS organisation_locations(organisation_id TEXT PRIMARY K
 CREATE TABLE IF NOT EXISTS security_events(id INTEGER PRIMARY KEY,at INTEGER NOT NULL,user_id TEXT REFERENCES users(id) ON DELETE CASCADE,email TEXT NOT NULL DEFAULT '',ip TEXT NOT NULL DEFAULT '',event TEXT NOT NULL,detail TEXT NOT NULL DEFAULT '');
 CREATE INDEX IF NOT EXISTS security_events_user ON security_events(user_id,at);
 CREATE INDEX IF NOT EXISTS security_events_at ON security_events(at);
+
+-- Still version 13: an optional time for the open follow-up. It sits beside followups instead of being a new column, because older
+-- images insert follow-ups by position and must keep working on this database. A time only counts while its date is the follow-up's date.
+CREATE TABLE IF NOT EXISTS followup_times(followup_id TEXT PRIMARY KEY REFERENCES followups(id) ON DELETE CASCADE,due_date TEXT NOT NULL,time TEXT NOT NULL CHECK(time GLOB '[0-2][0-9]:[0-5][0-9]'));

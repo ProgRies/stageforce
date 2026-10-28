@@ -1,7 +1,7 @@
 export type CellValue = string | number;
 export type UpcomingMeeting = { date: string; text: string };
 export type MapPin = { lat: number; lng: number };
-export type Entity = { id: string; row: number; values: CellValue[]; version: string; ownerId?: string; reservedBy?: string; upcoming?: UpcomingMeeting|null; location?: MapPin|null; followUpSource?: FollowUpSource|null };
+export type Entity = { id: string; row: number; values: CellValue[]; version: string; ownerId?: string; reservedBy?: string; upcoming?: UpcomingMeeting|null; location?: MapPin|null; followUpTime?: string; followUpSource?: FollowUpSource|null };
 export type FollowUpSource = { at: string; by: string; outcome: string|null };
 export type TeamUser = { id: string; name: string; email: string };
 export type EntityLink = { id: string; a: string; b: string; note: string };
@@ -106,4 +106,18 @@ export function buildQueue(entities:Entity[], count=30, staleDays=90, customerSh
   const remaining=max-out.length;take(warm,Math.ceil(remaining/2),"warm",e=>`Lead · ${text(e,10)}`);
   take(eligible.filter(cold).sort(recency),max-out.length,"cold",()=>"Neuer Kontakt");
   take(warm,max-out.length,"warm",e=>`Lead · ${text(e,10)}`);take(neglected,max-out.length,"customer",e=>contactLabel(e));return out;
+}
+// The Follow-ups week (see server/calendar.mjs): Monday to Sunday, my planned calls and everyone's meetings.
+export type CalendarCall={id:string;name:string;date:string;time:string;text:string;overdue:boolean};
+export type CalendarMeeting={id:string;organisationId:string;name:string;date:string;time:string;text:string;by:string;mine:boolean};
+export type CalendarWeek={from:string;to:string;today:string;followUps:CalendarCall[];meetings:CalendarMeeting[]};
+export type CalendarItem={key:string;organisationId:string;kind:"call"|"meeting";name:string;time:string;detail:string;overdue?:string;other?:boolean};
+export function mondayOf(d:string){return addDays(d,-((new Date(d+"T12:00:00Z").getUTCDay()+6)%7));}
+export function isoWeek(d:string){const t=new Date(d+"T12:00:00Z");t.setUTCDate(t.getUTCDate()+3-(t.getUTCDay()+6)%7);const first=new Date(Date.UTC(t.getUTCFullYear(),0,4,12));return 1+Math.round(((t.getTime()-first.getTime())/86400000-3+(first.getUTCDay()+6)%7)/7);}
+// One day's entries: overdue calls (only on today) first, then calls and meetings without a time, then the rest by time.
+export function dayItems(week:CalendarWeek,day:string):CalendarItem[]{
+ const calls=week.followUps.filter(c=>c.overdue?day===week.today:c.date===day).map((c):CalendarItem=>({key:"c"+c.id,organisationId:c.id,kind:"call",name:c.name,time:c.overdue?"":c.time,detail:c.text||"Anruf",overdue:c.overdue?c.date:undefined}));
+ const meetings=week.meetings.filter(m=>m.date===day).map((m):CalendarItem=>({key:"m"+m.id,organisationId:m.organisationId,kind:"meeting",name:m.name,time:m.time,detail:[m.text,m.by].filter(Boolean).join(" · "),other:!m.mine}));
+ const rank=(i:CalendarItem)=>i.overdue?0:i.time?2:1;
+ return [...calls,...meetings].sort((a,b)=>rank(a)-rank(b)||(a.overdue||"").localeCompare(b.overdue||"")||a.time.localeCompare(b.time)||(a.kind===b.kind?0:a.kind==="meeting"?-1:1)||a.name.localeCompare(b.name,"de"));
 }
