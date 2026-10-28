@@ -19,7 +19,7 @@ Copy `.env.example` only on the first installation, then review `.env`:
 | Setting | Default / meaning |
 | --- | --- |
 | `CRM_HOST` | `stageforce.jaimo.me`, hostname only |
-| `CRM_IMAGE` | Exact published release, e.g. `ghcr.io/progries/stageforce:0.3.13`. Never `latest` |
+| `CRM_IMAGE` | Exact published release, e.g. `ghcr.io/progries/stageforce:0.3.14`. Never `latest` |
 | `TRUST_PROXY` | `1`: Traefik sets `X-Forwarded-For`; sign-in limits count per client address |
 | `INTERNAL_DOMAINS` | `stage.bio,jaimo-solutions.com` (compose default): addresses that count as colleagues, not clients |
 | `SNAPSHOT_INTERVAL_HOURS` | `6`: hours between automatic snapshots, `0` disables them |

@@ -1,3 +1,17 @@
+# StageForce 0.3.14 · Follow-ups calendar · extension 0.4.21
+
+Publishes `ghcr.io/progries/stageforce:0.3.14`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.14` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. Afterwards everyone reloads the extension in `chrome://extensions` and refreshes Gmail.
+
+**Database:** one new table, `followup_times` (the optional time of a follow-up), created on startup. This is additive: no existing data is touched, sessions are unaffected, and the schema version stays 13. The 0.3.13 image still starts and works on the updated database, so a rollback is just pinning 0.3.13 again.
+
+- **Follow-ups calendar:** a week view of planned follow-ups, and a follow-up can now have an optional time (#48).
+- **Next planned call:** its date is shown and can be edited on the organisation, and logging a call can keep the planned one (#46).
+- **Anruf tab:** log a call by hand, and turn a note into a call (#45).
+- **Emails from colleagues:** an email a colleague sent while you were in To or CC is saved as their sent email and shows who sent it (#41, ticket 1023). Closed timeline cards show the sender and the first lines of each email (#43, ticket 1027).
+- **Extension popup:** the mailbox field is locked to the detected Gmail account (#42), and contacts already saved in the organisation no longer get a checkbox (#44).
+- **Layout:** the app works in a half-screen window (#41, ticket 1011), and the call button is readable in dark mode (#41, ticket 1024).
+- Each release now also updates the `:latest` image tag, for quick tests only; the server keeps pinning the exact version.
+
 # StageForce 0.3.13 · map layer fix
 
 Publishes `ghcr.io/progries/stageforce:0.3.13`. Set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.13` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. No database change; the schema stays at 13.
