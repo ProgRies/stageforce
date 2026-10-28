@@ -19,7 +19,7 @@ Open an email and click **Add to StageForce** next to its date. The popup shows:
 
 - **Organisation**: prefilled when the sender's address clearly belongs to one organisation, or when another email of the same Gmail conversation was saved before. Otherwise search for it, or type a new name to create it on save.
 - **Contacts**: the people in the email header. External participants are ticked; colleagues (addresses on the company domains, aliases included) are never offered as client contacts. Phone numbers from the sender's signature appear as removable "new" chips.
-- **Date and direction**: read from Gmail. The CRM decides whether it was sent or received.
+- **Date and direction**: read from Gmail. The CRM decides whether it was sent or received. An email a colleague sent while you were in To or CC is saved from your mailbox as their sent email: the popup shows **Sent by …**, and the timeline shows "E-Mail gesendet von …" with you as the one who logged it.
 - **Text**: the reply without its quoted history. **Include quoted history** keeps the full text for this email and also offers people and numbers from the earlier emails in the thread.
 - **Other messages of the conversation** that are opened in Gmail and not yet in the CRM, ticked, so one save stores them all. Collapsed messages Gmail has never loaded cannot be read; use Gmail's "Expand all" first.
 
