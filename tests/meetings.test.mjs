@@ -46,17 +46,17 @@ test('calendar and booking confirmations without a video link are offered as mee
 });
 test('saving an invitation logs one meeting that later invitations move or cancel',async()=>{
  const{db,user}=await setup();try{
-  const invite={originalSubject:'Einladung: Kickoff @ Di. 27. Okt. 2026 10:00 - 11:00 (MEZ)',originalBody:'Mit Google Meet teilnehmen',links:['https://meet.google.com/abc-defg-hij']};
-  assert.deepEqual(extensionAction(db,user,{action:'meeting',...invite,timestamp:msg.timestamp},origin).meeting,{provider:'Google Meet',title:'Kickoff',date:'2026-10-27',time:'10:00',likely:true,cancelled:false,logged:null});
-  const r=save(db,user,{...invite,newOrganisation:'Customer',meeting:{log:true,date:'2026-10-27'}}),id=r.organisation.id;
+  const invite={originalSubject:'Einladung: Kickoff @ Di. 27. Okt. 2027 10:00 - 11:00 (MEZ)',originalBody:'Mit Google Meet teilnehmen',links:['https://meet.google.com/abc-defg-hij']};
+  assert.deepEqual(extensionAction(db,user,{action:'meeting',...invite,timestamp:msg.timestamp},origin).meeting,{provider:'Google Meet',title:'Kickoff',date:'2027-10-27',time:'10:00',likely:true,cancelled:false,logged:null});
+  const r=save(db,user,{...invite,newOrganisation:'Customer',meeting:{log:true,date:'2027-10-27'}}),id=r.organisation.id;
   const meeting=()=>db.prepare("SELECT * FROM activities WHERE kind='Meeting'").all();
-  assert.equal(meeting().length,1);assert.equal(meeting()[0].occurred_on,'2026-10-27');assert.equal(meeting()[0].body,'Google Meet · 10:00 Uhr · Kickoff');
+  assert.equal(meeting().length,1);assert.equal(meeting()[0].occurred_on,'2027-10-27');assert.equal(meeting()[0].body,'Google Meet · 10:00 Uhr · Kickoff');
   assert.equal(db.prepare("SELECT count(*) n FROM activity_contacts ac JOIN activities a ON a.id=ac.activity_id WHERE a.kind='Meeting'").get().n,1);
   assert.equal(db.prepare('SELECT last_contact FROM organisations WHERE id=?').get(id).last_contact,'2026-10-13');
   const version=()=>db.prepare('SELECT version FROM organisations WHERE id=?').get(id).version;
-  save(db,user,{originalSubject:'Aktualisierte Einladung: Kickoff @ Do. 29. Okt. 2026 11:00 - 12:00 (MEZ)',originalBody:'Mit Google Meet teilnehmen',links:invite.links,organisationId:id,version:version(),timestamp:'2026-10-14T10:07:00Z',meeting:{log:true,date:'2026-10-29',time:'11:00'}});
-  assert.equal(meeting().length,1);assert.equal(meeting()[0].occurred_on,'2026-10-29');assert.equal(meeting()[0].body,'Google Meet · 11:00 Uhr · Kickoff');
-  save(db,user,{originalSubject:'Abgesagter Termin: Kickoff @ Do. 29. Okt. 2026 11:00 - 12:00 (MEZ)',originalBody:'',links:invite.links,organisationId:id,version:version(),timestamp:'2026-10-15T10:07:00Z',meeting:{log:true}});
+  save(db,user,{originalSubject:'Aktualisierte Einladung: Kickoff @ Do. 29. Okt. 2027 11:00 - 12:00 (MEZ)',originalBody:'Mit Google Meet teilnehmen',links:invite.links,organisationId:id,version:version(),timestamp:'2026-10-14T10:07:00Z',meeting:{log:true,date:'2027-10-29',time:'11:00'}});
+  assert.equal(meeting().length,1);assert.equal(meeting()[0].occurred_on,'2027-10-29');assert.equal(meeting()[0].body,'Google Meet · 11:00 Uhr · Kickoff');
+  save(db,user,{originalSubject:'Abgesagter Termin: Kickoff @ Do. 29. Okt. 2027 11:00 - 12:00 (MEZ)',originalBody:'',links:invite.links,organisationId:id,version:version(),timestamp:'2026-10-15T10:07:00Z',meeting:{log:true}});
   assert.equal(meeting().length,1);assert.equal(meeting()[0].body,'Google Meet · 11:00 Uhr · Kickoff');assert.equal(db.prepare('SELECT count(*) n FROM meeting_status').get().n,1);
   assert.ok(history(db,id,0,'communication').items.some(i=>i.art==='Meeting'));
   save(db,user,{originalSubject:'Angebot',originalBody:'Per Google Meet?',organisationId:id,version:version(),timestamp:'2026-10-16T10:07:00Z'});
@@ -71,17 +71,17 @@ test('saving an invitation logs one meeting that later invitations move or cance
 });
 test('invite, acceptance, reminder and booking confirmation of one meeting stay one entry',async()=>{
  const{db,user}=await setup();try{
-  const r=save(db,user,{originalSubject:'Einladung: Kickoff @ Di. 27. Okt. 2026 10:00 - 11:00 (MEZ)',originalBody:'Mit Google Meet teilnehmen',links:['https://meet.google.com/abc-defg-hij'],newOrganisation:'Customer',meeting:{log:true}}),id=r.organisation.id;
+  const r=save(db,user,{originalSubject:'Einladung: Kickoff @ Di. 27. Okt. 2027 10:00 - 11:00 (MEZ)',originalBody:'Mit Google Meet teilnehmen',links:['https://meet.google.com/abc-defg-hij'],newOrganisation:'Customer',meeting:{log:true}}),id=r.organisation.id;
   const version=()=>db.prepare('SELECT version FROM organisations WHERE id=?').get(id).version,meetings=()=>db.prepare("SELECT * FROM activities WHERE kind='Meeting'").all();
   const ask=b=>extensionAction(db,user,{action:'meeting',timestamp:msg.timestamp,organisationId:id,...b},origin).meeting.logged;
-  const accepted={originalSubject:'Akzeptiert: Kickoff @ Di. 27. Okt. 2026 10:00 - 11:00 (MEZ)',originalBody:'Pat hat angenommen.'};
-  assert.deepEqual(ask(accepted),{date:'2026-10-27',text:'Google Meet · 10:00 Uhr · Kickoff',update:false});
+  const accepted={originalSubject:'Akzeptiert: Kickoff @ Di. 27. Okt. 2027 10:00 - 11:00 (MEZ)',originalBody:'Pat hat angenommen.'};
+  assert.deepEqual(ask(accepted),{date:'2027-10-27',text:'Google Meet · 10:00 Uhr · Kickoff',update:false});
   save(db,user,{...accepted,organisationId:id,version:version(),timestamp:'2026-10-14T10:07:00Z',meeting:{log:true}});
-  save(db,user,{originalSubject:'Erinnerung: Kickoff @ Di. 27. Okt. 2026 10:00 - 11:00 (MEZ)',originalBody:'Mit Google Meet teilnehmen',links:['https://meet.google.com/abc-defg-hij'],organisationId:id,version:version(),timestamp:'2026-10-15T10:07:00Z',meeting:{log:true}});
-  save(db,user,{originalSubject:'Terminbestätigung: Kickoff',originalBody:'Ihr Termin am 27.10.2026 um 10:00 Uhr ist bestätigt.',organisationId:id,version:version(),timestamp:'2026-10-16T10:07:00Z',meeting:{log:true}});
+  save(db,user,{originalSubject:'Erinnerung: Kickoff @ Di. 27. Okt. 2027 10:00 - 11:00 (MEZ)',originalBody:'Mit Google Meet teilnehmen',links:['https://meet.google.com/abc-defg-hij'],organisationId:id,version:version(),timestamp:'2026-10-15T10:07:00Z',meeting:{log:true}});
+  save(db,user,{originalSubject:'Terminbestätigung: Kickoff',originalBody:'Ihr Termin am 27.10.2027 um 10:00 Uhr ist bestätigt.',organisationId:id,version:version(),timestamp:'2026-10-16T10:07:00Z',meeting:{log:true}});
   assert.equal(meetings().length,1);assert.equal(meetings()[0].body,'Google Meet · 10:00 Uhr · Kickoff');
-  assert.equal(ask({originalSubject:'Aktualisierte Einladung: Kickoff @ Do. 29. Okt. 2026 10:00 - 11:00 (MEZ)',originalBody:'',links:['https://meet.google.com/abc-defg-hij']}).update,true);
-  save(db,user,{originalSubject:'Terminbestätigung: Workshop',originalBody:'Ihr Termin am 27.10.2026 um 15:00 Uhr ist bestätigt.',organisationId:id,version:version(),timestamp:'2026-10-16T11:07:00Z',meeting:{log:true}});
+  assert.equal(ask({originalSubject:'Aktualisierte Einladung: Kickoff @ Do. 29. Okt. 2027 10:00 - 11:00 (MEZ)',originalBody:'',links:['https://meet.google.com/abc-defg-hij']}).update,true);
+  save(db,user,{originalSubject:'Terminbestätigung: Workshop',originalBody:'Ihr Termin am 27.10.2027 um 15:00 Uhr ist bestätigt.',organisationId:id,version:version(),timestamp:'2026-10-16T11:07:00Z',meeting:{log:true}});
   assert.equal(meetings().length,2,'a second meeting the same day at another time stays separate');
   assert.equal(ask({originalSubject:'Neuer Termin: Nächste Woche',originalBody:'Datum: 05.11.2026 09:00'}),null);
  }finally{db.close();}

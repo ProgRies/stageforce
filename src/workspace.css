@@ -207,7 +207,9 @@
 .detail-pane>.organisation-overview>.organisation-sidebar{min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;padding-bottom:28px}
 }
 @container(max-width:560px){
+/* Stacked: the pane scrolls as a whole, so the timeline and sidebar keep their full height instead of shrinking into each other. */
 .detail-pane>.organisation-overview{overflow-y:auto}
+.detail-pane>.organisation-overview>.communication-column,.detail-pane>.organisation-overview>.organisation-sidebar{flex-shrink:0;min-height:auto}
 .detail-pane>.organisation-overview .timeline-scroll,.detail-pane>.organisation-overview>.organisation-sidebar{overflow:visible;margin:0;padding-left:0;padding-right:0;-webkit-mask-image:none;mask-image:none}
 }
 .communication-event.meeting{--event-accent:#1f7a5c;background:linear-gradient(125deg,#effaf5,#dcf2e8);border-color:#9fd3bd}.communication-event.meeting .communication-icon{color:#1f7a5c;background:#dcf2e8;border-color:#9fd3bd}
