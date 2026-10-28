@@ -30,7 +30,7 @@ To take a contact from an email, select the person's details in the opened email
 
 ## The timeline
 
-The newest entry is on top: emails (blue), calls (purple), meetings and notes (amber). Open a card for the full text. Emails show their envelope and the contacts they were saved with. Calls, notes and meetings have a pencil to correct them; the date, author and linked contacts stay, and the edit lands in the change log.
+The newest entry is on top: emails (blue), calls (purple), meetings and notes (amber). A closed email card names the sender and shows the first lines of the email on one line. Open a card for the full text. Emails show their envelope and the contacts they were saved with. Calls, notes and meetings have a pencil to correct them; the date, author and linked contacts stay, and the edit lands in the change log.
 
 **Notiz hinzufügen** records a note or a meeting. A note never counts as client contact. A meeting does, once its day has come.
 
