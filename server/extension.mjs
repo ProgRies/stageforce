@@ -25,7 +25,7 @@ function envelope(b,user,db){
  const sender=[address(b.from)];if(!Array.isArray(b.recipients)||b.recipients.length>100)throw new Problem('Invalid participants.');
  return{sender,recipients:b.recipients.map(address),cc:[],mailbox,direction:ourAddresses(db,user,mailbox).internal(sender[0].email)?'outgoing':'incoming',original:'',dedupeKey:''};
 }
-function identity(b,user){const mailbox=field(b.mailbox,254).toLowerCase();if(mailbox!==user.email.toLowerCase())throw new Problem('The Gmail mailbox must match your CRM account.',403);return{mailbox,gmailId:field(b.gmailMessageId||'',200)};}
+function identity(b,user){const mailbox=field(b.mailbox,254).toLowerCase();if(mailbox!==user.email.toLowerCase())throw new Problem('The Gmail mailbox must match your CRM account. Leave it as your own address: the sender is read from the email.',403);return{mailbox,gmailId:field(b.gmailMessageId||'',200)};}
 function fingerprint(b){return createHash('sha256').update('extension-v1:'+JSON.stringify([field(b.from?.email,254).toLowerCase(),field(b.timestampRaw||b.timestamp,150),field(b.originalSubject,1000),field(b.originalBody,500000)])).digest('hex');}
 // A colleague's copy of an email has other Gmail ids, so it is recognised by sender, the minute it was sent and the subject (without Re:/AW: prefixes).
 // Before an email is linked or deduplicated, a shared recipient is required too, so one offer sent separately to two clients stays two emails.
