@@ -1,7 +1,8 @@
 export type CellValue = string | number;
 export type UpcomingMeeting = { date: string; text: string };
 export type MapPin = { lat: number; lng: number };
-export type Entity = { id: string; row: number; values: CellValue[]; version: string; ownerId?: string; reservedBy?: string; upcoming?: UpcomingMeeting|null; location?: MapPin|null };
+export type Entity = { id: string; row: number; values: CellValue[]; version: string; ownerId?: string; reservedBy?: string; upcoming?: UpcomingMeeting|null; location?: MapPin|null; followUpSource?: FollowUpSource|null };
+export type FollowUpSource = { at: string; by: string; outcome: string|null };
 export type TeamUser = { id: string; name: string; email: string };
 export type EntityLink = { id: string; a: string; b: string; note: string };
 export const HEADERS = ["Entität-ID","Name","Entitätstyp","FastBill-Link (manuell)","Ort","Bundesland","Website","Größe","Größenmaß","Beziehungsstatus","Vertriebsphase","Zuständig intern","Hauptkontakt","E-Mail","Telefon","Letzter belegter Kontakt","Nächster Schritt","Wiedervorlage","Kurzüberblick","Prüfbedarf","Kontakte JSON","Historie JSON","Verknüpfte Entitäten JSON","Quellen JSON"];
@@ -63,6 +64,11 @@ export const CALL_OUTCOMES = {
 export type CallOutcome = keyof typeof CALL_OUTCOMES;
 export const BOOKING_URL = "https://calendar.google.com/calendar/u/0/appointments/schedules/AcZssZ2Ihic54_5fuPXHGTSxvpiy_8_KR4baKXWw4HJlO5-0nlCL5JI7wwinxG4mSJzzk4cRpPZbPD4F";
 export function addDays(date:string,days:number){const d=new Date(date+"T12:00:00Z");d.setUTCDate(d.getUTCDate()+days);return d.toISOString().slice(0,10);}
+export function addMonths(date:string,months:number){const d=new Date(date+"T12:00:00Z"),day=d.getUTCDate();d.setUTCDate(1);d.setUTCMonth(d.getUTCMonth()+months);d.setUTCDate(Math.min(day,new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,0)).getUTCDate()));return d.toISOString().slice(0,10);}
+// The one planned call of an organisation ("Wiedervorlage"): quick picks, a short label for list chips and how far away it is.
+export const FOLLOW_UP_PICKS:[string,(today:string)=>string][]=[["1 Woche",t=>addDays(t,7)],["2 Wochen",t=>addDays(t,14)],["1 Monat",t=>addMonths(t,1)],["3 Monate",t=>addMonths(t,3)],["6 Monate",t=>addMonths(t,6)],["1 Jahr",t=>addMonths(t,12)]];
+export function followUpLabel(date:string,today=todayBerlin()){if(date<today)return "Anruf fällig seit "+meetingWhen(date,today).replace(/^\S+ /,"");if(date===today)return "Anruf heute";const when=meetingWhen(date,today);return "Anruf "+when+(date.slice(0,4)!==today.slice(0,4)&&!/^(heute|morgen)$/.test(when)?date.slice(2,4):"");}
+export function followUpDistance(date:string,today=todayBerlin()){const days=Math.round((Date.parse(date+"T12:00:00Z")-Date.parse(today+"T12:00:00Z"))/86400000);if(days<0)return days===-1?"seit gestern":`seit ${-days} Tagen`;if(days===0)return "heute";if(days===1)return "morgen";if(days<14)return `in ${days} Tagen`;if(days<60)return `in ${Math.round(days/7)} Wochen`;const months=Math.round(days/30.4);return months<12?`in ${months} Monaten`:months<18?"in einem Jahr":`in ${Math.round(months/12)} Jahren`;}
 // Timeline label for an activity kind; call results are stored as "Anruf · <Ergebnis>".
 export function activityLabel(kind:string){return kind.startsWith("Anruf · ")?kind.slice(8):kind==="Anrufversuch"?"Nicht erreicht":kind==="Anruf gestartet"?"Anruf gestartet":kind;}
 export type ReviewItem = {id:string;text:string;last:{kind:string;text:string;subject:string;date:string;author:string}|null};

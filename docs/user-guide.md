@@ -55,12 +55,18 @@ One tap on a result saves the call and sets when the organisation comes back:
 | Result | Next follow-up | Also |
 | --- | --- | --- |
 | Nicht erreicht | in 2 days | does not count as contact |
-| Später anrufen | the date you pick (tomorrow by default) | |
+| Später anrufen | the date you pick (tomorrow by default, or the date already planned) | |
 | Termin | in 14 days | opens the booking calendar, phase Termin vereinbart |
 | E-Mail nötig | in 7 days | puts the organisation on Prüfen |
 | Kein Interesse | in a year | phase Aktuell kein Bedarf |
 
 Every result except Nicht erreicht counts as the last contact. Only one call per person is open at a time.
+
+If a call is already planned for a later day, the card shows **Geplanten Anruf (…) behalten**, ticked. While it is ticked, a result such as Nicht erreicht or E-Mail nötig keeps that date (the phase and Prüfen still change); untick it to let the result set the date as in the table. Später anrufen always uses the date you pick.
+
+### Next planned call
+
+Every organisation has at most one planned call. It shows as a chip next to the status in the list (**Anruf Do., 28.01.27**, amber once it is due; a planned meeting is shown instead) and as a button next to **Zuständig** on the organisation (or **Kein Anruf geplant**). Click the button to see who set it and how, pick 1 Woche to 1 Jahr or a date, or remove it. When you log a call by hand with **Notiz hinzufügen → Anruf**, choose the next call there too: keep it unchanged, pick a new one or none.
 
 ### Call list
 

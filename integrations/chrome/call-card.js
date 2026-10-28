@@ -35,6 +35,7 @@
 .sf-call .confirm p{grid-column:span 2;margin:0;font-weight:600}
 .sf-call .error{margin:0;color:var(--danger);font-size:12px}.sf-call .error:empty{display:none}
 .sf-call .hint{margin:0;color:var(--muted);font-size:12px}
+.sf-call .keep{display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:var(--panel);font-size:12px;cursor:pointer}.sf-call .keep input{margin:0;accent-color:var(--accent)}
 .sf-call [hidden]{display:none!important}
 .sf-call.is-minimized header{cursor:pointer}
 .sf-call.in-pip{width:100%;max-width:none;min-height:100vh;border:0;border-radius:0;box-shadow:none}
@@ -42,10 +43,11 @@ body.sf-pip{margin:0;background:#fff}body.sf-pip.dark{background:#1e2140}`;
  const ICONS={pop:'M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6',min:'M5 12h14',max:'M6 9l6 6 6-6',close:'M18 6 6 18M6 6l12 12'};
  const berlin=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Berlin',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
  const plusDays=(day,n)=>new Date(Date.parse(day+'T12:00:00Z')+n*86400000).toISOString().slice(0,10);
+ const dayLabel=day=>new Intl.DateTimeFormat('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'2-digit',timeZone:'UTC'}).format(new Date(day+'T12:00:00Z'));
  const clock=ms=>{const s=Math.max(0,Math.floor(ms/1000)),h=Math.floor(s/3600),m=Math.floor(s/60)%60,p=v=>String(v).padStart(2,'0');return(h?h+':'+p(m):p(m))+':'+p(s%60);};
  const supported=()=>typeof window.documentPictureInPicture?.requestWindow==='function';
  function create({api,theme=()=>'light',onChange=()=>{},onSaved=()=>{},onOpen=null,rememberKey=''}){
-  let call=null,notes='',later='',busy=false,confirming=false,minimized=false,error='',pip=null,host=null,tick=null,draftTimer=null,drafted='';
+  let call=null,notes='',later='',keep=true,busy=false,confirming=false,minimized=false,error='',pip=null,host=null,tick=null,draftTimer=null,drafted='';
   const doc=document,el=(tag,props={},...children)=>{const e=Object.assign(doc.createElement(tag),props);e.append(...children);return e;};
   const icon=name=>{const s=doc.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('viewBox','0 0 24 24');s.setAttribute('aria-hidden','true');const p=doc.createElementNS('http://www.w3.org/2000/svg','path');p.setAttribute('d',ICONS[name]);for(const[k,v]of Object.entries({fill:'none',stroke:'currentColor','stroke-width':'2','stroke-linecap':'round','stroke-linejoin':'round'}))p.setAttribute(k,v);s.append(p);return s;};
   const org=el('button',{type:'button',className:'org'}),meta=el('span',{className:'meta'}),time=el('span',{className:'time'});
@@ -55,7 +57,11 @@ body.sf-pip{margin:0;background:#fff}body.sf-pip.dark{background:#1e2140}`;
   const date=el('input',{type:'date'}),later_=el('div',{className:'row later'},date,el('button',{type:'button',className:'button',textContent:'Zurück',onclick:()=>{later='';update();}}),el('button',{type:'button',className:'button primary',textContent:'Speichern',onclick:e=>save('callback',e)}));date.setAttribute('aria-label','Wann erneut anrufen');
   const confirm_=el('div',{className:'row confirm'},el('p',{textContent:'Anruf ohne Eintrag verwerfen?'}),el('button',{type:'button',className:'button',textContent:'Zurück',onclick:()=>{confirming=false;update();}}),el('button',{type:'button',className:'button danger',textContent:'Verwerfen',onclick:cancel}));
   const hint=el('p',{className:'hint',textContent:'Mit ↗ schwebt der Anruf über allen Tabs und Fenstern.'});
-  const body=el('div',{className:'body'},area,dial,outcomes,later_,confirm_,errorLine,hint);
+  // A call before the planned date (e.g. not reached) keeps that date unless unticked; "Später anrufen" always sets the picked one.
+  const keepBox=el('input',{type:'checkbox',checked:true}),keepText=el('span'),keep_=el('label',{className:'keep'},keepBox,keepText);
+  keepBox.onchange=()=>{keep=keepBox.checked;update();};
+  const planned=()=>call?.followUp&&call.followUp>berlin()?call.followUp:'';
+  const body=el('div',{className:'body'},area,dial,keep_,outcomes,later_,confirm_,errorLine,hint);
   const header=el('header',{},el('span',{className:'pulse'}),el('div',{className:'who'},org,meta),time,pop,min,discard);
   const card=el('section',{className:'sf-call'},header,body);card.setAttribute('role','region');card.setAttribute('aria-label','Laufender Anruf');
   area.oninput=()=>{notes=area.value;clearTimeout(draftTimer);draftTimer=setTimeout(saveDraft,800);};
@@ -75,13 +81,14 @@ body.sf-pip{margin:0;background:#fff}body.sf-pip.dark{background:#1e2140}`;
    time.textContent=clock(Date.now()-Date.parse(call.startedAt));
    pop.hidden=!!pip||!supported();min.title=min.ariaLabel=minimized?'Aufklappen':'Minimieren';min.replaceChildren(icon(minimized?'max':'min'));
    dial.href='tel:'+call.dial;if(area.value!==notes)area.value=notes;
-   for(const e of [area,discard,...outcomes.children,...later_.querySelectorAll('button,input'),...confirm_.querySelectorAll('button')])e.disabled=busy;
+   keep_.hidden=!planned()||!!later||confirming;keepText.textContent='Geplanten Anruf ('+(planned()?dayLabel(planned()):'')+') behalten';keepBox.checked=keep;
+   for(const e of [area,keepBox,discard,...outcomes.children,...later_.querySelectorAll('button,input'),...confirm_.querySelectorAll('button')])e.disabled=busy;
    later_.lastChild.disabled=busy||!later;
    outcomes.hidden=!!later||confirming;later_.hidden=!later||confirming;confirm_.hidden=!confirming;date.min=berlin();if(date.value!==later)date.value=later;
    errorLine.textContent=error;hint.hidden=!!pip||!supported();
   }
   function show(){
-   outcomes.replaceChildren(...call.outcomes.map((o,i,all)=>el('button',{type:'button',className:'button'+(o.key==='meeting'?' primary':'')+(i===all.length-1&&all.length%2?' wide':''),textContent:o.label,title:o.key==='meeting'?'Öffnet den Terminkalender':o.next,onclick:e=>o.key==='callback'?(later=plusDays(berlin(),1),update()):save(o.key,e)})));
+   outcomes.replaceChildren(...call.outcomes.map((o,i,all)=>el('button',{type:'button',className:'button'+(o.key==='meeting'?' primary':'')+(i===all.length-1&&all.length%2?' wide':''),textContent:o.label,title:o.key==='meeting'?'Öffnet den Terminkalender':o.next,onclick:e=>o.key==='callback'?(later=planned()||plusDays(berlin(),1),update()):save(o.key,e)})));
    if(!pip&&!host){host=doc.createElement('div');host.style.cssText='position:fixed;top:16px;right:16px;z-index:2147483647';const root=host.attachShadow({mode:'closed'});root.append(el('style',{textContent:CSS}),card);doc.documentElement.append(host);}
    if(!keysIsolated){keysIsolated=true;for(const type of ['keydown','keyup','keypress'])window.addEventListener(type,isolate,true);}
    clearInterval(tick);tick=setInterval(update,1000);update();remember(call.callId);onChange(call);
@@ -93,7 +100,7 @@ body.sf-pip{margin:0;background:#fff}body.sf-pip.dark{background:#1e2140}`;
   // Typing a note must not trigger the page's own shortcuts (Gmail reads keys from the whole page).
   let keysIsolated=false;const isolate=e=>{if(host&&e.composedPath().includes(host))e.stopImmediatePropagation();};
   function finish(){
-   clearInterval(tick);clearTimeout(draftTimer);call=null;notes=drafted=later=error='';busy=confirming=minimized=false;
+   clearInterval(tick);clearTimeout(draftTimer);call=null;notes=drafted=later=error='';busy=confirming=minimized=false;keep=true;
    const w=pip;pip=null;w?.close();host?.remove();host=null;card.remove();card.classList.remove('in-pip');remember('');onChange(null);
   }
   // Picture-in-Picture needs the click that started it, and opening the dialler uses that click up: the window is requested first,
@@ -112,7 +119,7 @@ body.sf-pip{margin:0;background:#fff}body.sf-pip.dark{background:#1e2140}`;
    if(busy||!call)return;
    if(outcome==='meeting')(event?.view||window).open(call.bookingUrl,'_blank','noopener');
    busy=true;error='';update();
-   try{const done=call,r=await api({action:'callSave',callId:done.callId,notes,outcome,callbackDate:outcome==='callback'?later:undefined});finish();onSaved(done,r);}
+   try{const done=call,r=await api({action:'callSave',callId:done.callId,notes,outcome,callbackDate:outcome==='callback'?later:undefined,keepFollowUp:outcome!=='callback'&&!!planned()&&keep});finish();onSaved(done,r);}
    catch(e){busy=false;error=e.message||'Speichern fehlgeschlagen.';update();}
   }
   async function cancel(){

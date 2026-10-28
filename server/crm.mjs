@@ -18,7 +18,13 @@ export function contacts(db,id){return db.prepare(`SELECT c.*,oc.is_primary FROM
 export function entity(db,id,full=false){const o=getOrg(db,id);const cs=contacts(db,id),primary=cs.find(c=>c.primary);const f=db.prepare('SELECT * FROM followups WHERE organisation_id=? AND completed_at IS NULL').get(id);const review=db.prepare('SELECT text FROM review_issues WHERE organisation_id=? AND resolved_at IS NULL').all(id).map(r=>r.text).join('\n');
  const values=[o.id,o.name,o.type,o.fastbill_url,o.city,o.state,o.website,o.size??'',o.size_unit,o.status,o.phase,o.owner,primary?.name||'',primary?.e_mails[0]||'',primary?.telefone[0]||cs.flatMap(c=>c.telefone)[0]||'',o.last_contact||'',f?.text||'',f?.due_date||'',o.summary,review,full?JSON.stringify(cs):'[]','[]','[]','[]'];
  if(full){values[23]=JSON.stringify(db.prepare('SELECT payload_json FROM source_references WHERE organisation_id=? AND activity_id IS NULL AND contact_id IS NULL').all(id).map(s=>JSON.parse(s.payload_json)));}
- return{id:o.id,row:0,values,version:String(o.version),ownerId:ownerResolver(db)(o.owner),reservedBy:reservations(db).get(o.id)||'',upcoming:upcomingMeetings(db,id).get(id)||null,location:locations(db,id).get(id)||null};
+ return{id:o.id,row:0,values,version:String(o.version),ownerId:ownerResolver(db)(o.owner),reservedBy:reservations(db).get(o.id)||'',upcoming:upcomingMeetings(db,id).get(id)||null,location:locations(db,id).get(id)||null,...(full&&f?.due_date?{followUpSource:followUpSource(db,id)}:{})};
+}
+// Who last set the planned call and how: a call result or a change by hand. Read from the audit log, so nothing extra is stored.
+function followUpSource(db,id){
+ const row=db.prepare("SELECT a.created_at,a.action,a.changes_json,u.name FROM audit_log a LEFT JOIN users u ON u.id=a.user_id WHERE a.organisation_id=? AND ((a.action='call' AND json_extract(a.changes_json,'$.due') IS NOT NULL) OR json_extract(a.changes_json,'$.Wiedervorlage') IS NOT NULL) ORDER BY a.created_at DESC,a.rowid DESC LIMIT 1").get(id);
+ if(!row)return null;const changes=JSON.parse(row.changes_json),outcome=row.action==='call'?changes.outcome:null;
+ return{at:row.created_at,by:row.name||'',outcome:outcome==='talked'?null:CALL_OUTCOMES[outcome]?.label||null};
 }
 export function locations(db,id){return new Map(db.prepare(`SELECT organisation_id,lat,lng FROM organisation_locations${id?' WHERE organisation_id=?':''}`).all(...(id?[id]:[])).map(r=>[r.organisation_id,{lat:r.lat,lng:r.lng}]));}
 export function listData(db){
