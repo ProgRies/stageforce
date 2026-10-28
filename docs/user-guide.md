@@ -68,6 +68,18 @@ If a call is already planned for a later day, the card shows **Geplanten Anruf (
 
 Every organisation has at most one planned call. It shows as a chip next to the status in the list (**Anruf Do., 28.01.27**, amber once it is due; a planned meeting is shown instead) and as a button next to **Zuständig** on the organisation (or **Kein Anruf geplant**). Click the button to see who set it and how, pick 1 Woche to 1 Jahr or a date, or remove it. When you log a call by hand with **Notiz hinzufügen → Anruf**, choose the next call there too: keep it unchanged, pick a new one or none.
 
+A planned call can also have a time (optional): in the button's editor, in **Notiz hinzufügen → Anruf** once a date is picked, and next to the date on the call card's **Später anrufen**. Picking a new date without a time clears the old time; any other call result sets a date without a time.
+
+### Follow-ups
+
+**Follow-ups** (below Anrufe) shows one week, Monday to Sunday, with the arrows (or ← →) to page and **Heute** to come back. It only shows what is in the CRM:
+
+- your planned calls, for organisations where you are **Zuständig**. Calls with a time are placed at their time; calls without one are listed first on their day.
+- everyone's meetings in green, yours filled and colleagues' outlined with their name.
+- calls that are overdue wait on today in amber with their original date (**fällig seit 24.10.**), until a logged call or an edit moves the date. There is nothing to tick off: logging the call sets the next date, as on the call card.
+
+Click any entry to open its organisation.
+
 ### Call list
 
 **Anrufe** builds your list for today. Due follow-ups always come first. Then come customers you have not spoken to for a chosen time (30 to 365 days), leads in progress (Angebot, Testphase, Termin vereinbart, Im Gespräch), and new leads. You choose the number of calls, the contact pause and the split between customers and leads.

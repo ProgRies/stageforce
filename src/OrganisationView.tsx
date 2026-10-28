@@ -1,7 +1,7 @@
 import {useConfirm} from './ConfirmDialog';
 import ContactSelection from './ContactSelection';
 import type {ContactSuggestion} from './contactExtraction';
-import {NextCallChoice,initialNextCall,nextCallFields,type NextCall} from './FollowUp';
+import {NextCallChoice,initialNextCall,nextCallFields,nextCallTime,type NextCall} from './FollowUp';
 import OrganisationHeader from './OrganisationHeader';
 import PhoneCall from './PhoneCall';
 import {lazy,Suspense,useEffect,useRef,useState} from 'react';
@@ -42,7 +42,7 @@ export default function OrganisationView({users,entity,entities,links,history,hi
  useEffect(()=>{if(internalOpen)internalHistory();},[internalOpen,entity.version]);
  function openNote(){setNote('');setNoteKind('Notiz');setNextCall(initialNextCall(entity));setDate(todayBerlin());setNoteError('');requestId.current=null;setNoteOpen(true);}
  async function saveNote(){if(busy||!note.trim())return;setBusy(true);setNoteError('');requestId.current??=crypto.randomUUID();try{
-  await api({action:'save',id:entity.id,version:entity.version,requestId:requestId.current,fields:noteKind==='Anruf'?nextCallFields(entity,nextCall):{},note:{type:noteKind,text:note.trim(),date,contacted:noteKind==='Meeting'}});
+  await api({action:'save',id:entity.id,version:entity.version,requestId:requestId.current,fields:noteKind==='Anruf'?nextCallFields(entity,nextCall):{},...(noteKind==='Anruf'?nextCallTime(nextCall):{}),note:{type:noteKind,text:note.trim(),date,contacted:noteKind==='Meeting'}});
   setNoteOpen(false);onSaved();
  }catch(e:any){setNoteError(e.message);if(e.status==='conflict')onSaved();}finally{setBusy(false);}}
  return <><OrganisationHeader users={users} entity={entity} disabled={!!activityEdit||busy||fieldsBusy||toolsDirty||noteOpen||loading} onSaved={onSaved} onBusy={setHeaderBusy}/><div className="organisation-overview"><section className="communication-column" aria-label="Kommunikationsverlauf" data-tour="timeline">

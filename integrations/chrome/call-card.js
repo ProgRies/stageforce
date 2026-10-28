@@ -31,7 +31,7 @@
 .sf-call .button.primary{background:linear-gradient(135deg,#5b5fc7,#8a4fbf);border-color:transparent;color:var(--accent-ink)}
 .sf-call .button.danger{background:var(--danger);border-color:transparent;color:#fff}
 .sf-call button:disabled,.sf-call input:disabled,.sf-call textarea:disabled{opacity:.6;cursor:default}
-.sf-call .later input{grid-column:span 2;border:1px solid var(--line);border-radius:9px;padding:6px 10px;background:var(--input);color-scheme:light}.sf-call[data-theme="dark"] .later input{color-scheme:dark}
+.sf-call .later input{min-width:0;border:1px solid var(--line);border-radius:9px;padding:6px 10px;background:var(--input);color-scheme:light}.sf-call[data-theme="dark"] .later input{color-scheme:dark}
 .sf-call .confirm p{grid-column:span 2;margin:0;font-weight:600}
 .sf-call .error{margin:0;color:var(--danger);font-size:12px}.sf-call .error:empty{display:none}
 .sf-call .hint{margin:0;color:var(--muted);font-size:12px}
@@ -47,14 +47,14 @@ body.sf-pip{margin:0;background:#fff}body.sf-pip.dark{background:#1e2140}`;
  const clock=ms=>{const s=Math.max(0,Math.floor(ms/1000)),h=Math.floor(s/3600),m=Math.floor(s/60)%60,p=v=>String(v).padStart(2,'0');return(h?h+':'+p(m):p(m))+':'+p(s%60);};
  const supported=()=>typeof window.documentPictureInPicture?.requestWindow==='function';
  function create({api,theme=()=>'light',onChange=()=>{},onSaved=()=>{},onOpen=null,rememberKey=''}){
-  let call=null,notes='',later='',keep=true,busy=false,confirming=false,minimized=false,error='',pip=null,host=null,tick=null,draftTimer=null,drafted='';
+  let call=null,notes='',later='',laterTime='',keep=true,busy=false,confirming=false,minimized=false,error='',pip=null,host=null,tick=null,draftTimer=null,drafted='';
   const doc=document,el=(tag,props={},...children)=>{const e=Object.assign(doc.createElement(tag),props);e.append(...children);return e;};
   const icon=name=>{const s=doc.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('viewBox','0 0 24 24');s.setAttribute('aria-hidden','true');const p=doc.createElementNS('http://www.w3.org/2000/svg','path');p.setAttribute('d',ICONS[name]);for(const[k,v]of Object.entries({fill:'none',stroke:'currentColor','stroke-width':'2','stroke-linecap':'round','stroke-linejoin':'round'}))p.setAttribute(k,v);s.append(p);return s;};
   const org=el('button',{type:'button',className:'org'}),meta=el('span',{className:'meta'}),time=el('span',{className:'time'});
   const pop=el('button',{type:'button',className:'icon',title:'Über allen Fenstern anzeigen'},icon('pop')),min=el('button',{type:'button',className:'icon'}),discard=el('button',{type:'button',className:'icon',title:'Anruf ohne Eintrag verwerfen'},icon('close'));
   const area=el('textarea',{placeholder:'Gesprächsnotiz · optional',rows:4});area.setAttribute('aria-label','Gesprächsnotiz');
   const dial=el('a',{className:'dial',textContent:'Wähl-App erneut öffnen'}),outcomes=el('div',{className:'row'}),errorLine=el('p',{className:'error'});errorLine.setAttribute('role','alert');
-  const date=el('input',{type:'date'}),later_=el('div',{className:'row later'},date,el('button',{type:'button',className:'button',textContent:'Zurück',onclick:()=>{later='';update();}}),el('button',{type:'button',className:'button primary',textContent:'Speichern',onclick:e=>save('callback',e)}));date.setAttribute('aria-label','Wann erneut anrufen');
+  const date=el('input',{type:'date'}),at=el('input',{type:'time',step:300}),later_=el('div',{className:'row later'},date,at,el('button',{type:'button',className:'button',textContent:'Zurück',onclick:()=>{later=laterTime='';update();}}),el('button',{type:'button',className:'button primary',textContent:'Speichern',onclick:e=>save('callback',e)}));date.setAttribute('aria-label','Wann erneut anrufen');at.setAttribute('aria-label','Uhrzeit (optional)');at.title='Uhrzeit (optional)';
   const confirm_=el('div',{className:'row confirm'},el('p',{textContent:'Anruf ohne Eintrag verwerfen?'}),el('button',{type:'button',className:'button',textContent:'Zurück',onclick:()=>{confirming=false;update();}}),el('button',{type:'button',className:'button danger',textContent:'Verwerfen',onclick:cancel}));
   const hint=el('p',{className:'hint',textContent:'Mit ↗ schwebt der Anruf über allen Tabs und Fenstern.'});
   // A call before the planned date (e.g. not reached) keeps that date unless unticked; "Später anrufen" always sets the picked one.
@@ -65,7 +65,7 @@ body.sf-pip{margin:0;background:#fff}body.sf-pip.dark{background:#1e2140}`;
   const header=el('header',{},el('span',{className:'pulse'}),el('div',{className:'who'},org,meta),time,pop,min,discard);
   const card=el('section',{className:'sf-call'},header,body);card.setAttribute('role','region');card.setAttribute('aria-label','Laufender Anruf');
   area.oninput=()=>{notes=area.value;clearTimeout(draftTimer);draftTimer=setTimeout(saveDraft,800);};
-  date.oninput=()=>{later=date.value;update();};
+  date.oninput=()=>{later=date.value;update();};at.oninput=()=>{laterTime=at.value;update();};
   org.onclick=e=>{e.stopPropagation();if(call&&onOpen)onOpen(call.organisation.id);};
   pop.onclick=e=>{e.stopPropagation();popOut();};
   min.onclick=e=>{e.stopPropagation();minimized=!minimized;update();if(pip)try{pip.resizeTo(pip.outerWidth,minimized?header.offsetHeight+(pip.outerHeight-pip.innerHeight):card.scrollHeight+(pip.outerHeight-pip.innerHeight));}catch{}};
@@ -84,11 +84,11 @@ body.sf-pip{margin:0;background:#fff}body.sf-pip.dark{background:#1e2140}`;
    keep_.hidden=!planned()||!!later||confirming;keepText.textContent='Geplanten Anruf ('+(planned()?dayLabel(planned()):'')+') behalten';keepBox.checked=keep;
    for(const e of [area,keepBox,discard,...outcomes.children,...later_.querySelectorAll('button,input'),...confirm_.querySelectorAll('button')])e.disabled=busy;
    later_.lastChild.disabled=busy||!later;
-   outcomes.hidden=!!later||confirming;later_.hidden=!later||confirming;confirm_.hidden=!confirming;date.min=berlin();if(date.value!==later)date.value=later;
+   outcomes.hidden=!!later||confirming;later_.hidden=!later||confirming;confirm_.hidden=!confirming;date.min=berlin();if(date.value!==later)date.value=later;if(at.value!==laterTime)at.value=laterTime;
    errorLine.textContent=error;hint.hidden=!!pip||!supported();
   }
   function show(){
-   outcomes.replaceChildren(...call.outcomes.map((o,i,all)=>el('button',{type:'button',className:'button'+(o.key==='meeting'?' primary':'')+(i===all.length-1&&all.length%2?' wide':''),textContent:o.label,title:o.key==='meeting'?'Öffnet den Terminkalender':o.next,onclick:e=>o.key==='callback'?(later=planned()||plusDays(berlin(),1),update()):save(o.key,e)})));
+   outcomes.replaceChildren(...call.outcomes.map((o,i,all)=>el('button',{type:'button',className:'button'+(o.key==='meeting'?' primary':'')+(i===all.length-1&&all.length%2?' wide':''),textContent:o.label,title:o.key==='meeting'?'Öffnet den Terminkalender':o.next,onclick:e=>o.key==='callback'?(later=planned()||plusDays(berlin(),1),laterTime=planned()&&call.followUpTime||'',update()):save(o.key,e)})));
    if(!pip&&!host){host=doc.createElement('div');host.style.cssText='position:fixed;top:16px;right:16px;z-index:2147483647';const root=host.attachShadow({mode:'closed'});root.append(el('style',{textContent:CSS}),card);doc.documentElement.append(host);}
    if(!keysIsolated){keysIsolated=true;for(const type of ['keydown','keyup','keypress'])window.addEventListener(type,isolate,true);}
    clearInterval(tick);tick=setInterval(update,1000);update();remember(call.callId);onChange(call);
@@ -100,7 +100,7 @@ body.sf-pip{margin:0;background:#fff}body.sf-pip.dark{background:#1e2140}`;
   // Typing a note must not trigger the page's own shortcuts (Gmail reads keys from the whole page).
   let keysIsolated=false;const isolate=e=>{if(host&&e.composedPath().includes(host))e.stopImmediatePropagation();};
   function finish(){
-   clearInterval(tick);clearTimeout(draftTimer);call=null;notes=drafted=later=error='';busy=confirming=minimized=false;keep=true;
+   clearInterval(tick);clearTimeout(draftTimer);call=null;notes=drafted=later=laterTime=error='';busy=confirming=minimized=false;keep=true;
    const w=pip;pip=null;w?.close();host?.remove();host=null;card.remove();card.classList.remove('in-pip');remember('');onChange(null);
   }
   // Picture-in-Picture needs the click that started it, and opening the dialler uses that click up: the window is requested first,
@@ -119,7 +119,7 @@ body.sf-pip{margin:0;background:#fff}body.sf-pip.dark{background:#1e2140}`;
    if(busy||!call)return;
    if(outcome==='meeting')(event?.view||window).open(call.bookingUrl,'_blank','noopener');
    busy=true;error='';update();
-   try{const done=call,r=await api({action:'callSave',callId:done.callId,notes,outcome,callbackDate:outcome==='callback'?later:undefined,keepFollowUp:outcome!=='callback'&&!!planned()&&keep});finish();onSaved(done,r);}
+   try{const done=call,r=await api({action:'callSave',callId:done.callId,notes,outcome,callbackDate:outcome==='callback'?later:undefined,callbackTime:outcome==='callback'&&laterTime||undefined,keepFollowUp:outcome!=='callback'&&!!planned()&&keep});finish();onSaved(done,r);}
    catch(e){busy=false;error=e.message||'Speichern fehlgeschlagen.';update();}
   }
   async function cancel(){
