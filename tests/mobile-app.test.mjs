@@ -128,3 +128,12 @@ test('the server serves the phone app under /m/ and leaves the desktop page as i
   for(const path of ['/m/../server/http.mjs','/m/%2e%2e/package.json','/other.html'])assert.equal((await fetch(base+path)).status,404,path);
  }finally{await new Promise(r=>server.close(r));db.close();rmSync(dir,{recursive:true,force:true});}
 });
+
+test('the phone app lists due calls of my organisations, also a date set by hand or a call a colleague logged',async()=>{
+ const{db,user}=await team();const sid=await addUser(db,'sam@example.test','Sam',password);enableMfa(db,sid,newSecret());const sam=db.prepare('SELECT * FROM users WHERE id=?').get(sid);
+ const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Berlin'}).format(new Date());
+ const mine=createOrg(db,user,'Meine Stadt'),theirs=createOrg(db,user,'Sams Stadt');db.prepare('UPDATE organisations SET owner=? WHERE id=?').run(user.id,mine.id);db.prepare('UPDATE organisations SET owner=? WHERE id=?').run(sam.id,theirs.id);
+ // Planned by hand (no one attached) and planned by a colleague's call: both belong to the organisation's owner.
+ db.prepare("INSERT INTO followups VALUES('f1',?,'Rückruf',?,'',NULL)").run(mine.id,today);db.prepare("INSERT INTO followups VALUES('f2',?,'Rückruf',?,?,NULL)").run(theirs.id,today,user.id);
+ assert.deepEqual(mobileHome(db,user).due.map(o=>o.name),['Meine Stadt']);assert.deepEqual(mobileHome(db,sam).due.map(o=>o.name),['Sams Stadt']);
+});

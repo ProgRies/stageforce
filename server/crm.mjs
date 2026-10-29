@@ -193,7 +193,8 @@ export function confirmImport(db,user,b){
    const cid=found[0]?.id||addContact(db,id,{name:selected.name,e_mails:[selected.email]});contactIds.push(cid);
    db.prepare('INSERT OR IGNORE INTO activity_contacts VALUES(?,?)').run(aid,cid);
   }
-  if(direction==='outgoing')resolveReview(db,id,CALL_OUTCOMES.email.review);
+  // "E-Mail senden" is done once an email went to a client; a colleague's internal note or forward does not count.
+  if(direction==='outgoing'&&p.participants.some(a=>!a.internal&&(a.role==='recipient'||a.role==='cc')))resolveReview(db,id,CALL_OUTCOMES.email.review);
   applyFields(db,id,fields);audit(db,id,user,'email_import',{messageId:mid,direction,fields,contactIds});db.prepare('UPDATE organisations SET version=version+1,updated_at=? WHERE id=?').run(now(),id);db.prepare('INSERT INTO requests VALUES(?,?,?,?)').run('import:'+b.importId,user.id,id,now());db.prepare('DELETE FROM email_imports WHERE id=?').run(b.importId);reindex(db,id);return{entity:entity(db,id,true)};
  });
 }

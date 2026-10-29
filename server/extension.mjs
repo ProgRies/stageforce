@@ -30,14 +30,22 @@ function fingerprint(b){return createHash('sha256').update('extension-v1:'+JSON.
 // A colleague's copy of an email has other Gmail ids, so it is recognised by sender, the minute it was sent and the subject (without Re:/AW: prefixes).
 // Before an email is linked or deduplicated, a shared recipient is required too, so one offer sent separately to two clients stays two emails.
 const subjectKey=v=>String(v||'').toLowerCase().replace(/^(?:\s*(?:re|aw|antw|wg|fw|fwd)\s*(?:\[\d+\])?\s*:)+/,'').replace(/\s+/g,' ').trim();
-function sameEmail(db,senders,stamp,subject,recipients=null){
+// Whether a saved email went to the people this one went to. With client addresses on both sides only those count, so a template sent
+// separately to two clients, with the same colleague in copy, stays two emails. An empty list (nothing known) matches.
+function sameRecipients(ours,stored,recipients){
+ if(!recipients?.length)return true;let to=[];try{to=JSON.parse(stored.recipients_json).map(a=>String(a?.email||'').toLowerCase());}catch{}
+ const ext=to.filter(e=>!ours.internal(e)),wanted=recipients.filter(e=>!ours.internal(e));
+ return ext.length&&wanted.length?ext.some(e=>wanted.includes(e)):to.some(e=>recipients.includes(e));
+}
+function sameEmail(db,senders,stamp,subject,recipients=null,ours=null){
  const t=Date.parse(stamp||''),key=subjectKey(subject);if(!senders.length||!Number.isFinite(t)||!key)return null;const start=Math.floor(t/60000)*60000;
- const rows=db.prepare('SELECT m.*,a.organisation_id FROM messages m JOIN activities a ON a.message_id=m.id WHERE m.sent_at>=? AND m.sent_at<?').all(new Date(start).toISOString(),new Date(start+60000).toISOString()).filter(m=>{let from='';try{from=String(JSON.parse(m.sender_json)[0]?.email||'').toLowerCase();}catch{}if(!senders.includes(from)||subjectKey(m.subject)!==key)return false;if(!recipients)return true;let to=[];try{to=JSON.parse(m.recipients_json).map(a=>String(a?.email||'').toLowerCase());}catch{}return to.some(e=>recipients.includes(e));});
+ const rows=db.prepare('SELECT m.*,a.organisation_id FROM messages m JOIN activities a ON a.message_id=m.id WHERE m.sent_at>=? AND m.sent_at<?').all(new Date(start).toISOString(),new Date(start+60000).toISOString()).filter(m=>{let from='';try{from=String(JSON.parse(m.sender_json)[0]?.email||'').toLowerCase();}catch{}if(!senders.includes(from)||subjectKey(m.subject)!==key)return false;if(!recipients)return true;return recipients.length>0&&sameRecipients(ours,m,recipients);});
  return rows.length===1?rows[0]:null;
 }
-function existingMessage(db,user,b){const {mailbox,gmailId}=identity(b,user);let m=gmailId?db.prepare('SELECT m.*,a.organisation_id FROM extension_message_refs r JOIN messages m ON m.id=r.message_id JOIN activities a ON a.message_id=m.id WHERE r.mailbox=? AND r.gmail_id=?').get(mailbox,gmailId):null;
- if(!m&&(typeof b.originalBody==='string'||/^[a-f0-9]{64}$/.test(b.legacyFingerprint||''))){m=db.prepare('SELECT m.*,a.organisation_id FROM messages m JOIN activities a ON a.message_id=m.id WHERE m.dedupe_key=?').get(b.legacyFingerprint||fingerprint(b));if(m&&gmailId)db.prepare('INSERT OR IGNORE INTO extension_message_refs VALUES(?,?,?)').run(mailbox,gmailId,m.id);}
- if(!m&&b.from?.email){m=sameEmail(db,[field(b.from.email,254).toLowerCase()],field(b.sentAt||b.timestamp||'',50),field(b.originalSubject||b.subject||'',1000),(Array.isArray(b.recipients)?b.recipients.slice(0,200):[]).map(a=>field(a?.email,254).toLowerCase()));if(m&&gmailId)db.prepare('INSERT OR IGNORE INTO extension_message_refs VALUES(?,?,?)').run(mailbox,gmailId,m.id);}return m;}
+const recipientsIn=b=>(Array.isArray(b.recipients)?b.recipients.slice(0,200):[]).map(a=>field(a?.email,254).toLowerCase());
+function existingMessage(db,user,b){const {mailbox,gmailId}=identity(b,user),ours=ourAddresses(db,user,mailbox),recipients=recipientsIn(b);let m=gmailId?db.prepare('SELECT m.*,a.organisation_id FROM extension_message_refs r JOIN messages m ON m.id=r.message_id JOIN activities a ON a.message_id=m.id WHERE r.mailbox=? AND r.gmail_id=?').get(mailbox,gmailId):null;
+ if(!m&&(typeof b.originalBody==='string'||/^[a-f0-9]{64}$/.test(b.legacyFingerprint||''))){m=db.prepare('SELECT m.*,a.organisation_id FROM messages m JOIN activities a ON a.message_id=m.id WHERE m.dedupe_key=?').get(b.legacyFingerprint||fingerprint(b));if(m&&!sameRecipients(ours,m,recipients))m=null;if(m&&gmailId)db.prepare('INSERT OR IGNORE INTO extension_message_refs VALUES(?,?,?)').run(mailbox,gmailId,m.id);}
+ if(!m&&b.from?.email){m=sameEmail(db,[field(b.from.email,254).toLowerCase()],field(b.sentAt||b.timestamp||'',50),field(b.originalSubject||b.subject||'',1000),recipients,ours);if(m&&gmailId)db.prepare('INSERT OR IGNORE INTO extension_message_refs VALUES(?,?,?)').run(mailbox,gmailId,m.id);}return m;}
 // Where an address is already stored in the CRM, across all organisations, so the popup can say so before saving.
 function crmContact(db,address){const rows=db.prepare("SELECT c.name,o.id,o.name AS organisation FROM contact_addresses ca JOIN contacts c ON c.id=ca.contact_id JOIN organisation_contacts oc ON oc.contact_id=c.id JOIN organisations o ON o.id=oc.organisation_id WHERE ca.kind='email' AND ca.value=? COLLATE NOCASE ORDER BY o.name COLLATE NOCASE").all(address);if(!rows.length)return null;const organisations=[...new Map(rows.map(r=>[r.id,{id:r.id,name:r.organisation}])).values()];return{name:contactName(rows.find(r=>r.name)?.name,address),organisations:organisations.slice(0,5),more:Math.max(0,organisations.length-5)};}
 function attachReference(db,user,b,mid){const {mailbox,gmailId}=identity(b,user),thread=threadId(b);if(gmailId)db.prepare('INSERT OR IGNORE INTO extension_message_refs VALUES(?,?,?)').run(mailbox,gmailId,mid);if(thread)db.prepare('INSERT OR IGNORE INTO extension_thread_refs VALUES(?,?,?)').run(mailbox,thread,mid);}
@@ -48,7 +56,7 @@ function linksIn(b){if(b.links===undefined)return[];if(!Array.isArray(b.links)||
 function meetingIn(db,b){const m=detectMeeting({subject:field(b.originalSubject||b.subject||'',1000),body:field(b.originalBody||'',500000),links:linksIn(b),attachments:attachmentRefs(b.attachments).map(a=>a.name),sentAt:field(b.timestamp||'',50)});if(!m)return null;
  // With an organisation chosen, say whether this meeting is already in its timeline.
  const id=b.organisationId&&field(b.organisationId,100),found=id&&db.prepare('SELECT 1 FROM organisations WHERE id=?').get(id)&&findMeeting(db,id,m,m.date,m.time);
- return{provider:m.provider,title:m.title,date:m.date,time:m.time,likely:m.likely,cancelled:m.cancelled,logged:found?{date:found.date,text:found.body,update:found.match==='key'&&(found.date!==m.date||m.cancelled||found.body!==meetingText(m))}:null};}
+ return{provider:m.provider,title:m.title,date:m.date,time:m.time,likely:m.likely,cancelled:m.cancelled,logged:found?{date:found.date,text:found.body,update:found.match==='key'&&(m.cancelled||m.moves&&(found.date!==m.date||found.body!==meetingText(m)))}:null};}
 function attachmentRefs(value){if(value===undefined)return[];if(!Array.isArray(value)||value.length>100)throw new Problem('Too many attachment references.');return value.map(a=>({name:field(a.name,500),size:field(a.size||'',100),type:field(a.type||'',100),referenceOnly:true})).filter(a=>a.name);}
 export function extensionAction(db,user,b,origin){
  if(b.action==='check')return{email:user.email,appearance:appearance(db,user)||'system'};
@@ -132,7 +140,8 @@ export function extensionAction(db,user,b,origin){
   const stamp=field(b.timestamp,50);if(!/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(stamp)||!Number.isFinite(Date.parse(stamp))||Date.parse(stamp)>Date.now()+300000)throw new Problem('Check the email timestamp.');
   const sentAt=new Date(stamp).toISOString();
   const direction=['incoming','outgoing'].includes(b.direction)?b.direction:p.direction;
-  const dedupeKey=fingerprint(b);
+  // The same text sent in the same minute to another client has the same fingerprint; that email gets one that includes its recipients.
+  let dedupeKey=fingerprint(b);if(db.prepare('SELECT 1 FROM messages WHERE dedupe_key=?').get(dedupeKey))dedupeKey=createHash('sha256').update('extension-v2:'+dedupeKey+':'+JSON.stringify(p.recipients.map(a=>a.email).sort())).digest('hex');
   let sourceUrl='';try{const u=new URL(b.sourceUrl);if(u.origin==='https://mail.google.com'&&u.href.length<=2000)sourceUrl=u.href;}catch{}
   const payload={...p,subject,sentAt,direction,original,cleaned:original,removed:'',warnings:[],attachments:attachmentRefs(b.attachments),messageId:'',dedupeKey,sourceUrl};
   const staged=stageImport(db,user,payload);

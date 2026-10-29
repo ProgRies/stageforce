@@ -80,3 +80,17 @@ test('inbox and English Gmail dates with spelled-out months are read as local ti
  assert.equal(f('Tue, 3 Mar 2026, 23:59').toISOString(),local(2026,2,3,23,59));
  assert.equal(f('Oct 20, 2026, 13:00 PM'),null);assert.equal(f('Mon, Foo 20, 2026, 10:00'),null);assert.equal(f('20. Okt.'),null);
 });
+test('the same template sent in the same minute to two clients stays two emails, also with a colleague in copy',async()=>{
+ const{db,user}=await setup();try{
+ const a=createOrg(db,user,'Stadt A'),b=createOrg(db,user,'Stadt B');
+ const sent={...msg,from:{name:'Alex',email:msg.mailbox},direction:'outgoing',originalSubject:'Kurze Nachfrage',subject:'Kurze Nachfrage',originalBody:'Guten Tag,\nhaben Sie unser Angebot erhalten?',body:'Guten Tag,\nhaben Sie unser Angebot erhalten?',action:'save',confirmed:true};
+ const to=(address)=>({recipients:[{email:address,name:''},{email:'sam@team.test',name:'Sam'}],contactEmails:[address]});
+ action(db,user,{...sent,...to('info@stadt-a.test'),requestId:randomUUID(),gmailMessageId:'g1',organisationId:a.id,version:a.version});
+ const second=action(db,user,{...sent,...to('info@stadt-b.test'),requestId:randomUUID(),gmailMessageId:'g2',organisationId:b.id,version:b.version});
+ assert.equal(second.duplicate,false);assert.equal(second.organisation.id,b.id);assert.equal(db.prepare('SELECT count(*) n FROM messages').get().n,2);
+ // Each Gmail message finds its own saved copy, and opening the second one again is recognised as saved.
+ assert.equal(action(db,user,{action:'messageStatus',mailbox:msg.mailbox,gmailMessageId:'g2'}).organisation.id,b.id);
+ const retry=action(db,user,{...sent,...to('info@stadt-b.test'),requestId:randomUUID(),gmailMessageId:'g2',organisationId:b.id,version:getOrg(db,b.id).version});
+ assert.equal(retry.duplicate,true);assert.equal(db.prepare('SELECT count(*) n FROM messages').get().n,2);
+ }finally{db.close();}
+});
