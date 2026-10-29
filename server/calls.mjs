@@ -54,10 +54,13 @@ export function startIncoming(db,user,b){
  });
 }
 // Everything the call card needs to show or resume a call, including the result buttons, so the CRM and the extension render the same card.
-const OUTCOMES=Object.entries(CALL_OUTCOMES).map(([key,o])=>({key,label:o.label,next:o.next}));
-// A call that came in was answered: "Nicht erreicht" does not apply, and a plain conversation (a client with a question) changes no follow-up.
+// "Speichern" logs a plain conversation and changes no follow-up; it is stored as "Gespräch geführt", like a call logged by hand.
+// "Kein Interesse" is no longer offered (a "no" is Später anrufen in a year), but is still accepted from older extensions.
 const TALKED={label:'Gespräch geführt',contacted:true};
-const INCOMING=[{key:'talked',label:TALKED.label,next:'Wiedervorlage bleibt'},...OUTCOMES.filter(o=>o.key!=='not_reached')];
+const SAVE={key:'talked',label:'Speichern',next:'Geplanter Anruf bleibt'};
+const OUTCOMES=[...Object.entries(CALL_OUTCOMES).filter(([key])=>key!=='no_interest').map(([key,o])=>({key,label:o.label,next:o.next})),SAVE];
+// A call that came in was answered: "Nicht erreicht" does not apply.
+const INCOMING=[SAVE,...OUTCOMES.filter(o=>o.key!=='not_reached'&&o.key!=='talked')];
 const safeDial=p=>{try{return p?dialNumber(p):'';}catch{return'';}};
 function callView(db,r){const o=getOrg(db,r.organisation_id);return{callId:r.id,organisation:{id:o.id,name:o.name,version:String(o.version)},contact:contacts(db,o.id).find(c=>c.id===r.contact_id),phone:r.phone,dial:safeDial(r.phone),direction:r.direction==='in'?'in':'out',startedAt:r.started_at,notes:db.prepare('SELECT notes FROM call_drafts WHERE call_id=?').get(r.id)?.notes||'',outcomes:r.direction==='in'?INCOMING:OUTCOMES,bookingUrl:BOOKING_URL,...plannedCall(db,o.id)};}
 // An unsaved call from the last twelve hours is still open; older attempts were abandoned and are left alone.
@@ -71,7 +74,7 @@ export function draftCall(db,user,b){
 export function saveCall(db,user,b){return transaction(db,()=>{
  const call=db.prepare('SELECT * FROM call_attempts WHERE id=? AND user_id=?').get(field(b.callId,36),user.id);if(!call)throw new Problem('Call not found.',404);if(call.activity_id)return{saved:true,duplicate:true,organisation:{id:call.organisation_id,version:String(getOrg(db,call.organisation_id).version)}};
  const note=field(b.notes||'',12000),date=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Berlin',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(call.started_at));
- const incoming=call.direction==='in';if(b.outcome!=null&&!Object.hasOwn(CALL_OUTCOMES,b.outcome)&&!(incoming&&b.outcome==='talked'))throw new Problem('Unknown call result.');const outcome=b.outcome==null?null:b.outcome==='talked'?TALKED:CALL_OUTCOMES[b.outcome];
+ const incoming=call.direction==='in';if(b.outcome!=null&&!Object.hasOwn(CALL_OUTCOMES,b.outcome)&&b.outcome!=='talked')throw new Problem('Unknown call result.');const outcome=b.outcome==null?null:b.outcome==='talked'?TALKED:CALL_OUTCOMES[b.outcome];
  let due=null;if(outcome?.days!=null){due=b.outcome==='callback'&&b.callbackDate?field(b.callbackDate,10):addDays(todayBerlin(),outcome.days);if(!validDate(due)||due<todayBerlin())throw new Problem('Check the call-back date.');}
  // "Später anrufen" may come with a time; every other result sets a date without one.
  const time=b.outcome==='callback'?followUpTime(b.callbackTime):'';

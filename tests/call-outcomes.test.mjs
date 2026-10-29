@@ -21,6 +21,14 @@ test('each result logs the call and schedules the next one for the caller',async
  assert.equal(phases.meeting,'Termin vereinbart');assert.equal(phases.no_interest,'Aktuell kein Bedarf');assert.equal(phases.not_reached,'Unbearbeitet');
  assert.deepEqual(listData(db).review.map(r=>r.text),['E-Mail senden']);
 }finally{db.close();}});
+test('"Speichern" logs a talked call and leaves the planned date, next step and phase alone',async()=>{const{db,user}=await setup();try{
+ const{org,start}=dial(db,user);const date=addDays(today,30);saveCall(db,user,{callId:start(),outcome:'callback',callbackDate:date});
+ saveCall(db,user,{callId:start(),notes:'Kurz über die Preise gesprochen',outcome:'talked',keepFollowUp:false});
+ const e=entity(db,org.id),h=history(db,org.id,0,'communication').items[0];
+ assert.equal(e.values[17],date);assert.equal(e.values[16],'Rückruf vereinbart');assert.equal(e.values[10],'Unbearbeitet');
+ assert.equal(h.art,'Anruf · Gespräch geführt');assert.equal(h.text,'Kurz über die Preise gesprochen');assert.equal(getOrg(db,org.id).last_contact,today);
+ const none=dial(db,user,'Ohne Termin');saveCall(db,user,{callId:none.start(),outcome:'talked'});assert.equal(entity(db,none.org.id).values[17],'');
+}finally{db.close();}});
 test('call back uses the chosen date, keeps the note and replaces the previous follow-up',async()=>{const{db,user}=await setup();try{
  const{org,start}=dial(db,user);saveCall(db,user,{callId:start(),outcome:'not_reached'});
  const date=addDays(today,10);saveCall(db,user,{callId:start(),notes:'Ab Montag wieder im Büro',outcome:'callback',callbackDate:date});
@@ -49,7 +57,7 @@ test('the call list never gives up: a due follow-up returns even after "Kein Int
 test('an open call can be resumed with its draft note, blocks a second call and closes on save',async()=>{const{db,user}=await setup();try{
  const{org,start}=dial(db,user);const id=start();
  assert.deepEqual(draftCall(db,user,{callId:id,notes:'Ruft nach 15 Uhr zurück'}),{saved:true});
- const open=openCall(db,user).call;assert.equal(open.callId,id);assert.equal(open.organisation.name,'Lead');assert.equal(open.notes,'Ruft nach 15 Uhr zurück');assert.equal(open.dial,'+49301234567');assert.deepEqual(open.outcomes.map(o=>o.key),['not_reached','callback','meeting','email','no_interest']);
+ const open=openCall(db,user).call;assert.equal(open.callId,id);assert.equal(open.organisation.name,'Lead');assert.equal(open.notes,'Ruft nach 15 Uhr zurück');assert.equal(open.dial,'+49301234567');assert.deepEqual(open.outcomes.map(o=>o.key),['not_reached','callback','meeting','email','talked']);assert.equal(open.outcomes.at(-1).label,'Speichern');
  assert.throws(()=>dial(db,user,'Other').start(),/Another call with a note is still open/);
  // Repeating the same request returns the open call instead of refusing it.
  assert.equal(prepareCall(db,user,{organisationId:org.id,contactId:open.contact.id,phone:'030 1234567',startedAt:open.startedAt,requestId:id}).callId,id);
