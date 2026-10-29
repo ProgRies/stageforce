@@ -106,3 +106,16 @@ test('a date without a year in a late-year email lands in the next year',()=>{
  assert.equal(meetingDate('Termin: 7. Jan. 10:00',2026).date,'2026-01-07');
  assert.equal(detectMeeting({subject:'Terminbestätigung',body:'Wann: 7. Januar, 10:00 Uhr',sentAt:'2026-12-15T09:00:00Z'}).date,'2027-01-07');
 });
+
+test('two meetings in the same personal Zoom room or with the same confirmation subject stay two; an update moves one',async()=>{const{db,user}=await setup();try{
+ const room='https://us02web.zoom.us/j/1234567890',meetings=()=>db.prepare("SELECT occurred_on,body FROM activities WHERE kind='Meeting' ORDER BY occurred_on").all().map(r=>r.occurred_on);
+ const first=save(db,user,{newOrganisation:'Customer',gmailMessageId:'z1',originalSubject:'Einladung: Kennenlernen @ Do. 5. Nov. 2026 10:00',originalBody:room,links:[room],meeting:{log:true,date:'2026-11-05',time:'10:00'}}),id=first.organisation.id;
+ const v=()=>String(db.prepare('SELECT version FROM organisations WHERE id=?').get(id).version);
+ save(db,user,{organisationId:id,version:v(),gmailMessageId:'z2',timestamp:'2026-10-14T08:00:00Z',timestampRaw:'14.10.2026, 10:00',originalSubject:'Einladung: Schulung @ Do. 3. Dez. 2026 14:00',originalBody:room,links:[room],meeting:{log:true,date:'2026-12-03',time:'14:00'}});
+ assert.deepEqual(meetings(),['2026-11-05','2026-12-03']);
+ save(db,user,{organisationId:id,version:v(),gmailMessageId:'z3',timestamp:'2026-10-15T08:00:00Z',timestampRaw:'15.10.2026, 10:00',originalSubject:'Aktualisierte Einladung: Schulung @ Fr. 4. Dez. 2026 14:00',originalBody:room,links:[room],meeting:{log:true,date:'2026-12-04',time:'14:00'}});
+ assert.deepEqual(meetings(),['2026-11-05','2026-12-04']);
+ save(db,user,{organisationId:id,version:v(),gmailMessageId:'b1',timestamp:'2026-10-16T08:00:00Z',timestampRaw:'16.10.2026, 10:00',originalSubject:'Terminbestätigung',originalBody:'Ihr Termin am 10.11.2026 um 15:30 Uhr',meeting:{log:true,date:'2026-11-10',time:'15:30'}});
+ save(db,user,{organisationId:id,version:v(),gmailMessageId:'b2',timestamp:'2026-10-17T08:00:00Z',timestampRaw:'17.10.2026, 10:00',originalSubject:'Terminbestätigung',originalBody:'Ihr Termin am 20.11.2026 um 09:00 Uhr',meeting:{log:true,date:'2026-11-20',time:'09:00'}});
+ assert.deepEqual(meetings(),['2026-11-05','2026-11-10','2026-11-20','2026-12-04']);
+}finally{db.close();}});

@@ -1,7 +1,13 @@
-# StageForce 0.3.16 · Email and meeting fixes · extension 0.4.22
+# StageForce 0.3.16 · One way to log a call · email and meeting fixes · extension 0.4.22
 
-Publishes `ghcr.io/progries/stageforce:0.3.16`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.16` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. No database change; the schema stays at 13. Afterwards everyone reloads the extension in `chrome://extensions` and refreshes Gmail.
+Publishes `ghcr.io/progries/stageforce:0.3.16`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.16` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. No database change; the schema stays at 13. Afterwards everyone reloads the extension in `chrome://extensions` and refreshes Gmail. A Gmail card from an extension that was not reloaded still works with the old one-tap buttons.
 
+- **One way to log a call:** the call card (CRM and Gmail), **Notiz hinzufügen → Anruf** and the phone app all ask the same two things, then save with one **Speichern**: the **Ergebnis** (Gespräch geführt, Nicht erreicht, Termin vereinbart, E-Mail nötig) and the **Nächster Anruf** (Unverändert, 2 Tage to 1 Jahr, Datum … with an optional time, Kein Anruf). The result preselects the next call (Nicht erreicht: 2 Tage, Termin: 2 Wochen, E-Mail: 1 Woche; a planned call still ahead stays). This replaces the one-tap buttons, "Später anrufen" and the "behalten" checkbox.
+- **A due call needs a new date:** when the planned call was due today or earlier, "Unverändert" is not offered, so a call can no longer leave it due and bring the organisation back the next day.
+- **Phase only moves forward:** "Termin vereinbart" moves a lead to that phase, but a customer at Gewonnen or a lead at Angebot or Testphase keeps its phase.
+- **Booking page:** "Termin vereinbart" no longer opens it on its own; the card shows a link to it.
+- **Hand-written next steps stay:** a call result moves the date but keeps a next step written by hand. Only the results' own wording ("Erneut anrufen") is replaced.
+- **Meetings in the same Zoom room:** two meetings with the same personal Zoom link, or with the same confirmation subject ("Terminbestätigung"), stay two meetings. Only an updated or cancelled invitation changes an existing one.
 - **Meetings from Gmail:** the popup recognises invitations and booking confirmations again. They start ticked with the meeting's own date and time, and a meeting that is already logged says so. Since 0.3.12, the extension had refused this check without showing an error.
 - **Replies no longer move meetings:** an acceptance, reply or reminder about a logged meeting only adds its contacts. Only the invitation itself, or an updated one, moves it. Before, ticking "log as meeting" on a reply moved the planned meeting to the reply's date and counted it as a past contact.
 - **Dates without a year:** "7. Jan." in a December email now means next January.

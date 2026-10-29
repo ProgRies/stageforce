@@ -11,6 +11,7 @@ const PROVIDERS=[
  {name:'Skype',link:/https?:\/\/join\.skype\.com\/[\w-]+/i,text:/\bskype[- ](?:meeting|besprechung)\b/i,key:l=>/skype\.com\/([\w-]+)/i.exec(l)?.[1]},
 ];
 const INVITE=/^(?:(?:aktualisierte |updated |neue )?(?:einladung|invitation|meeting invitation|besprechungsanfrage)|termin|meeting|besprechung)\s*(?:mit[^:]{0,80})?:\s*/i;
+const UPDATED=/^(?:(?:re|aw|fwd?|wg)\s*:\s*)*(?:aktualisierte |updated |geänderte |changed )(?:einladung|invitation|meeting invitation|termin|event)\b|^(?:termin|event|meeting) (?:geändert|verschoben|updated|rescheduled)\s*:/i;
 const CANCELLED=/^(?:abgesagt|abgesagter termin|abgesagtes ereignis|canceled|cancelled|canceled event|cancelled event|absage)\s*(?:with[^:]{0,80})?:\s*/i;
 // Declines and counter-proposals say nothing about a meeting taking place; acceptances confirm it.
 const RESPONSE=/^(?:abgelehnt|mit vorbehalt|vorläufig|declined|tentative|tentatively accepted|neue zeit vorgeschlagen|new time proposed)\s*:/i;
@@ -70,7 +71,7 @@ export function detectMeeting({subject='',body='',links=[],attachments=[],sentAt
  if(!provider.name&&!when&&!calendar&&!confirmed)return null;
  const id=link&&provider.key(link);
  const title=cleanTitle(subject)||provider.name||'Meeting';
- return{provider:provider.name,title,link,likely:!!(link||when||confirmed||INVITE.test(subject)||CANCELLED.test(subject)),date:when?.date||'',time:when?.time||'',cancelled:CANCELLED.test(subject),moves:INVITE.test(subject),key:((provider.name||'Termin')+':'+(id||title.toLowerCase())).slice(0,500)};
+ return{provider:provider.name,title,link,likely:!!(link||when||confirmed||INVITE.test(subject)||CANCELLED.test(subject)),date:when?.date||'',time:when?.time||'',cancelled:CANCELLED.test(subject),moves:INVITE.test(subject),updated:UPDATED.test(subject),key:((provider.name||'Termin')+':'+(id||title.toLowerCase())).slice(0,500)};
 }
 export const meetingText=m=>[m.provider,m.time&&m.time+' Uhr',m.title&&m.title!==m.provider&&m.title!=='Meeting'&&m.title].filter(Boolean).join(' · ')||'Meeting';
 // The user ticked "log as meeting" on an email nothing was detected in: one meeting for that email.
@@ -78,10 +79,12 @@ export const manualMeeting=(subject,messageId)=>({provider:'',title:cleanTitle(S
 const uhr=body=>/(\d{2}:\d{2}) Uhr/.exec(body||'')?.[1]||'';
 // The entry an email belongs to: the same invitation (join link or title), or else any meeting of the
 // organisation on the same day at a matching time, so an invite, its acceptance, a booking confirmation
-// and a reminder end up as one entry.
+// and a reminder end up as one entry. A personal Zoom room or a generic subject ("Terminbestätigung") is shared by
+// different meetings: an email naming another date only belongs to an entry with that key when it updates or cancels it.
 export function findMeeting(db,organisationId,meeting,date,time){
- const byKey=db.prepare('SELECT a.id,a.occurred_on AS date,a.body FROM meeting_refs r JOIN activities a ON a.id=r.activity_id WHERE a.organisation_id=? AND r.meeting_key=? ORDER BY a.created_at LIMIT 1').get(organisationId,meeting.key);
- if(byKey)return{...byKey,match:'key'};
+ const byKey=db.prepare('SELECT a.id,a.occurred_on AS date,a.body FROM meeting_refs r JOIN activities a ON a.id=r.activity_id WHERE a.organisation_id=? AND r.meeting_key=? ORDER BY a.created_at').all(organisationId,meeting.key);
+ const day=meeting.date||date,same=byKey.find(a=>a.date===day)||((meeting.updated||meeting.cancelled||!meeting.date)&&byKey.at(-1));
+ if(same)return{...same,match:'key'};
  if(!date)return null;const at=time??meeting.time;
  const sameDay=db.prepare("SELECT id,occurred_on AS date,body FROM activities WHERE organisation_id=? AND kind='Meeting' AND occurred_on=? ORDER BY created_at").all(organisationId,date).find(a=>!at||!uhr(a.body)||uhr(a.body)===at);
  return sameDay?{...sameDay,match:'date'}:null;

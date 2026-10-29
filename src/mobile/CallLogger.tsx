@@ -2,11 +2,11 @@ import {useCallback,useEffect,useRef,useState} from 'react';
 import {Phone,PhoneIncoming,MessageSquareText,UserPlus,Search,X,ChevronLeft,Settings,LogOut,Trash2,Sun,Moon,Monitor,Flag,MessageCircleCheck,CalendarClock,CalendarCheck,Mail,ThumbsDown,PhoneMissed,Check,Clock,History,LoaderCircle,Pause,Play,Building2,type LucideIcon} from 'lucide-react';
 import {api} from '../api';
 import {useAppearance} from '../Appearance';
-import {todayBerlin,addDays} from '../domain';
+import {todayBerlin,defaultNextCall,type NextCall} from '../domain';
 type Contact={id:string;name:string;role:string;phones:string[];primary:boolean};
 type Caller={id:string;name:string;version:string;subtitle:string;status:string;contacts:Contact[]};
 type Outcome={key:string;label:string;next:string};
-type LiveCall={callId:string;organisation:{id:string;name:string;version:string};contact?:{id:string;name:string};phone:string;dial:string;direction:'in'|'out';startedAt:string;notes:string;outcomes:Outcome[];bookingUrl:string};
+type LiveCall={callId:string;organisation:{id:string;name:string;version:string};contact?:{id:string;name:string};phone:string;dial:string;direction:'in'|'out';startedAt:string;notes:string;outcomes:Outcome[];results:{key:string;label:string;days:number|null}[];nextPicks:{label:string;date:string}[];followUp:string|null;bookingUrl:string};
 type View={kind:'home'}|{kind:'org';org:Caller}|{kind:'new';name:string}|{kind:'call';call:LiveCall;isNew:boolean}|{kind:'saved';org:string;label:string};
 const ICONS:Record<string,LucideIcon>={talked:MessageCircleCheck,callback:CalendarClock,meeting:CalendarCheck,email:Mail,no_interest:ThumbsDown,not_reached:PhoneMissed};
 const clock=(ms:number)=>{const s=Math.max(0,Math.floor(ms/1000)),p=(v:number)=>String(v).padStart(2,'0');return Math.floor(s/3600)?`${Math.floor(s/3600)}:${p(Math.floor(s/60)%60)}:${p(s%60)}`:`${p(Math.floor(s/60))}:${p(s%60)}`;};
@@ -91,19 +91,23 @@ function NewLead({initial,busy,onStart}:{initial:string;busy:boolean;onStart:(bo
  </main>;
 }
 function LiveCallCard({call,isNew,onDone,onDiscard}:{call:LiveCall;isNew:boolean;onDone:(org:string,label:string)=>void;onDiscard:()=>void}){
- const[notes,setNotes]=useState(call.notes||''),[now,setNow]=useState(Date.now()),[later,setLater]=useState(''),[confirm,setConfirm]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[synced,setSynced]=useState(true);
+ const[notes,setNotes]=useState(call.notes||''),[now,setNow]=useState(Date.now()),[result,setResult]=useState(''),[next,setNext]=useState<NextCall>(null),[touched,setTouched]=useState(false),[custom,setCustom]=useState(false),[confirm,setConfirm]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[synced,setSynced]=useState(true);
  const drafted=useRef(call.notes||''),timer=useRef<ReturnType<typeof setTimeout>>(undefined),latest=useRef(notes);latest.current=notes;
  const flush=useCallback(()=>{clearTimeout(timer.current);const value=latest.current;if(value===drafted.current)return;api({action:'callDraft',callId:call.callId,notes:value}).then(()=>{drafted.current=value;if(latest.current===value)setSynced(true);}).catch(()=>{});},[call.callId]);
  useEffect(()=>{const t=setInterval(()=>setNow(Date.now()),1000);const hide=()=>{if(document.visibilityState==='hidden')flush();};document.addEventListener('visibilitychange',hide);window.addEventListener('pagehide',flush);return()=>{clearInterval(t);document.removeEventListener('visibilitychange',hide);window.removeEventListener('pagehide',flush);flush();};},[flush]);
  function type(value:string){setNotes(value);setSynced(false);keep(call.callId,value);clearTimeout(timer.current);timer.current=setTimeout(flush,700);}
- async function save(outcome:string,date?:string){
-  if(busy)return;if(outcome==='meeting')window.open(call.bookingUrl,'_blank','noopener');
+ // The same choice as the call card and the Anruf tab: the result, then the next call (preselected from the result), then Speichern.
+ const today=todayBerlin(),planned=call.followUp&&call.followUp>today?call.followUp:'',date=next?.kind==='date'?next.date:'';
+ const ready=!!result&&!!next&&(next.kind!=='date'||next.date>=today);
+ function choose(key:string){setResult(key);if(!touched){setNext(defaultNextCall(key,call.followUp||'',today));setCustom(false);}}
+ function pick(value:NextCall,isCustom=false){setTouched(true);setCustom(isCustom);setNext(value);}
+ async function save(){
+  if(busy||!ready||!next)return;
   setBusy(true);setError('');
-  try{await api({action:'callSave',callId:call.callId,notes,outcome,callbackDate:outcome==='callback'?date:undefined});onDone(call.organisation.name,outcome==='talked'?'Gespräch geführt':call.outcomes.find(o=>o.key===outcome)?.label||'Gespeichert');}
+  try{await api({action:'callSave',callId:call.callId,notes,outcome:result,next:next.kind==='date'?{kind:'date',date:next.date,time:next.time||undefined}:{kind:next.kind}});onDone(call.organisation.name,call.results.find(r=>r.key===result)?.label||'Gespeichert');}
   catch(e:any){setBusy(false);setError(e.message||'Speichern fehlgeschlagen. Die Notiz bleibt erhalten.');}
  }
  async function discard(){setBusy(true);setError('');try{await api({action:'callCancel',callId:call.callId});onDiscard();}catch(e:any){setBusy(false);setError(e.message||'Verwerfen fehlgeschlagen.');}}
- const today=todayBerlin(),outcomes=call.outcomes;
  return <main className="m-screen m-call">
   <section className="m-live glass" aria-label="Laufender Anruf">
    <div className="m-live-top"><span className="m-pulse" aria-hidden="true"/><span>Eingehender Anruf</span><time>{clock(now-Date.parse(call.startedAt))}</time></div>
@@ -113,17 +117,22 @@ function LiveCallCard({call,isNew,onDone,onDiscard}:{call:LiveCall;isNew:boolean
   </section>
   <label className="m-note glass"><span className="m-note-head"><span>Gesprächsnotiz</span><small aria-live="polite">{notes?synced?<><Check size={12} aria-hidden="true"/>gesichert</>:'…':''}</small></span><textarea value={notes} onChange={e=>type(e.target.value)} rows={5} placeholder="Worum geht es? Kurze Stichpunkte reichen." disabled={busy}/></label>
   {error&&<p role="alert" className="m-error glass">{error}</p>}
-  {later?<section className="m-sheet-inline glass">
-   <h2>Wann zurückrufen?</h2>
-   <div className="m-chips">{[['Morgen',1],['Übermorgen',2],['Nächste Woche',7]].map(([label,days])=>{const d=addDays(today,days as number);return <button key={d} type="button" className={later===d?'is-on':''} onClick={()=>setLater(d)}>{label}</button>;})}</div>
-   <label className="m-field"><span>Datum</span><input type="date" min={today} value={later} onChange={e=>setLater(e.target.value)}/></label>
-   <div className="m-pair"><button type="button" className="m-secondary glass" disabled={busy} onClick={()=>setLater('')}>Zurück</button><button type="button" className="m-primary" disabled={busy||!later} onClick={()=>save('callback',later)}><CalendarClock size={19} aria-hidden="true"/>Speichern</button></div>
-  </section>:confirm?<section className="m-sheet-inline glass">
+  {confirm?<section className="m-sheet-inline glass">
    <h2>Anruf ohne Eintrag verwerfen?</h2><p className="m-hint">{isNew?'Die neu angelegte Organisation bleibt in Prüfen stehen.':'Die Notiz geht verloren.'}</p>
    <div className="m-pair"><button type="button" className="m-secondary glass" disabled={busy} onClick={()=>setConfirm(false)}>Zurück</button><button type="button" className="m-danger" disabled={busy} onClick={discard}><Trash2 size={18} aria-hidden="true"/>Verwerfen</button></div>
   </section>:<>
-   <h2 className="m-label">Ergebnis · speichert sofort</h2>
-   <div className="m-outcomes">{outcomes.map((o,i)=>{const Icon=ICONS[o.key]||Check;return <button key={o.key} type="button" className={`m-outcome glass ${i===0?'is-main':''}`} disabled={busy} title={o.next} onClick={()=>o.key==='callback'?setLater(addDays(today,1)):save(o.key)}><Icon size={22} aria-hidden="true"/><span>{o.label}</span></button>;})}</div>
+   <h2 className="m-label">Ergebnis</h2>
+   <div className="m-chips" role="group" aria-label="Ergebnis">{call.results.map(r=>{const Icon=ICONS[r.key]||Check;return <button key={r.key} type="button" className={result===r.key?'is-on':''} aria-pressed={result===r.key} disabled={busy} onClick={()=>choose(r.key)}><Icon size={16} aria-hidden="true"/> {r.label}</button>;})}</div>
+   {result==='meeting'&&call.bookingUrl&&<a className="m-text-button" href={call.bookingUrl} target="_blank" rel="noopener">Buchungsseite öffnen ↗</a>}
+   <h2 className="m-label">Nächster Anruf</h2>
+   <div className="m-chips" role="group" aria-label="Nächster Anruf">
+    {planned&&<button type="button" className={next?.kind==='keep'?'is-on':''} aria-pressed={next?.kind==='keep'} disabled={busy} onClick={()=>pick({kind:'keep'})}>Unverändert ({new Intl.DateTimeFormat('de-DE',{day:'2-digit',month:'2-digit',timeZone:'UTC'}).format(new Date(planned+'T12:00:00Z'))})</button>}
+    {call.nextPicks.map(p=><button key={p.label} type="button" className={!custom&&date===p.date?'is-on':''} aria-pressed={!custom&&date===p.date} disabled={busy} onClick={()=>pick({kind:'date',date:p.date,time:next?.kind==='date'?next.time:''})}>{p.label}</button>)}
+    <button type="button" className={custom?'is-on':''} aria-pressed={custom} disabled={busy} onClick={()=>pick(date?{kind:'date',date,time:next?.kind==='date'?next.time:''}:null,true)}>Datum …</button>
+    <button type="button" className={next?.kind==='none'?'is-on':''} aria-pressed={next?.kind==='none'} disabled={busy} onClick={()=>pick({kind:'none'})}>Kein Anruf</button>
+   </div>
+   {(custom||date)&&<div className="m-pair">{custom&&<label className="m-field"><span>Datum</span><input type="date" min={today} value={date} disabled={busy} onChange={e=>pick(e.target.value?{kind:'date',date:e.target.value,time:next?.kind==='date'?next.time:''}:null,true)}/></label>}{date&&<label className="m-field"><span>Uhrzeit · optional</span><input type="time" step={300} value={next?.kind==='date'?next.time||'':''} disabled={busy} onChange={e=>pick({kind:'date',date,time:e.target.value},custom)}/></label>}</div>}
+   <button type="button" className="m-primary" disabled={busy||!ready} onClick={save}><Check size={19} aria-hidden="true"/>{busy?'Wird gespeichert …':'Speichern'}</button>
    <button type="button" className="m-text-button" disabled={busy} onClick={()=>setConfirm(true)}><X size={15} aria-hidden="true"/>Ohne Eintrag verwerfen</button>
   </>}
  </main>;

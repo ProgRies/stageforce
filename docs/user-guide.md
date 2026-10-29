@@ -50,25 +50,24 @@ Tap a contact's phone number, or the white phone button beside **Notiz hinzufüg
 
 The call then lives in the **call card**. In Chrome it is a small window that floats above every tab and app (Picture-in-Picture); move it to a corner once and Chrome remembers the spot. Elsewhere it sits in the top-right corner of the page. The card has the note field, **Wähl-App erneut öffnen**, the results, minimise and discard. The note is saved on the server as you type, so a closed tab loses nothing; the CRM or the Gmail popup shows the open call again until you save or discard it. Calls left open for more than 12 hours count as abandoned.
 
-One tap on a result saves the call and sets when the organisation comes back:
+After the call, pick the **Ergebnis**, then the **Nächster Anruf**, then press **Speichern**. The CRM card, the Gmail card, **Notiz hinzufügen → Anruf** and the phone app all offer the same choice:
 
-| Result | Next follow-up | Also |
+| Ergebnis | Next call preselected | Also |
 | --- | --- | --- |
+| Gespräch geführt | nothing (you pick) | |
 | Nicht erreicht | in 2 days | does not count as contact |
-| Später anrufen | the date you pick (tomorrow by default, or the date already planned) | |
-| Termin | in 14 days | opens the booking calendar, phase Termin vereinbart |
-| E-Mail nötig | in 7 days | puts the organisation on Prüfen |
-| Speichern | stays as it is (or none) | saves the call as Gespräch geführt |
+| Termin vereinbart | in 2 weeks | a lead moves to the phase Termin vereinbart; shows a link to the booking page |
+| E-Mail nötig | in 1 week | puts the organisation on Prüfen |
 
-For a "no", use Später anrufen with a date a year out. Every result except Nicht erreicht counts as the last contact. Only one call per person is open at a time.
+A planned call still ahead is preselected as **Unverändert (…)** instead, so a result keeps it unless you pick something else. A call that was due today or earlier has no **Unverändert**: pick when the organisation comes back (2 Tage to 1 Jahr, **Datum …** with an optional time), or **Kein Anruf**. For a "no", pick Gespräch geführt and 1 Jahr.
 
-If a call is already planned for a later day, the card shows **Geplanten Anruf (…) behalten**, ticked. While it is ticked, a result such as Nicht erreicht or E-Mail nötig keeps that date (the phase and Prüfen still change); untick it to let the result set the date as in the table. Später anrufen always uses the date you pick.
+Results only move the phase forward: a customer at Gewonnen, or a lead at Angebot or Testphase, keeps its phase. A next step written by hand (such as "Preisliste schicken, dann nachfassen") stays when the date changes; only the results' own wording ("Erneut anrufen") is replaced. Every result except Nicht erreicht counts as the last contact. Only one call per person is open at a time.
 
 ### Next planned call
 
-Every organisation has at most one planned call. It shows as a chip next to the status in the list (**Anruf Do., 28.01.27**, amber once it is due; a planned meeting is shown instead) and as a button next to **Zuständig** on the organisation (or **Kein Anruf geplant**). Click the button to see who set it and how, pick 1 Woche to 1 Jahr or a date, or remove it. When you log a call by hand with **Notiz hinzufügen → Anruf**, choose the next call there too: keep it unchanged, pick a new one or none.
+Every organisation has at most one planned call. It shows as a chip next to the status in the list (**Anruf Do., 28.01.27**, amber once it is due; a planned meeting is shown instead) and as a button next to **Zuständig** on the organisation (or **Kein Anruf geplant**). Click the button to see who set it and how, pick 1 Woche to 1 Jahr or a date, or remove it. When you log a call by hand with **Notiz hinzufügen → Anruf**, pick its result and the next call there too, as on the call card.
 
-A planned call can also have a time (optional): in the button's editor, in **Notiz hinzufügen → Anruf** once a date is picked, and next to the date on the call card's **Später anrufen**. Picking a new date without a time clears the old time; any other call result sets a date without a time.
+A planned call can also have a time (optional): in the button's editor, and next to the date once a next call is picked after a call. Picking a new date without a time clears the old time.
 
 ### Follow-ups
 

@@ -27,7 +27,7 @@ sign in inside the installed app.
 2. Pick the person. For a caller who is not in the CRM, tap **Neuer Lead** and enter the organisation, the caller's name
    and optionally the number.
 3. Type the note. It is saved on the server as you type, so switching to the Phone app (iOS may restart the PWA) loses nothing.
-4. Tap a result. **Gespräch geführt** logs the call and keeps the planned follow-up; the other results work as on the desktop.
+4. Pick the result and the next call, then tap **Speichern**, as on the desktop call card.
 
 Every organisation created from a call is listed in **Prüfen** ("Neu aus Anruf angelegt · Daten prüfen") until someone
 checks its data at the desk, like a call that needs an email.
