@@ -126,13 +126,14 @@ function LiveCallCard({call,isNew,onDone,onDiscard}:{call:LiveCall;isNew:boolean
    <h2 className="m-label">Ergebnis</h2>
    <div className="m-chips" role="group" aria-label="Ergebnis">{call.results.map(r=>{const Icon=ICONS[r.key]||Check;return <button key={r.key} type="button" className={result===r.key?'is-on':''} aria-pressed={result===r.key} disabled={busy} onClick={()=>choose(r.key)}><Icon size={16} aria-hidden="true"/> {r.label}</button>;})}</div>
    {result==='meeting'&&call.bookingUrl&&<a className="m-text-button" href={call.bookingUrl} target="_blank" rel="noopener">Buchungsseite öffnen ↗</a>}
-   <label className="m-field"><span>Nächster Anruf</span><select value={selected} disabled={busy} onChange={e=>chooseNext(e.target.value)}>
+   <h2 className="m-label">Nächster Anruf</h2>
+   <div className="m-field"><select aria-label="Nächster Anruf" value={selected} disabled={busy} onChange={e=>chooseNext(e.target.value)}>
     {selected===''&&<option value="">Bitte wählen …</option>}
     {planned&&<option value="keep">Unverändert · {nextCallDay(planned,today)}</option>}
     {call.nextPicks.map(p=><option key={p.label} value={'d:'+p.date}>{p.label} · {nextCallDay(p.date,today)}</option>)}
     <option value="custom">{selected==='custom'&&date?nextCallDay(date,today)+(next?.kind==='date'&&next.time?' · '+next.time+' Uhr':''):'Datum und Uhrzeit wählen …'}</option>
     <option value="none">Kein Anruf planen</option>
-   </select></label>
+   </select></div>
    {selected==='custom'&&<div className="m-pair"><label className="m-field"><span>Datum</span><input type="date" min={today} value={date} disabled={busy} onChange={e=>pick(e.target.value?{kind:'date',date:e.target.value,time:next?.kind==='date'?next.time:''}:null,true)}/></label><label className="m-field"><span>Uhrzeit · optional</span><input type="time" step={300} value={next?.kind==='date'?next.time||'':''} disabled={busy||!date} onChange={e=>pick({kind:'date',date,time:e.target.value},true)}/></label></div>}
    <button type="button" className="m-primary" disabled={busy||!ready} onClick={save}><Check size={19} aria-hidden="true"/>{busy?'Wird gespeichert …':'Speichern'}</button>
    <button type="button" className="m-text-button" disabled={busy} onClick={()=>setConfirm(true)}><X size={15} aria-hidden="true"/>Ohne Eintrag verwerfen</button>
