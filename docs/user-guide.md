@@ -58,9 +58,9 @@ One tap on a result saves the call and sets when the organisation comes back:
 | Später anrufen | the date you pick (tomorrow by default, or the date already planned) | |
 | Termin | in 14 days | opens the booking calendar, phase Termin vereinbart |
 | E-Mail nötig | in 7 days | puts the organisation on Prüfen |
-| Kein Interesse | in a year | phase Aktuell kein Bedarf |
+| Speichern | stays as it is (or none) | saves the call as Gespräch geführt |
 
-Every result except Nicht erreicht counts as the last contact. Only one call per person is open at a time.
+For a "no", use Später anrufen with a date a year out. Every result except Nicht erreicht counts as the last contact. Only one call per person is open at a time.
 
 If a call is already planned for a later day, the card shows **Geplanten Anruf (…) behalten**, ticked. While it is ticked, a result such as Nicht erreicht or E-Mail nötig keeps that date (the phase and Prüfen still change); untick it to let the result set the date as in the table. Später anrufen always uses the date you pick.
 

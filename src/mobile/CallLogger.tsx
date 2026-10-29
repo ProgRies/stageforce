@@ -99,7 +99,7 @@ function LiveCallCard({call,isNew,onDone,onDiscard}:{call:LiveCall;isNew:boolean
  async function save(outcome:string,date?:string){
   if(busy)return;if(outcome==='meeting')window.open(call.bookingUrl,'_blank','noopener');
   setBusy(true);setError('');
-  try{await api({action:'callSave',callId:call.callId,notes,outcome,callbackDate:outcome==='callback'?date:undefined});onDone(call.organisation.name,call.outcomes.find(o=>o.key===outcome)?.label||'Gespeichert');}
+  try{await api({action:'callSave',callId:call.callId,notes,outcome,callbackDate:outcome==='callback'?date:undefined});onDone(call.organisation.name,outcome==='talked'?'Gespräch geführt':call.outcomes.find(o=>o.key===outcome)?.label||'Gespeichert');}
   catch(e:any){setBusy(false);setError(e.message||'Speichern fehlgeschlagen. Die Notiz bleibt erhalten.');}
  }
  async function discard(){setBusy(true);setError('');try{await api({action:'callCancel',callId:call.callId});onDiscard();}catch(e:any){setBusy(false);setError(e.message||'Verwerfen fehlgeschlagen.');}}

@@ -52,7 +52,8 @@ export function gmailSearch(e:Entity,mailbox:string) {
 }
 export function websiteURL(value: unknown) { const s=String(value||"").trim(); if(!s)return "";try{const u=new URL(/^https?:\/\//i.test(s)?s:"https://"+s);return ["http:","https:"].includes(u.protocol)&&!u.username&&!u.password?u.href:"";}catch{return "";} }
 export function phone(e: Entity) { const primary=text(e,14).trim();if(primary.replace(/\D/g,"").length>=6)return primary; for(const c of jsonList(e.values[20]))for(const p of c.telefone||[])if(String(p).replace(/\D/g,"").length>=6)return String(p);return ""; }
-// One tap after a call decides when the organisation comes back. Nobody drops out for good unless
+// One tap after a call decides when the organisation comes back ("Speichern" in server/calls.mjs leaves it as it is).
+// "Kein Interesse" is no longer on the card; it stays here so older extensions and records keep working. Nobody drops out for good unless
 // the phase is set to "Verloren" by hand.
 export const CALL_OUTCOMES = {
   not_reached:{label:"Nicht erreicht",days:2,next:"Erneut anrufen",contacted:false},

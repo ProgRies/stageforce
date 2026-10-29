@@ -61,7 +61,7 @@ test('a call from a new lead creates the organisation and contact on the spot an
  const org=getOrg(db,c.organisation.id);assert.equal(org.status,'Lead');
  assert.deepEqual(db.prepare('SELECT text FROM review_issues WHERE organisation_id=? AND resolved_at IS NULL').all(org.id).map(r=>r.text),[NEW_FROM_CALL]);
  assert.deepEqual(contacts(db,org.id).map(x=>[x.name,x.telefone,x.primary]),[['Lisa Hoffmann',['+49 151 2345 6789'],true]]);
- assert.deepEqual(c.outcomes.map(o=>o.key),['talked','callback','meeting','email','no_interest'],'an answered call cannot be "Nicht erreicht"');
+ assert.deepEqual(c.outcomes.map(o=>o.key),['talked','callback','meeting','email'],'an answered call cannot be "Nicht erreicht"');
  assert.throws(()=>startIncoming(db,user,call({newOrganisation:'stadt neu',contactName:'X'})),/gibt es schon/);
  db.close();
 });
@@ -96,8 +96,7 @@ test('"Gespräch geführt" logs an incoming call without touching the follow-up;
  last=db.prepare('SELECT kind,body FROM activities WHERE organisation_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1').get(org.id);
  assert.equal(last.body,'Eingehender Anruf · Später anrufen');
  const out=prepareCall(db,user,call({organisationId:org.id,contactId:anna.id,phone:'+49 4131 309 3344'}));
- assert.equal(out.direction,'out');assert.ok(out.outcomes.some(o=>o.key==='not_reached'));assert.ok(!out.outcomes.some(o=>o.key==='talked'),'the desktop call card keeps its results');
- assert.throws(()=>saveCall(db,user,{callId:out.callId,outcome:'talked'}),/Unknown call result/);
+ assert.equal(out.direction,'out');assert.ok(out.outcomes.some(o=>o.key==='not_reached'));assert.ok(!out.outcomes.some(o=>o.key==='no_interest'),'"Kein Interesse" is no longer offered');
  db.close();
 });
 
