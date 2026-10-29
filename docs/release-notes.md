@@ -1,3 +1,14 @@
+# StageForce 0.3.16 · Email and meeting fixes · extension 0.4.22
+
+Publishes `ghcr.io/progries/stageforce:0.3.16`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.16` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. No database change; the schema stays at 13. Afterwards everyone reloads the extension in `chrome://extensions` and refreshes Gmail.
+
+- **Meetings from Gmail:** the popup recognises invitations and booking confirmations again. They start ticked with the meeting's own date and time, and a meeting that is already logged says so. Since 0.3.12, the extension had refused this check without showing an error.
+- **Replies no longer move meetings:** an acceptance, reply or reminder about a logged meeting only adds its contacts. Only the invitation itself, or an updated one, moves it. Before, ticking "log as meeting" on a reply moved the planned meeting to the reply's date and counted it as a past contact.
+- **Dates without a year:** "7. Jan." in a December email now means next January.
+- **Template emails:** the same text sent in the same minute to two clients is saved as two emails, also with a colleague in copy. Before, the second one showed as "Already in StageForce" under the first client.
+- **Prüfen:** a colleague's internal email or forward no longer ticks off "E-Mail senden". Only an email that went to the client does.
+- **Phone app:** "due today" shows the planned calls of your organisations, including dates set by hand in the CRM.
+
 # StageForce 0.3.15 · Speichern on the call card
 
 Publishes `ghcr.io/progries/stageforce:0.3.15`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.15` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. No database change; the schema stays at 13. The extension is unchanged (still 0.4.21), so nobody needs to reload it.
