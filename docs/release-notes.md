@@ -1,3 +1,10 @@
+# StageForce 0.3.15 · Speichern on the call card
+
+Publishes `ghcr.io/progries/stageforce:0.3.15`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.15` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. No database change; the schema stays at 13. The extension is unchanged (still 0.4.21), so nobody needs to reload it.
+
+- **Call card:** "Kein Interesse" is replaced by a neutral **Speichern**. It saves the call and its note as "Gespräch geführt" and leaves the planned call, next step and phase as they are. For a "no", use Später anrufen with a date a year out. This applies in the CRM, the extension and the phone app (#50).
+- Existing "Kein Interesse" entries stay as they are, and a card still open in an older tab can still save with it.
+
 # StageForce 0.3.14 · Follow-ups calendar · extension 0.4.21
 
 Publishes `ghcr.io/progries/stageforce:0.3.14`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.14` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. Afterwards everyone reloads the extension in `chrome://extensions` and refreshes Gmail.
