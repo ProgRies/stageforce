@@ -50,7 +50,7 @@ Tap a contact's phone number, or the white phone button beside **Notiz hinzufüg
 
 The call then lives in the **call card**. In Chrome it is a small window that floats above every tab and app (Picture-in-Picture); move it to a corner once and Chrome remembers the spot. Elsewhere it sits in the top-right corner of the page. The card has the note field, **Wähl-App erneut öffnen**, the results, minimise and discard. The note is saved on the server as you type, so a closed tab loses nothing; the CRM or the Gmail popup shows the open call again until you save or discard it. Calls left open for more than 12 hours count as abandoned.
 
-After the call, pick the **Ergebnis**, then the **Nächster Anruf**, then press **Speichern**. The CRM card, the Gmail card, **Notiz hinzufügen → Anruf** and the phone app all offer the same choice:
+After the call, pick the **Ergebnis**, check the **Nächster Anruf** dropdown, then press **Speichern**. The CRM card, the Gmail card, **Notiz hinzufügen → Anruf** and the phone app all offer the same choice:
 
 | Ergebnis | Next call preselected | Also |
 | --- | --- | --- |
@@ -59,7 +59,7 @@ After the call, pick the **Ergebnis**, then the **Nächster Anruf**, then press 
 | Termin vereinbart | in 2 weeks | a lead moves to the phase Termin vereinbart; shows a link to the booking page |
 | E-Mail nötig | in 1 week | puts the organisation on Prüfen |
 
-A planned call still ahead is preselected as **Unverändert (…)** instead, so a result keeps it unless you pick something else. A call that was due today or earlier has no **Unverändert**: pick when the organisation comes back (2 Tage to 1 Jahr, **Datum …** with an optional time), or **Kein Anruf**. For a "no", pick Gespräch geführt and 1 Jahr.
+A planned call still ahead is preselected as **Unverändert · …** instead, so a result keeps it unless you pick something else. A call that was due today or earlier has no **Unverändert**: pick when the organisation comes back (In 2 Tagen to In 1 Jahr, each with its date, or **Datum und Uhrzeit wählen …**), or **Kein Anruf planen**. For a "no", pick Gespräch geführt and 1 Jahr.
 
 Results only move the phase forward: a customer at Gewonnen, or a lead at Angebot or Testphase, keeps its phase. A next step written by hand (such as "Preisliste schicken, dann nachfassen") stays when the date changes; only the results' own wording ("Erneut anrufen") is replaced. Every result except Nicht erreicht counts as the last contact. Only one call per person is open at a time.
 

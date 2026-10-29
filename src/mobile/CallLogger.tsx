@@ -2,7 +2,7 @@ import {useCallback,useEffect,useRef,useState} from 'react';
 import {Phone,PhoneIncoming,MessageSquareText,UserPlus,Search,X,ChevronLeft,Settings,LogOut,Trash2,Sun,Moon,Monitor,Flag,MessageCircleCheck,CalendarClock,CalendarCheck,Mail,ThumbsDown,PhoneMissed,Check,Clock,History,LoaderCircle,Pause,Play,Building2,type LucideIcon} from 'lucide-react';
 import {api} from '../api';
 import {useAppearance} from '../Appearance';
-import {todayBerlin,defaultNextCall,type NextCall} from '../domain';
+import {todayBerlin,defaultNextCall,nextCallDay,type NextCall} from '../domain';
 type Contact={id:string;name:string;role:string;phones:string[];primary:boolean};
 type Caller={id:string;name:string;version:string;subtitle:string;status:string;contacts:Contact[]};
 type Outcome={key:string;label:string;next:string};
@@ -101,6 +101,8 @@ function LiveCallCard({call,isNew,onDone,onDiscard}:{call:LiveCall;isNew:boolean
  const ready=!!result&&!!next&&(next.kind!=='date'||next.date>=today);
  function choose(key:string){setResult(key);if(!touched){setNext(defaultNextCall(key,call.followUp||'',today));setCustom(false);}}
  function pick(value:NextCall,isCustom=false){setTouched(true);setCustom(isCustom);setNext(value);}
+ const selected=!next&&!custom?'':next?.kind==='keep'?'keep':next?.kind==='none'?'none':!custom&&call.nextPicks.some(p=>p.date===date)?'d:'+date:'custom';
+ function chooseNext(v:string){if(v==='keep')pick({kind:'keep'});else if(v==='none')pick({kind:'none'});else if(v==='custom')pick(date?{kind:'date',date}:null,true);else if(v.startsWith('d:'))pick({kind:'date',date:v.slice(2)});}
  async function save(){
   if(busy||!ready||!next)return;
   setBusy(true);setError('');
@@ -124,14 +126,14 @@ function LiveCallCard({call,isNew,onDone,onDiscard}:{call:LiveCall;isNew:boolean
    <h2 className="m-label">Ergebnis</h2>
    <div className="m-chips" role="group" aria-label="Ergebnis">{call.results.map(r=>{const Icon=ICONS[r.key]||Check;return <button key={r.key} type="button" className={result===r.key?'is-on':''} aria-pressed={result===r.key} disabled={busy} onClick={()=>choose(r.key)}><Icon size={16} aria-hidden="true"/> {r.label}</button>;})}</div>
    {result==='meeting'&&call.bookingUrl&&<a className="m-text-button" href={call.bookingUrl} target="_blank" rel="noopener">Buchungsseite öffnen ↗</a>}
-   <h2 className="m-label">Nächster Anruf</h2>
-   <div className="m-chips" role="group" aria-label="Nächster Anruf">
-    {planned&&<button type="button" className={next?.kind==='keep'?'is-on':''} aria-pressed={next?.kind==='keep'} disabled={busy} onClick={()=>pick({kind:'keep'})}>Unverändert ({new Intl.DateTimeFormat('de-DE',{day:'2-digit',month:'2-digit',timeZone:'UTC'}).format(new Date(planned+'T12:00:00Z'))})</button>}
-    {call.nextPicks.map(p=><button key={p.label} type="button" className={!custom&&date===p.date?'is-on':''} aria-pressed={!custom&&date===p.date} disabled={busy} onClick={()=>pick({kind:'date',date:p.date,time:next?.kind==='date'?next.time:''})}>{p.label}</button>)}
-    <button type="button" className={custom?'is-on':''} aria-pressed={custom} disabled={busy} onClick={()=>pick(date?{kind:'date',date,time:next?.kind==='date'?next.time:''}:null,true)}>Datum …</button>
-    <button type="button" className={next?.kind==='none'?'is-on':''} aria-pressed={next?.kind==='none'} disabled={busy} onClick={()=>pick({kind:'none'})}>Kein Anruf</button>
-   </div>
-   {(custom||date)&&<div className="m-pair">{custom&&<label className="m-field"><span>Datum</span><input type="date" min={today} value={date} disabled={busy} onChange={e=>pick(e.target.value?{kind:'date',date:e.target.value,time:next?.kind==='date'?next.time:''}:null,true)}/></label>}{date&&<label className="m-field"><span>Uhrzeit · optional</span><input type="time" step={300} value={next?.kind==='date'?next.time||'':''} disabled={busy} onChange={e=>pick({kind:'date',date,time:e.target.value},custom)}/></label>}</div>}
+   <label className="m-field"><span>Nächster Anruf</span><select value={selected} disabled={busy} onChange={e=>chooseNext(e.target.value)}>
+    {selected===''&&<option value="">Bitte wählen …</option>}
+    {planned&&<option value="keep">Unverändert · {nextCallDay(planned,today)}</option>}
+    {call.nextPicks.map(p=><option key={p.label} value={'d:'+p.date}>{p.label} · {nextCallDay(p.date,today)}</option>)}
+    <option value="custom">{selected==='custom'&&date?nextCallDay(date,today)+(next?.kind==='date'&&next.time?' · '+next.time+' Uhr':''):'Datum und Uhrzeit wählen …'}</option>
+    <option value="none">Kein Anruf planen</option>
+   </select></label>
+   {selected==='custom'&&<div className="m-pair"><label className="m-field"><span>Datum</span><input type="date" min={today} value={date} disabled={busy} onChange={e=>pick(e.target.value?{kind:'date',date:e.target.value,time:next?.kind==='date'?next.time:''}:null,true)}/></label><label className="m-field"><span>Uhrzeit · optional</span><input type="time" step={300} value={next?.kind==='date'?next.time||'':''} disabled={busy||!date} onChange={e=>pick({kind:'date',date,time:e.target.value},true)}/></label></div>}
    <button type="button" className="m-primary" disabled={busy||!ready} onClick={save}><Check size={19} aria-hidden="true"/>{busy?'Wird gespeichert …':'Speichern'}</button>
    <button type="button" className="m-text-button" disabled={busy} onClick={()=>setConfirm(true)}><X size={15} aria-hidden="true"/>Ohne Eintrag verwerfen</button>
   </>}

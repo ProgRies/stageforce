@@ -43,6 +43,7 @@
 .sf-call .chip:hover:not(:disabled){border-color:var(--accent)}
 .sf-call .chip[aria-pressed="true"]{background:linear-gradient(135deg,#5b5fc7,#8a4fbf);border-color:transparent;color:var(--accent-ink);font-weight:600}
 .sf-call .results .chip{flex:1 1 calc(50% - 5px)}
+.sf-call select.next{width:100%;min-height:36px;border:1px solid var(--line);border-radius:9px;padding:6px 9px;background:var(--input);color-scheme:light}.sf-call[data-theme="dark"] select.next{color-scheme:dark}
 .sf-call .when{display:flex;gap:6px}.sf-call .when input{min-width:0;flex:1;border:1px solid var(--line);border-radius:9px;padding:5px 9px;background:var(--input);color-scheme:light}.sf-call[data-theme="dark"] .when input{color-scheme:dark}
 .sf-call .booking{align-self:flex-start;font-size:12px;color:var(--accent);text-decoration:none}.sf-call[data-theme="dark"] .booking{color:#b9a8ff}.sf-call .booking:hover{text-decoration:underline}
 .sf-call [hidden]{display:none!important}
@@ -52,6 +53,7 @@ body.sf-pip{margin:0;background:#fff}body.sf-pip.dark{background:#1e2140}`;
  const ICONS={pop:'M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6',min:'M5 12h14',max:'M6 9l6 6 6-6',close:'M18 6 6 18M6 6l12 12'};
  const berlin=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Berlin',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
  const plusDays=(day,n)=>new Date(Date.parse(day+'T12:00:00Z')+n*86400000).toISOString().slice(0,10);
+ const shortDay=(day,today)=>new Intl.DateTimeFormat('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',timeZone:'UTC'}).format(new Date(day+'T12:00:00Z'))+(day.slice(0,4)!==today.slice(0,4)?day.slice(2,4):'');
  const dayLabel=day=>new Intl.DateTimeFormat('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'2-digit',timeZone:'UTC'}).format(new Date(day+'T12:00:00Z'));
  const clock=ms=>{const s=Math.max(0,Math.floor(ms/1000)),h=Math.floor(s/3600),m=Math.floor(s/60)%60,p=v=>String(v).padStart(2,'0');return(h?h+':'+p(m):p(m))+':'+p(s%60);};
  const supported=()=>typeof window.documentPictureInPicture?.requestWindow==='function';
@@ -72,13 +74,14 @@ body.sf-pip{margin:0;background:#fff}body.sf-pip.dark{background:#1e2140}`;
   const planned=()=>call?.followUp&&call.followUp>berlin()?call.followUp:'';
   // Cards from 0.3.16 on: pick the result, then the next call (preselected from the result), then Speichern. Older servers send no
   // `results`, and the card falls back to the one-tap buttons above.
-  const results=el('div',{className:'chips results'}),nextChips=el('div',{className:'chips'}),nextDate=el('input',{type:'date'}),nextTime=el('input',{type:'time',step:300});
-  nextDate.setAttribute('aria-label','Datum des nächsten Anrufs');nextTime.setAttribute('aria-label','Uhrzeit (optional)');nextTime.title='Uhrzeit (optional)';
+  const results=el('div',{className:'chips results'}),nextSelect=el('select',{className:'next'}),nextDate=el('input',{type:'date'}),nextTime=el('input',{type:'time',step:300});
+  nextSelect.setAttribute('aria-label','Nächster Anruf');nextDate.setAttribute('aria-label','Datum des nächsten Anrufs');nextTime.setAttribute('aria-label','Uhrzeit (optional)');nextTime.title='Uhrzeit (optional)';
   const when=el('div',{className:'when'},nextDate,nextTime),booking=el('a',{className:'booking',textContent:'Buchungsseite öffnen ↗',target:'_blank',rel:'noopener'});
   const saveButton=el('button',{type:'button',className:'button primary',textContent:'Speichern',onclick:()=>save(result)});
-  const picker=el('div',{className:'picker'},el('p',{className:'label',textContent:'Ergebnis'}),results,booking,el('p',{className:'label',textContent:'Nächster Anruf'}),nextChips,when,saveButton);
+  const picker=el('div',{className:'picker'},el('p',{className:'label',textContent:'Ergebnis'}),results,booking,el('p',{className:'label',textContent:'Nächster Anruf'}),nextSelect,when,saveButton);
   const choose=key=>{result=key;if(!touched){const r=call.results.find(r=>r.key===key);next=planned()?{kind:'keep'}:r?.days?{kind:'date',date:plusDays(berlin(),r.days)}:null;custom=false;}drawPicker();};
   const pickNext=value=>{touched=true;next=value;drawPicker();};
+  nextSelect.onchange=()=>{const v=nextSelect.value,date=next?.kind==='date'?next.date:'';custom=v==='custom';pickNext(v==='keep'?{kind:'keep'}:v==='none'?{kind:'none'}:v==='custom'?(date?{kind:'date',date,time:nextTime.value}:null):v.startsWith('d:')?{kind:'date',date:v.slice(2)}:null);};
   nextDate.oninput=()=>pickNext(nextDate.value?{kind:'date',date:nextDate.value,time:nextTime.value}:null);
   nextTime.oninput=()=>{if(next?.kind==='date')pickNext({...next,time:nextTime.value});};
   const ready=()=>!!result&&!!next&&(next.kind!=='date'||next.date>=berlin());
@@ -105,7 +108,7 @@ body.sf-pip{margin:0;background:#fff}body.sf-pip.dark{background:#1e2140}`;
    keep_.hidden=!planned()||!!later||confirming;keepText.textContent='Geplanten Anruf ('+(planned()?dayLabel(planned()):'')+') behalten';keepBox.checked=keep;
    const modern=!!call.results;
    keep_.hidden||=modern;picker.hidden=!modern||confirming;
-   for(const e of [area,keepBox,discard,...outcomes.children,...later_.querySelectorAll('button,input'),...picker.querySelectorAll('.chip,input'),...confirm_.querySelectorAll('button')])e.disabled=busy;
+   for(const e of [area,keepBox,discard,...outcomes.children,...later_.querySelectorAll('button,input'),...picker.querySelectorAll('.chip,input,select'),...confirm_.querySelectorAll('button')])e.disabled=busy;
    if(modern)saveButton.disabled=busy||!ready();
    later_.lastChild.disabled=busy||!later;
    outcomes.hidden=modern||!!later||confirming;later_.hidden=!later||confirming;confirm_.hidden=!confirming;date.min=berlin();if(date.value!==later)date.value=later;if(at.value!==laterTime)at.value=laterTime;
@@ -117,12 +120,12 @@ body.sf-pip{margin:0;background:#fff}body.sf-pip.dark{background:#1e2140}`;
    // "Unverändert" only while the planned call is still ahead; a call that was due needs a new date (or none).
    const chip=(label,on,onclick)=>{const b=el('button',{type:'button',className:'chip',textContent:label,onclick});b.setAttribute('aria-pressed',String(on));return b;};
    results.replaceChildren(...call.results.map(r=>chip(r.label,result===r.key,()=>choose(r.key))));
-   const date=next?.kind==='date'?next.date:'';
-   nextChips.replaceChildren(...[planned()&&chip('Unverändert ('+dayLabel(planned())+')',next?.kind==='keep',()=>{custom=false;pickNext({kind:'keep'});}),
-     ...call.nextPicks.map(p=>chip(p.label,!custom&&date===p.date,()=>{custom=false;pickNext({kind:'date',date:p.date,time:nextTime.value});})),
-     chip('Datum …',custom,()=>{custom=true;pickNext(date?{kind:'date',date,time:nextTime.value}:null);}),
-     chip('Kein Anruf',next?.kind==='none',()=>{custom=false;pickNext({kind:'none'});})].filter(Boolean));
-   when.hidden=!(custom||date);nextDate.hidden=!custom;nextDate.min=berlin();if(nextDate.value!==date)nextDate.value=date;if(!date&&nextTime.value)nextTime.value='';
+   // One field for the next call: the result fills it in, so usually it only needs a look.
+   const date=next?.kind==='date'?next.date:'',today=berlin(),selected=!next&&!custom?'':next?.kind==='keep'?'keep':next?.kind==='none'?'none':!custom&&call.nextPicks.some(p=>p.date===date)?'d:'+date:'custom';
+   const option=(value,text)=>el('option',{value,textContent:text});
+   nextSelect.replaceChildren(...[selected===''&&option('','Bitte wählen …'),planned()&&option('keep','Unverändert · '+shortDay(planned(),today)),...call.nextPicks.map(p=>option('d:'+p.date,p.label+' · '+shortDay(p.date,today))),
+    option('custom',selected==='custom'&&date?shortDay(date,today)+(nextTime.value?' · '+nextTime.value+' Uhr':''):'Datum und Uhrzeit wählen …'),option('none','Kein Anruf planen')].filter(Boolean));nextSelect.value=selected;
+   when.hidden=!custom;nextTime.disabled=!date;nextDate.min=berlin();if(nextDate.value!==date)nextDate.value=date;if(!date&&nextTime.value)nextTime.value='';
    booking.hidden=result!=='meeting'||!call.bookingUrl;booking.href=call.bookingUrl||'';
    update();
   }

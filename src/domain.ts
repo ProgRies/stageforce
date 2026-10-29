@@ -72,7 +72,9 @@ export const FOLLOW_UP_PICKS:[string,(today:string)=>string][]=[["1 Woche",t=>ad
 // A result preselects its next call: a planned call still ahead stays ("Unverändert"), otherwise `days` from today, if it has any.
 export const CALL_RESULTS=[{key:"talked",label:"Gespräch geführt",days:null},{key:"not_reached",label:"Nicht erreicht",days:2},{key:"meeting",label:"Termin vereinbart",days:14},{key:"email",label:"E-Mail nötig",days:7}] as const;
 export type CallResult=typeof CALL_RESULTS[number]["key"];
-export const CALL_NEXT_PICKS:[string,(today:string)=>string][]=[["2 Tage",t=>addDays(t,2)],...FOLLOW_UP_PICKS];
+export const CALL_NEXT_PICKS:[string,(today:string)=>string][]=[["In 2 Tagen",t=>addDays(t,2)],["In 1 Woche",t=>addDays(t,7)],["In 2 Wochen",t=>addDays(t,14)],["In 1 Monat",t=>addMonths(t,1)],["In 3 Monaten",t=>addMonths(t,3)],["In 6 Monaten",t=>addMonths(t,6)],["In 1 Jahr",t=>addMonths(t,12)]];
+// "Sa., 31.10." for the next-call field; with the year when it is not this year's.
+export function nextCallDay(date:string,today=todayBerlin()){const d=new Date(date+"T12:00:00Z");return new Intl.DateTimeFormat("de-DE",{weekday:"short",day:"2-digit",month:"2-digit",timeZone:"UTC"}).format(d)+(date.slice(0,4)!==today.slice(0,4)?date.slice(2,4):"");}
 export type NextCall={kind:'keep'}|{kind:'none'}|{kind:'date';date:string;time?:string}|null;
 export function defaultNextCall(result:string,planned:string,today=todayBerlin()):NextCall{
  if(planned&&planned>today)return{kind:'keep'};
