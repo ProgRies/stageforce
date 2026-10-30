@@ -5,11 +5,11 @@ The Chrome extension in `integrations/chrome` (version 0.4.22) connects Gmail to
 ## Install and connect
 
 1. Open `chrome://extensions`, turn on Developer mode, click **Load unpacked** and select the `integrations/chrome` folder (the one with `manifest.json`). Pin the StageForce icon if you like.
-2. In the CRM: gear → **Browser-Erweiterung verbinden** → **Schlüssel erstellen**. Confirm with a fresh code from your authenticator app and copy the key. It is shown only once.
+2. In the CRM: gear → **Browser-Erweiterung verbinden** → **Schlüssel erstellen** (later **Neuen Schlüssel erstellen**). Give the computer a name, confirm with a fresh code from your authenticator app and copy the key. It is shown only once.
 3. Click the extension's toolbar icon. Enter the CRM address (`https://stageforce.jaimo.me` on the server, `http://localhost:3000` locally) and the key, click **Connect** and allow access to that address.
 4. Reload Gmail.
 
-Each colleague uses their own CRM account and key. The Gmail account must have the same address as the CRM account. Keys expire after 90 days; replacing or revoking a key in the CRM disconnects the extension immediately, as do a password reset, an authenticator reset or disabling the account. A key only works against the CRM that issued it, so a local key does not work on the server.
+Each colleague uses their own CRM account. Each computer gets its own key (up to 10 per account), listed by name with its expiry and last use: don't copy one key to several computers. The Gmail account must have the same address as the CRM account. Keys expire after 90 days; renewing or revoking a key disconnects only that computer immediately. A password reset, an authenticator reset or disabling the account disconnects all of them. A key only works against the CRM that issued it, so a local key does not work on the server.
 
 To update the extension, replace the folder (for example with `git pull`), click the reload button in `chrome://extensions` and reload Gmail.
 

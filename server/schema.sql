@@ -47,6 +47,9 @@ CREATE TABLE IF NOT EXISTS meeting_status(activity_id TEXT PRIMARY KEY REFERENCE
 INSERT OR IGNORE INTO schema_versions VALUES(4,datetime('now'));
 
 CREATE TABLE IF NOT EXISTS extension_keys(user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,token_hash TEXT NOT NULL UNIQUE,created_at INTEGER NOT NULL,expires_at INTEGER NOT NULL,last_used_at INTEGER);
+-- One browser key per computer. extension_keys keeps each user's newest key as well, so the previous release still works after a rollback.
+CREATE TABLE IF NOT EXISTS extension_devices(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,label TEXT NOT NULL,token_hash TEXT NOT NULL UNIQUE,created_at INTEGER NOT NULL,expires_at INTEGER NOT NULL,last_used_at INTEGER);
+CREATE INDEX IF NOT EXISTS extension_devices_user ON extension_devices(user_id);
 
 
 CREATE TABLE IF NOT EXISTS extension_message_refs(mailbox TEXT NOT NULL,gmail_id TEXT NOT NULL,message_id TEXT NOT NULL REFERENCES messages(id),PRIMARY KEY(mailbox,gmail_id));

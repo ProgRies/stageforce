@@ -2,22 +2,53 @@ import {contactName,formatPhone} from '../src/domain.ts';
 import {appearance} from './appearance.mjs';
 import {detectMeeting,logMeeting,manualMeeting,findMeeting,meetingText} from './meetings.mjs';
 import {prepareCall,saveCall,cancelCall,openCall,draftCall,mergePhones,dialNumber} from './calls.mjs';
-import {randomBytes,createHash} from 'node:crypto';
+import {randomBytes,createHash,randomUUID} from 'node:crypto';
 import {hashToken,limited,email} from './auth.mjs';
 import {transaction,now} from './db.mjs';
 import {Problem,ourAddresses,matchEmail,stageImport,confirmImport,getOrg,contacts,createOrg,linkSave,contactSave,assertVersion} from './crm.mjs';
 const brief=o=>({id:o.id,name:o.name,version:String(o.version)});
 const field=(v,max=1000)=>{if(typeof v!=='string'||v.length>max||v.includes('\0'))throw new Problem('Invalid field.');return v.trim();};
-export function extensionStatus(db,user){const k=db.prepare('SELECT created_at,expires_at,last_used_at FROM extension_keys WHERE user_id=?').get(user.id);return{email:user.email,connected:!!k&&k.expires_at>Date.now(),...k};}
-export function extensionRevoke(db,user){db.prepare('DELETE FROM extension_keys WHERE user_id=?').run(user.id);return extensionStatus(db,user);}
-export function extensionCreate(db,user){const token='sf_ext_'+randomBytes(32).toString('base64url'),t=Date.now();db.prepare('INSERT INTO extension_keys(user_id,token_hash,created_at,expires_at) VALUES(?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET token_hash=excluded.token_hash,created_at=excluded.created_at,expires_at=excluded.expires_at,last_used_at=NULL').run(user.id,hashToken(token),t,t+90*86400000);return{...extensionStatus(db,user),token};}
+// Each computer gets its own browser key, so one can be renewed or revoked while the others stay connected.
+const KEY_DAYS=90,MAX_KEYS=10;
+const deviceRows=(db,user)=>db.prepare('SELECT id,label,created_at,expires_at,last_used_at FROM extension_devices WHERE user_id=? ORDER BY rowid').all(user.id);
+export function extensionStatus(db,user){const t=Date.now(),devices=deviceRows(db,user).map(d=>({...d,expired:d.expires_at<=t}));return{email:user.email,connected:devices.some(d=>!d.expired),devices,limit:MAX_KEYS};}
+// The previous release reads only extension_keys: it keeps the user's newest active key, so a rollback leaves that computer connected.
+function mirrorNewest(db,user){db.prepare('DELETE FROM extension_keys WHERE user_id=?').run(user.id);db.prepare('INSERT INTO extension_keys(user_id,token_hash,created_at,expires_at,last_used_at) SELECT user_id,token_hash,created_at,expires_at,last_used_at FROM extension_devices WHERE user_id=? AND expires_at>? ORDER BY created_at DESC,rowid DESC LIMIT 1').run(user.id,Date.now());}
+const newToken=()=>'sf_ext_'+randomBytes(32).toString('base64url');
+function ownDevice(db,user,id){const d=typeof id==='string'&&db.prepare('SELECT * FROM extension_devices WHERE id=? AND user_id=?').get(id,user.id);if(!d)throw new Problem('Dieser Schlüssel existiert nicht mehr. Die Liste wurde aktualisiert.',404,'key_missing');return d;}
+// Names are trimmed and kept short; an empty name becomes "Computer n" and a taken one gets " (2)", " (3)", … so every row is told apart.
+function deviceLabel(db,user,value){
+ if(value!==undefined&&typeof value!=='string')throw new Problem('Ungültiger Name.');
+ const taken=new Set(deviceRows(db,user).map(d=>d.label.toLowerCase()));let base=String(value||'').replace(/[\u0000-\u001f\u007f]/g,'').replace(/\s+/g,' ').trim().slice(0,60);
+ if(!base){let n=taken.size+1;while(taken.has('computer '+n))n++;return'Computer '+n;}
+ let label=base,n=2;while(taken.has(label.toLowerCase()))label=`${base} (${n++})`;return label;
+}
+export function extensionCreate(db,user,label){
+ return transaction(db,()=>{const t=Date.now();
+  // Keys that ran out long ago are dropped, so the list holds the computers still in use.
+  db.prepare('DELETE FROM extension_devices WHERE user_id=? AND expires_at<?').run(user.id,t-KEY_DAYS*86400000);
+  if(db.prepare('SELECT count(*) n FROM extension_devices WHERE user_id=? AND expires_at>?').get(user.id,t).n>=MAX_KEYS)throw new Problem(`Höchstens ${MAX_KEYS} Schlüssel. Bitte zuerst einen nicht mehr genutzten widerrufen.`,409,'key_limit');
+  const token=newToken(),id=randomUUID(),name=deviceLabel(db,user,label);
+  db.prepare('INSERT INTO extension_devices(id,user_id,label,token_hash,created_at,expires_at) VALUES(?,?,?,?,?,?)').run(id,user.id,name,hashToken(token),t,t+KEY_DAYS*86400000);mirrorNewest(db,user);
+  return{...extensionStatus(db,user),token,id,label:name};
+ });
+}
+// A renewed key keeps its name; the old one stops working at once, on that computer only.
+export function extensionRenew(db,user,id){
+ return transaction(db,()=>{const d=ownDevice(db,user,id),token=newToken(),t=Date.now();
+  db.prepare('UPDATE extension_devices SET token_hash=?,created_at=?,expires_at=?,last_used_at=NULL WHERE id=?').run(hashToken(token),t,t+KEY_DAYS*86400000,d.id);mirrorNewest(db,user);
+  return{...extensionStatus(db,user),token,id:d.id,label:d.label};
+ });
+}
+export function extensionRevoke(db,user,id){return transaction(db,()=>{const d=ownDevice(db,user,id);db.prepare('DELETE FROM extension_devices WHERE id=?').run(d.id);mirrorNewest(db,user);return{...extensionStatus(db,user),label:d.label};});}
 export function authorizeExtension(db,req,rateLimit=true){
  const origin=req.headers.origin;if(origin&&!/^chrome-extension:\/\/[a-p]{32}$/.test(origin))throw new Problem('Extension requests only.',403);
  const m=/^Bearer (sf_ext_[A-Za-z0-9_-]{43})$/.exec(req.headers.authorization||'');
- const user=m&&db.prepare('SELECT u.* FROM extension_keys k JOIN users u ON u.id=k.user_id WHERE k.token_hash=? AND k.expires_at>? AND u.active=1 AND EXISTS(SELECT 1 FROM user_mfa m WHERE m.user_id=u.id)').get(hashToken(m[1]),Date.now());
+ const key=m&&db.prepare('SELECT k.id,k.user_id FROM extension_devices k JOIN users u ON u.id=k.user_id WHERE k.token_hash=? AND k.expires_at>? AND u.active=1 AND EXISTS(SELECT 1 FROM user_mfa m WHERE m.user_id=u.id)').get(hashToken(m[1]),Date.now());
+ const user=key&&db.prepare('SELECT * FROM users WHERE id=?').get(key.user_id);
  if(!user)throw new Problem('Connect your extension in Stage Force settings.',401);
  if(rateLimit&&limited(db,'extension:'+user.id,180,60000))throw new Problem('Please wait a minute.',429);
- db.prepare('UPDATE extension_keys SET last_used_at=? WHERE user_id=?').run(Date.now(),user.id);return user;
+ db.prepare('UPDATE extension_devices SET last_used_at=? WHERE id=?').run(Date.now(),key.id);return user;
 }
 function envelope(b,user,db){
  const mailbox=field(b.mailbox,254).toLowerCase();if(mailbox!==user.email.toLowerCase())throw new Problem('The Gmail mailbox must match your CRM account. Check the selected mailbox.',403);

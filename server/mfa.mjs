@@ -21,7 +21,7 @@ export function enableMfa(db,userId,secret,step=0){return transaction(db,()=>{
  db.prepare('INSERT INTO user_mfa(user_id,secret,last_step,enabled_at) VALUES(?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET secret=excluded.secret,last_step=excluded.last_step,enabled_at=excluded.enabled_at').run(userId,secret,step,Date.now());
  db.prepare('DELETE FROM mfa_recovery_codes WHERE user_id=?').run(userId);
  const codes=Array.from({length:RECOVERY_COUNT},recoveryCode);for(const c of codes)db.prepare('INSERT INTO mfa_recovery_codes(user_id,code_hash) VALUES(?,?)').run(userId,hashToken(normalRecovery(c)));return codes;});}
-export function resetMfa(db,userId){transaction(db,()=>{for(const table of ['user_mfa','mfa_recovery_codes','login_challenges','sessions','extension_keys'])db.prepare(`DELETE FROM ${table} WHERE user_id=?`).run(userId);});}
+export function resetMfa(db,userId){transaction(db,()=>{for(const table of ['user_mfa','mfa_recovery_codes','login_challenges','sessions','extension_keys','extension_devices'])db.prepare(`DELETE FROM ${table} WHERE user_id=?`).run(userId);});}
 export const recoveryLeft=(db,userId)=>db.prepare('SELECT count(*) n FROM mfa_recovery_codes WHERE user_id=? AND used_at IS NULL').get(userId).n;
 // After a correct password: a challenge whose token only lives in an HttpOnly cookie. New users get a secret to scan.
 export function startChallenge(db,user){

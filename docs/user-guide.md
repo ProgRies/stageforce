@@ -119,7 +119,7 @@ Open tabs update on their own within about a second when a colleague saves somet
 | Section | What it does |
 | --- | --- |
 | Darstellung | Hell, Dunkel or System. The extension popup follows the same choice. |
-| Browser-Erweiterung verbinden | Creates, replaces or revokes your extension key. Creating one asks for a fresh authenticator code. Keys expire after 90 days. |
+| Browser-Erweiterung verbinden | One extension key per computer: create, renew or revoke each one separately. Creating or renewing asks for a fresh authenticator code. Keys expire after 90 days. |
 | Passwort ändern | Changes your password with your current one. Your other sessions, including phones, are signed out. |
 | Handy-App | The address of the phone app and the list of signed-in phones, each with sign-out. |
 | Anmeldeaktivität | Your own sign-ins, wrong passwords and codes, and key changes of the last 90 days. |
