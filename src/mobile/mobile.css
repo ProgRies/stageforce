@@ -112,9 +112,9 @@ svg{flex-shrink:0}
 .m-form h2,.m-sheet-inline h2{font-size:19px;font-weight:650;letter-spacing:-.3px}
 .m-field{display:flex;flex-direction:column;gap:6px}
 .m-field>span{font-size:14px;font-weight:550;color:var(--soft)}
-.m-field input{width:100%;min-height:52px;padding:0 14px;border:1px solid var(--line);border-radius:14px;background:var(--field);font-size:17px;-webkit-appearance:none;appearance:none}
+.m-field input,.m-field select{width:100%;color:inherit;font:inherit;min-height:52px;padding:0 14px;border:1px solid var(--line);border-radius:14px;background:var(--field);font-size:17px;-webkit-appearance:none;appearance:none}
 .m-field input[type="date"]{display:flex;align-items:center}
-.m-field input:focus{outline:0;border-color:rgba(168,85,247,.55);box-shadow:0 0 0 3px rgba(168,85,247,.18)}
+.m-field input:focus,.m-field select:focus{outline:0;border-color:rgba(168,85,247,.55);box-shadow:0 0 0 3px rgba(168,85,247,.18)}
 .m-flag{display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border-radius:12px;background:var(--flag-bg);color:var(--flag);font-size:14px;line-height:1.45}
 .m-flag svg{margin-top:2px}
 .m-error{padding:12px 14px;border-radius:14px;color:var(--danger);font-size:15px;line-height:1.45;margin-bottom:10px}
@@ -197,3 +197,5 @@ svg{flex-shrink:0}
 
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 .password-form{display:grid;gap:12px}
+
+.m-field select{background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%);background-position:calc(100% - 20px) 50%,calc(100% - 14px) 50%;background-size:6px 6px;background-repeat:no-repeat;padding-right:36px}

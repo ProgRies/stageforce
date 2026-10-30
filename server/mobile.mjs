@@ -1,5 +1,6 @@
 import {todayBerlin} from '../src/domain.ts';
 import {Problem,getOrg,contacts,search} from './crm.mjs';
+import {ownerResolver} from './leads.mjs';
 // The phone app's caller picker: small answers with only what one tap needs (organisation, contacts, numbers),
 // instead of the whole list the desktop loads.
 const digits=s=>String(s||'').replace(/\D/g,'');
@@ -8,9 +9,11 @@ function caller(db,id){
  return{id:o.id,name:o.name,version:String(o.version),subtitle:place,status:o.status,
   contacts:contacts(db,id).map(c=>({id:c.id,name:c.name,role:c.rolle,phones:c.telefone,primary:c.primary}))};
 }
-// What a call is most likely about: the user's call-backs due today, then the organisations they spoke to last.
+// What a call is most likely about: the planned calls due today of the organisations the user is responsible for (as in the
+// Follow-ups week, so a date set by hand counts too; without a responsible person, the one who planned it), then the organisations they spoke to last.
 export function mobileHome(db,user){
- const due=db.prepare('SELECT organisation_id AS id FROM followups WHERE completed_at IS NULL AND owner=? AND due_date IS NOT NULL AND due_date<=? ORDER BY due_date LIMIT 5').all(user.id,todayBerlin()).map(r=>r.id);
+ const owner=ownerResolver(db);
+ const due=db.prepare('SELECT f.organisation_id AS id,o.owner,f.owner AS planner FROM followups f JOIN organisations o ON o.id=f.organisation_id WHERE f.completed_at IS NULL AND f.due_date IS NOT NULL AND f.due_date<=? ORDER BY f.due_date,o.name COLLATE NOCASE').all(todayBerlin()).filter(r=>(owner(r.owner)||owner(r.planner))===user.id).slice(0,5).map(r=>r.id);
  const recent=db.prepare('SELECT organisation_id AS id,MAX(started_at) AS at FROM call_attempts WHERE user_id=? AND activity_id IS NOT NULL GROUP BY organisation_id ORDER BY at DESC LIMIT 8').all(user.id).map(r=>r.id).filter(id=>!due.includes(id)).slice(0,5);
  return{due:due.map(id=>caller(db,id)),recent:recent.map(id=>caller(db,id))};
 }

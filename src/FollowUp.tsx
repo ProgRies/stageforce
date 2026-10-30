@@ -1,6 +1,6 @@
 import {useEffect,useRef,useState} from 'react';
 import {CalendarClock} from 'lucide-react';
-import {dateISO,todayBerlin,followUpDistance,FOLLOW_UP_PICKS,type Entity} from './domain';
+import {dateISO,todayBerlin,followUpDistance,FOLLOW_UP_PICKS,CALL_NEXT_PICKS,CALL_RESULTS,nextCallDay,type Entity,type NextCall} from './domain';
 // The organisation's one planned call ("Wiedervorlage"): shown in the header, changed by hand there or when a call is logged.
 const fullDay=(date:string)=>new Intl.DateTimeFormat('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric',timeZone:'UTC'}).format(new Date(date+'T12:00:00Z'));
 const shortDay=(date:string)=>new Intl.DateTimeFormat('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit',timeZone:'UTC'}).format(new Date(date+'T12:00:00Z'));
@@ -26,19 +26,31 @@ export function FollowUpButton({entity,disabled,save}:{entity:Entity;disabled:bo
   </div>}
  </span>;
 }
-// What logging a call by hand does to the planned call. null: not chosen yet (only when nothing is planned).
-export type NextCall={kind:'keep'}|{kind:'none'}|{kind:'date';date:string;time?:string}|null;
-export const initialNextCall=(entity:Entity):NextCall=>dateISO(entity.values[17])?{kind:'keep'}:null;
+// What logging a call does to the planned call (null: not chosen yet). The Anruf tab, the call card (integrations/chrome/call-card.js)
+// and the phone app offer the same choice: the result, then the next call, preselected from the result.
+export type {NextCall} from './domain';
+export const initialNextCall=(entity:Entity):NextCall=>dateISO(entity.values[17])>todayBerlin()?{kind:'keep'}:null;
 export function nextCallFields(entity:Entity,next:NextCall):Record<string,string>{return next?.kind==='date'?{'17':next.date}:next?.kind==='none'&&dateISO(entity.values[17])?{'17':''}:{};}
 // Sent beside the fields: only a new date carries a time (or clears the old one).
 export const nextCallTime=(next:NextCall)=>next?.kind==='date'?{followUpTime:next.time||''}:{};
-export function NextCallChoice({entity,value,onChange}:{entity:Entity;value:NextCall;onChange:(next:NextCall)=>void}){
- const due=dateISO(entity.values[17]),today=todayBerlin(),[custom,setCustom]=useState(false),date=value?.kind==='date'?value.date:'';
- const time=value?.kind==='date'?value.time||'':'',picked=(d:string)=>{setCustom(false);onChange({kind:'date',date:d,time});};
- return <div className="next-call" role="group" aria-label="Nächster Anruf"><span className="next-call-title">Nächster Anruf</span><div className="followup-picks">
-  {due&&<button type="button" className={`filter ${value?.kind==='keep'?'active':''}`} aria-pressed={value?.kind==='keep'} onClick={()=>{setCustom(false);onChange({kind:'keep'});}}>{due<today?'Unverändert (fällig)':`Unverändert (${shortDay(due)})`}</button>}
-  <Picks value={custom?'':date} today={today} onPick={picked}/>
-  <button type="button" className={`filter ${custom?'active':''}`} aria-pressed={custom} onClick={()=>{setCustom(true);onChange(date?{kind:'date',date,time}:null);}}>Datum …</button>
-  <button type="button" className={`filter ${value?.kind==='none'?'active':''}`} aria-pressed={value?.kind==='none'} onClick={()=>{setCustom(false);onChange({kind:'none'});}}>Kein Anruf</button>
- </div>{(custom||date)&&<div className="followup-when">{custom?<input type="date" aria-label="Datum des nächsten Anrufs" min={today} value={date} onChange={e=>onChange(e.target.value?{kind:'date',date:e.target.value,time}:null)}/>:<span className="next-call-day">{fullDay(date)}</span>}{date&&<input type="time" step={300} aria-label="Uhrzeit (optional)" title="Uhrzeit (optional)" value={time} onChange={e=>onChange({kind:'date',date,time:e.target.value})}/>}</div>}</div>;
+export function CallResultChoice({results=CALL_RESULTS,value,onChange,className='followup-picks'}:{results?:readonly {key:string;label:string}[];value:string;onChange:(key:string)=>void;className?:string}){
+ return <div className="next-call" role="group" aria-label="Ergebnis"><span className="next-call-title">Ergebnis</span><div className={className}>{results.map(r=><button type="button" key={r.key} className={`filter ${value===r.key?'active':''}`} aria-pressed={value===r.key} onClick={()=>onChange(r.key)}>{r.label}</button>)}</div></div>;
+}
+// One field: "Unverändert" while the planned call is still ahead (a call that was due needs a new date, or none), the quick picks,
+// a date with an optional time, or no call. The result preselects it, so usually it only needs a look.
+export function NextCallChoice({due,value,onChange,className='next-call-select'}:{due:string;value:NextCall;onChange:(next:NextCall)=>void;className?:string}){
+ const today=todayBerlin(),[custom,setCustom]=useState(false),date=value?.kind==='date'?value.date:'',time=value?.kind==='date'?value.time||'':'';
+ const picks=CALL_NEXT_PICKS.map(([label,pick])=>({label,date:pick(today)})),picked=!custom&&picks.find(p=>p.date===date);
+ const selected=!value&&!custom?'':value?.kind==='keep'?'keep':value?.kind==='none'?'none':picked?'d:'+date:'custom';
+ function choose(v:string){setCustom(v==='custom');if(v==='keep')onChange({kind:'keep'});else if(v==='none')onChange({kind:'none'});else if(v==='custom')onChange(date?{kind:'date',date,time}:null);else if(v.startsWith('d:'))onChange({kind:'date',date:v.slice(2)});else onChange(null);}
+ return <label className="next-call"><span className="next-call-title">Nächster Anruf</span>
+  <select className={className} value={selected} onChange={e=>choose(e.target.value)}>
+   {selected===''&&<option value="">Bitte wählen …</option>}
+   {due>today&&<option value="keep">{`Unverändert · ${nextCallDay(due,today)}`}</option>}
+   {picks.map(p=><option key={p.label} value={'d:'+p.date}>{`${p.label} · ${nextCallDay(p.date,today)}`}</option>)}
+   <option value="custom">{selected==='custom'&&date?`${nextCallDay(date,today)}${time?' · '+time+' Uhr':''}`:'Datum und Uhrzeit wählen …'}</option>
+   <option value="none">Kein Anruf planen</option>
+  </select>
+  {selected==='custom'&&<span className="followup-when"><input type="date" aria-label="Datum des nächsten Anrufs" min={today} value={date} onChange={e=>onChange(e.target.value?{kind:'date',date:e.target.value,time}:null)}/><input type="time" step={300} aria-label="Uhrzeit (optional)" title="Uhrzeit (optional)" value={time} disabled={!date} onChange={e=>onChange({kind:'date',date,time:e.target.value})}/></span>}
+ </label>;
 }

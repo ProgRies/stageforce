@@ -1,7 +1,7 @@
 import {uid,now,transaction,reindex} from './db.mjs';
-import {formatPhone,CALL_OUTCOMES,BOOKING_URL,addDays,validDate,todayBerlin} from '../src/domain.ts';
+import {formatPhone,CALL_OUTCOMES,CALL_RESULTS,CALL_NEXT_PICKS,BOOKING_URL,addDays,validDate,todayBerlin} from '../src/domain.ts';
 import {claimOnCall} from './leads.mjs';
-import {Problem,getOrg,contacts,createOrg,addContact,audit,addActivity,assertVersion,followUpTime,setFollowUpTime,plannedCall} from './crm.mjs';
+import {Problem,getOrg,contacts,createOrg,addContact,audit,addActivity,assertVersion,followUpTime,setFollowUpTime,plannedCall,applyCallResult,callOutcome,TALKED} from './crm.mjs';
 const field=(v,max=1000)=>{if(typeof v!=='string'||v.length>max||v.includes('\0'))throw new Problem('Invalid field.');return v.trim();};
 export const dialNumber=value=>{const s=formatPhone(field(value,100)).replace(/[^+\d]/g,'');if(!/^\+?\d{6,15}$/.test(s))throw new Problem('Check the phone number.');return s;};
 export function mergePhones(db,user,orgId,contact,phones){
@@ -53,16 +53,16 @@ export function startIncoming(db,user,b){
  db.prepare("INSERT INTO call_attempts(id,user_id,organisation_id,contact_id,phone,started_at,source_message_id,activity_id,direction) VALUES(?,?,?,?,?,?,NULL,NULL,'in')").run(row.id,row.user_id,id,contact.id,phone,startedAt);reindex(db,id);return callView(db,row);
  });
 }
-// Everything the call card needs to show or resume a call, including the result buttons, so the CRM and the extension render the same card.
-// "Speichern" logs a plain conversation and changes no follow-up; it is stored as "Gespräch geführt", like a call logged by hand.
-// "Kein Interesse" is no longer offered (a "no" is Später anrufen in a year), but is still accepted from older extensions.
-const TALKED={label:'Gespräch geführt',contacted:true};
+// Everything the call card needs to show or resume a call, so the CRM, the extension and the phone app render the same choices:
+// `results` and `nextPicks` for the card that picks a result and the next call, then saves (0.3.16 on). `outcomes` keeps the one-tap
+// buttons of older cards: "Speichern" logs a plain conversation and changes no follow-up, "Kein Interesse" is still accepted.
 const SAVE={key:'talked',label:'Speichern',next:'Geplanter Anruf bleibt'};
 const OUTCOMES=[...Object.entries(CALL_OUTCOMES).filter(([key])=>key!=='no_interest').map(([key,o])=>({key,label:o.label,next:o.next})),SAVE];
 // A call that came in was answered: "Nicht erreicht" does not apply.
 const INCOMING=[SAVE,...OUTCOMES.filter(o=>o.key!=='not_reached'&&o.key!=='talked')];
 const safeDial=p=>{try{return p?dialNumber(p):'';}catch{return'';}};
-function callView(db,r){const o=getOrg(db,r.organisation_id);return{callId:r.id,organisation:{id:o.id,name:o.name,version:String(o.version)},contact:contacts(db,o.id).find(c=>c.id===r.contact_id),phone:r.phone,dial:safeDial(r.phone),direction:r.direction==='in'?'in':'out',startedAt:r.started_at,notes:db.prepare('SELECT notes FROM call_drafts WHERE call_id=?').get(r.id)?.notes||'',outcomes:r.direction==='in'?INCOMING:OUTCOMES,bookingUrl:BOOKING_URL,...plannedCall(db,o.id)};}
+const RESULTS=CALL_RESULTS.map(({key,label,days})=>({key,label,days}));
+function callView(db,r){const o=getOrg(db,r.organisation_id),today=todayBerlin();return{results:r.direction==='in'?RESULTS.filter(x=>x.key!=='not_reached'):RESULTS,nextPicks:CALL_NEXT_PICKS.map(([label,pick])=>({label,date:pick(today)})),today,callId:r.id,organisation:{id:o.id,name:o.name,version:String(o.version)},contact:contacts(db,o.id).find(c=>c.id===r.contact_id),phone:r.phone,dial:safeDial(r.phone),direction:r.direction==='in'?'in':'out',startedAt:r.started_at,notes:db.prepare('SELECT notes FROM call_drafts WHERE call_id=?').get(r.id)?.notes||'',outcomes:r.direction==='in'?INCOMING:OUTCOMES,bookingUrl:BOOKING_URL,...plannedCall(db,o.id)};}
 // An unsaved call from the last twelve hours is still open; older attempts were abandoned and are left alone.
 const openAttempt=(db,user)=>db.prepare('SELECT * FROM call_attempts WHERE user_id=? AND activity_id IS NULL AND started_at>? ORDER BY started_at DESC LIMIT 1').get(user.id,new Date(Date.now()-12*3600000).toISOString());
 export function openCall(db,user){const row=openAttempt(db,user);return{call:row?callView(db,row):null};}
@@ -74,27 +74,27 @@ export function draftCall(db,user,b){
 export function saveCall(db,user,b){return transaction(db,()=>{
  const call=db.prepare('SELECT * FROM call_attempts WHERE id=? AND user_id=?').get(field(b.callId,36),user.id);if(!call)throw new Problem('Call not found.',404);if(call.activity_id)return{saved:true,duplicate:true,organisation:{id:call.organisation_id,version:String(getOrg(db,call.organisation_id).version)}};
  const note=field(b.notes||'',12000),date=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Berlin',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(call.started_at));
- const incoming=call.direction==='in';if(b.outcome!=null&&!Object.hasOwn(CALL_OUTCOMES,b.outcome)&&b.outcome!=='talked')throw new Problem('Unknown call result.');const outcome=b.outcome==null?null:b.outcome==='talked'?TALKED:CALL_OUTCOMES[b.outcome];
- let due=null;if(outcome?.days!=null){due=b.outcome==='callback'&&b.callbackDate?field(b.callbackDate,10):addDays(todayBerlin(),outcome.days);if(!validDate(due)||due<todayBerlin())throw new Problem('Check the call-back date.');}
- // "Später anrufen" may come with a time; every other result sets a date without one.
- const time=b.outcome==='callback'?followUpTime(b.callbackTime):'';
- // "Behalten" on the card: a call before the planned date leaves that date (and its next step) as it is; the result still sets phase and Prüfen.
+ const incoming=call.direction==='in';if(b.outcome!=null&&!callOutcome(b.outcome))throw new Problem('Unknown call result.');const outcome=b.outcome==null?null:callOutcome(b.outcome);
  const planned=db.prepare('SELECT due_date FROM followups WHERE organisation_id=? AND completed_at IS NULL').get(call.organisation_id)?.due_date;
- const keep=b.keepFollowUp===true&&due!==null&&b.outcome!=='callback'&&!!planned&&planned>todayBerlin();if(keep)due=null;
+ let due,time='',keep=false;
+ if(b.next!==undefined){
+  // The card picks the result and the next call separately: keep the planned call, a new date (with an optional time) or none.
+  if(!outcome||!CALL_RESULTS.some(r=>r.key===b.outcome))throw new Problem('Choose the call result.');
+  const next=b.next;if(!next||!['keep','date','none'].includes(next.kind))throw new Problem('Choose the next call.');
+  if(next.kind==='date'){due=field(next.date,10);if(!validDate(due)||due<todayBerlin())throw new Problem('Check the call-back date.');time=followUpTime(next.time);}
+  else if(next.kind==='none')due='';
+  else keep=!!planned;
+ }else if(outcome?.days!=null){
+  // Older cards: one tap sets the result's own date; "Später anrufen" brings a picked date and time, "Behalten" keeps a planned call ahead.
+  due=b.outcome==='callback'&&b.callbackDate?field(b.callbackDate,10):addDays(todayBerlin(),outcome.days);if(!validDate(due)||due<todayBerlin())throw new Problem('Check the call-back date.');
+  time=b.outcome==='callback'?followUpTime(b.callbackTime):'';
+  if(b.keepFollowUp===true&&b.outcome!=='callback'&&!!planned&&planned>todayBerlin()){keep=true;due=undefined;}
+ }
  const aid=addActivity(db,call.organisation_id,user,{type:outcome?'Anruf · '+outcome.label:'Anruf gestartet',text:(incoming?'Eingehender Anruf · ':'')+(note||(outcome?outcome.label:'Anruf gestartet · keine Notiz')),date,contacted:!!outcome?.contacted});
- if(outcome?.days!=null){applyOutcome(db,user,call.organisation_id,outcome,due);if(due!==null)setFollowUpTime(db,call.organisation_id,time);}
+ if(outcome){applyCallResult(db,user,call.organisation_id,outcome,due);if(due!==undefined)setFollowUpTime(db,call.organisation_id,due?time:'');}
  db.prepare('INSERT INTO activity_contacts VALUES(?,?)').run(aid,call.contact_id);db.prepare('UPDATE call_attempts SET activity_id=? WHERE id=?').run(aid,call.id);db.prepare('DELETE FROM call_drafts WHERE call_id=?').run(call.id);
- audit(db,call.organisation_id,user,'call',{activityId:aid,outcome:b.outcome??null,due,...(time?{time}:{}),...(keep?{keptFollowUp:planned}:{}),contactId:call.contact_id,phone:call.phone,startedAt:call.started_at,sourceMessageId:call.source_message_id,direction:call.direction});
+ audit(db,call.organisation_id,user,'call',{activityId:aid,outcome:b.outcome??null,due:due===undefined?null:due||'',...(time?{time}:{}),...(keep?{keptFollowUp:planned}:{}),contactId:call.contact_id,phone:call.phone,startedAt:call.started_at,sourceMessageId:call.source_message_id,direction:call.direction});
  claimOnCall(db,user,call.organisation_id);
  db.prepare('UPDATE organisations SET version=version+1,updated_at=? WHERE id=?').run(now(),call.organisation_id);reindex(db,call.organisation_id);return{saved:true,organisation:{id:call.organisation_id,version:String(getOrg(db,call.organisation_id).version)}};
  });}
-// The open follow-up always holds the next call; a phase change or a handoff to Prüfen comes with some results.
-// A kept planned call comes in as due=null and only gets the phase and Prüfen parts.
-function applyOutcome(db,user,id,outcome,due){
- const open=db.prepare('SELECT id FROM followups WHERE organisation_id=? AND completed_at IS NULL').get(id);
- if(due!==null){if(open)db.prepare('UPDATE followups SET text=?,due_date=?,owner=? WHERE id=?').run(outcome.next,due,user.id,open.id);
- else db.prepare('INSERT INTO followups VALUES(?,?,?,?,?,NULL)').run(uid(),id,outcome.next,due,user.id);}
- if(outcome.phase)db.prepare('UPDATE organisations SET phase=? WHERE id=?').run(outcome.phase,id);
- if(outcome.review&&!db.prepare('SELECT 1 FROM review_issues WHERE organisation_id=? AND resolved_at IS NULL AND text=?').get(id,outcome.review))db.prepare('INSERT INTO review_issues VALUES(?,?,?,NULL)').run(uid(),id,outcome.review);
-}
 export function cancelCall(db,user,b){const call=db.prepare('SELECT * FROM call_attempts WHERE id=?').get(field(b.callId,36));if(!call)return{cancelled:true};if(call.user_id!==user.id)throw new Problem('Call not found.',404);if(call.activity_id)throw new Problem('This call has already been saved.');db.prepare('DELETE FROM call_attempts WHERE id=? AND activity_id IS NULL').run(call.id);return{cancelled:true};}

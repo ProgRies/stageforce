@@ -12,6 +12,8 @@ test('worker keeps token out of content scripts and limits destinations and acti
  assert.equal((await send({type:'api',payload:{action:'load'}})).ok,false);assert.equal((await send({type:'api',payload:{action:'check'}})).ok,false);
  assert.equal((await send({type:'api',payload:{action:'search',query:'customer'},url:'https://evil.test'})).ok,true);assert.equal(calls[0].url,'http://localhost:3000/api/integrations/extension');assert.equal(calls[0].options.redirect,'error');assert.equal(calls[0].options.credentials,'omit');assert.equal(calls[0].options.headers.Authorization,'Bearer '+token);
  assert.equal((await send({type:'api',payload:{action:'search',query:'customer'}},{id,url:'https://evil.test',tab:{id:2}})).ok,false);
+ // Every action the Gmail scripts send must pass the worker; a missing one fails silently in the popup (the meeting preview did).
+ for(const action of new Set(['content.js','call-card.js'].flatMap(f=>[...readFileSync(new URL('../integrations/chrome/'+f,import.meta.url),'utf8').matchAll(/action:'(\w+)'/g)].map(m=>m[1]))))assert.equal((await send({type:'api',payload:{action}})).ok,true,action);
  const options={id,url:root+'options.html'};assert.equal((await send({type:'connect',origin:'http://192.168.1.2:3000',token},options)).ok,false);assert.equal((await send({type:'connect',origin:'https://crm.test/path',token},options)).ok,false);
  assert.equal((await send({type:'disconnect'},options)).ok,true);assert.equal((await send({type:'status'})).ok,false);
 });

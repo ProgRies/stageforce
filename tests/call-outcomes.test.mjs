@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {openDB} from '../server/db.mjs';
 import {addUser} from '../server/auth.mjs';
-import {createOrg,addContact,entity,listData,history,getOrg,activitySave} from '../server/crm.mjs';
+import {createOrg,addContact,entity,listData,history,getOrg,activitySave,save} from '../server/crm.mjs';
 import {prepareCall,saveCall,cancelCall,openCall,draftCall} from '../server/calls.mjs';
 import {deleteOrganisation} from '../server/lifecycle.mjs';
 import {todayBerlin,addDays,buildQueue,callable} from '../src/domain.ts';
@@ -76,4 +76,49 @@ test('starting a call drops an older open call without a note, so nothing linger
  const first=dial(db,user,'First').start(),second=dial(db,user,'Second').start();
  assert.equal(db.prepare('SELECT count(*) n FROM call_attempts WHERE id=?').get(first).n,0);assert.equal(openCall(db,user).call.callId,second);
  draftCall(db,user,{callId:second,notes:'   '});assert.equal(dial(db,user,'Third').start().length,36);
+}finally{db.close();}});
+
+// 0.3.16: the card, the Anruf tab and the phone app pick a result and the next call separately, then save.
+const followUp=(db,id)=>({...db.prepare('SELECT f.text,f.due_date,t.time FROM followups f LEFT JOIN followup_times t ON t.followup_id=f.id WHERE f.organisation_id=? AND f.completed_at IS NULL').get(id)});
+test('a result and a next call: keep, a date with a time, or none',async()=>{const{db,user}=await setup();try{
+ const {org,start}=dial(db,user),ahead=addDays(today,10);
+ assert.equal(callView(db,user,start).results.map(r=>r.key).join(),'talked,not_reached,meeting,email');
+ saveCall(db,user,{callId:start(),outcome:'talked',next:{kind:'date',date:ahead,time:'09:30'}});
+ assert.deepEqual(followUp(db,org.id),{text:'Rückruf vereinbart',due_date:ahead,time:'09:30'});
+ // Not reached before the planned day: "Unverändert" leaves it as it is.
+ saveCall(db,user,{callId:start(),outcome:'not_reached',next:{kind:'keep'}});assert.deepEqual(followUp(db,org.id),{text:'Rückruf vereinbart',due_date:ahead,time:'09:30'});
+ assert.equal(history(db,org.id).items[0].art,'Anruf · Nicht erreicht');
+ saveCall(db,user,{callId:start(),outcome:'not_reached',next:{kind:'date',date:addDays(today,2)}});assert.deepEqual(followUp(db,org.id),{text:'Erneut anrufen',due_date:addDays(today,2),time:null});
+ saveCall(db,user,{callId:start(),outcome:'talked',next:{kind:'none'}});assert.equal(followUp(db,org.id).due_date,null);
+ assert.throws(()=>saveCall(db,user,{callId:start(),next:{kind:'keep'}}),/result/);
+ assert.throws(()=>saveCall(db,user,{callId:start(),outcome:'callback',next:{kind:'keep'}}),/result/);
+ assert.throws(()=>saveCall(db,user,{callId:start(),outcome:'talked',next:{kind:'date',date:addDays(today,-1)}}),/date/);
+ assert.throws(()=>saveCall(db,user,{callId:start(),outcome:'talked',next:{kind:'later'}}),/next call/);
+}finally{db.close();}});
+function callView(db,user,start){const id=start();const v=openCall(db,user).call;cancelCall(db,user,{callId:id});return v;}
+test('a next step written by hand stays when a result moves the date',async()=>{const{db,user}=await setup();try{
+ const {org,start}=dial(db,user);db.prepare("INSERT INTO followups VALUES('f1',?,'Preisliste schicken, dann nachfassen',?,'',NULL)").run(org.id,today);
+ saveCall(db,user,{callId:start(),outcome:'not_reached',next:{kind:'date',date:addDays(today,2)}});
+ assert.deepEqual(followUp(db,org.id),{text:'Preisliste schicken, dann nachfassen',due_date:addDays(today,2),time:null});
+ // Older cards too.
+ saveCall(db,user,{callId:start(),outcome:'email'});assert.equal(followUp(db,org.id).text,'Preisliste schicken, dann nachfassen');
+}finally{db.close();}});
+test('"Termin vereinbart" only moves the phase forward',async()=>{const{db,user}=await setup();try{
+ for(const [from,to] of [['Unbearbeitet','Termin vereinbart'],['Im Gespräch','Termin vereinbart'],['Angebot','Angebot'],['Gewonnen','Gewonnen'],['Testphase','Testphase']]){
+  const {org,start}=dial(db,user,'Lead '+from);db.prepare('UPDATE organisations SET phase=? WHERE id=?').run(from,org.id);
+  saveCall(db,user,{callId:start(),outcome:'meeting',next:{kind:'date',date:addDays(today,14)}});assert.equal(getOrg(db,org.id).phase,to,from);
+ }
+ // An older extension's one tap behaves the same.
+ const {org,start}=dial(db,user,'Kunde');db.prepare("UPDATE organisations SET phase='Gewonnen' WHERE id=?").run(org.id);saveCall(db,user,{callId:start(),outcome:'no_interest'});assert.equal(getOrg(db,org.id).phase,'Gewonnen');
+}finally{db.close();}});
+test('the Anruf tab logs the same results by hand',async()=>{const{db,user}=await setup();try{
+ const org=createOrg(db,user,'Lead'),log=(outcome,fields,text='')=>save(db,user,{id:org.id,version:entity(db,org.id).version,requestId:randomUUID(),fields,note:{type:'Anruf',text,date:today,outcome}});
+ log('not_reached',{17:addDays(today,2)});
+ assert.equal(history(db,org.id,0,'communication').items[0].art,'Anruf · Nicht erreicht');assert.equal(history(db,org.id,0,'communication').items[0].text,'Nicht erreicht');assert.equal(entity(db,org.id).values[15],'');
+ assert.deepEqual(followUp(db,org.id),{text:'Erneut anrufen',due_date:addDays(today,2),time:null});
+ log('meeting',{},'Demo am 12.11.');assert.equal(getOrg(db,org.id).phase,'Termin vereinbart');assert.equal(entity(db,org.id).values[15],today);assert.equal(followUp(db,org.id).due_date,addDays(today,2));
+ log('email',{17:addDays(today,7)});assert.equal(listData(db).review.length,1);
+ // Without a result (older pages) it stays a conversation.
+ save(db,user,{id:org.id,version:entity(db,org.id).version,requestId:randomUUID(),fields:{},note:{type:'Anruf',text:'kurz gesprochen',date:today}});assert.equal(history(db,org.id,0,'communication').items[0].art,'Anruf · Gespräch geführt');
+ assert.throws(()=>log('callback',{}),/Anrufergebnis/);
 }finally{db.close();}});

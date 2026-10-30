@@ -11,6 +11,7 @@ const PROVIDERS=[
  {name:'Skype',link:/https?:\/\/join\.skype\.com\/[\w-]+/i,text:/\bskype[- ](?:meeting|besprechung)\b/i,key:l=>/skype\.com\/([\w-]+)/i.exec(l)?.[1]},
 ];
 const INVITE=/^(?:(?:aktualisierte |updated |neue )?(?:einladung|invitation|meeting invitation|besprechungsanfrage)|termin|meeting|besprechung)\s*(?:mit[^:]{0,80})?:\s*/i;
+const UPDATED=/^(?:(?:re|aw|fwd?|wg)\s*:\s*)*(?:aktualisierte |updated |geänderte |changed )(?:einladung|invitation|meeting invitation|termin|event)\b|^(?:termin|event|meeting) (?:geändert|verschoben|updated|rescheduled)\s*:/i;
 const CANCELLED=/^(?:abgesagt|abgesagter termin|abgesagtes ereignis|canceled|cancelled|canceled event|cancelled event|absage)\s*(?:with[^:]{0,80})?:\s*/i;
 // Declines and counter-proposals say nothing about a meeting taking place; acceptances confirm it.
 const RESPONSE=/^(?:abgelehnt|mit vorbehalt|vorläufig|declined|tentative|tentatively accepted|neue zeit vorgeschlagen|new time proposed)\s*:/i;
@@ -28,8 +29,10 @@ function time(s){
  let h=+m[1];const min=+(m[2]||0),suffix=(m[3]||'').toLowerCase().replace(/\./g,'');
  if(suffix==='pm'&&h<12)h+=12;if(suffix==='am'&&h===12)h=0;return h<24&&min<60?pad(h)+':'+pad(min):'';
 }
-// The first calendar date in a line, with the time that follows it.
-export function meetingDate(line,fallbackYear){
+// The first calendar date in a line, with the time that follows it. `fallback` (a year, or the email's day) completes a date written
+// without one; from the email's day, a date more than two months before it is read as next year's ("7. Jan." in a December email).
+export function meetingDate(line,fallback){
+ const sent=/^\d{4}-\d{2}-\d{2}$/.test(String(fallback||''))?fallback:'',fallbackYear=sent?+sent.slice(0,4):fallback;
  const s=String(line||'');let y,m,d,rest;
  let r=new RegExp('(\\d{1,2})\\.?\\s+'+MONTH+'\\s+(\\d{4})','i').exec(s);
  if(r){d=+r[1];m=month(r[2]);y=+r[3];}
@@ -37,7 +40,7 @@ export function meetingDate(line,fallbackYear){
  if(!r&&(r=/(\d{4})-(\d{2})-(\d{2})/.exec(s))){y=+r[1];m=+r[2];d=+r[3];}
  if(!r&&(r=/(\d{1,2})\.(\d{1,2})\.(\d{4}|\d{2})\b/.exec(s))){d=+r[1];m=+r[2];y=+r[3]<100?2000+ +r[3]:+r[3];}
  if(!r&&(r=/(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(s))){m=+r[1];d=+r[2];y=+r[3];}
- if(!r&&fallbackYear&&(r=new RegExp('(\\d{1,2})\\.?\\s+'+MONTH+'(?![\\w])','i').exec(s))){d=+r[1];m=month(r[2]);y=fallbackYear;}
+ if(!r&&fallbackYear&&(r=new RegExp('(\\d{1,2})\\.?\\s+'+MONTH+'(?![\\w])','i').exec(s))){d=+r[1];m=month(r[2]);y=fallbackYear;if(sent&&m&&Date.UTC(y,m-1,d)<Date.parse(sent+'T00:00:00Z')-60*86400000)y++;}
  if(!r||!m||!validDay(y,m,d))return null;rest=s.slice(r.index+r[0].length);
  return{date:y+'-'+pad(m)+'-'+pad(d),time:time(rest.slice(0,40))};
 }
@@ -64,35 +67,37 @@ export function detectMeeting({subject='',body='',links=[],attachments=[],sentAt
  // Booking-tool names also sit in signatures ("book a call: calendly.com/…"), so alone they only count with a labelled date.
  if(!provider&&!confirmed&&!BOOKING.test(subject+'\n'+body.slice(0,5000))&&!INVITE.test(subject)&&!CANCELLED.test(subject))return null;
  provider??={name:'',key:()=>null};
- const year=Number((sentAt||'').slice(0,4))||new Date().getFullYear(),when=scheduled(subject,body,year,confirmed);
+ const day=/^\d{4}-\d{2}-\d{2}/.test(sentAt||'')?sentAt.slice(0,10):'',year=day||new Date().getFullYear(),when=scheduled(subject,body,year,confirmed);
  if(!provider.name&&!when&&!calendar&&!confirmed)return null;
  const id=link&&provider.key(link);
  const title=cleanTitle(subject)||provider.name||'Meeting';
- return{provider:provider.name,title,link,likely:!!(link||when||confirmed||INVITE.test(subject)||CANCELLED.test(subject)),date:when?.date||'',time:when?.time||'',cancelled:CANCELLED.test(subject),key:((provider.name||'Termin')+':'+(id||title.toLowerCase())).slice(0,500)};
+ return{provider:provider.name,title,link,likely:!!(link||when||confirmed||INVITE.test(subject)||CANCELLED.test(subject)),date:when?.date||'',time:when?.time||'',cancelled:CANCELLED.test(subject),moves:INVITE.test(subject),updated:UPDATED.test(subject),key:((provider.name||'Termin')+':'+(id||title.toLowerCase())).slice(0,500)};
 }
 export const meetingText=m=>[m.provider,m.time&&m.time+' Uhr',m.title&&m.title!==m.provider&&m.title!=='Meeting'&&m.title].filter(Boolean).join(' · ')||'Meeting';
 // The user ticked "log as meeting" on an email nothing was detected in: one meeting for that email.
-export const manualMeeting=(subject,messageId)=>({provider:'',title:cleanTitle(String(subject||'').replace(/^(?:(?:re|aw|fwd?|wg)\s*:\s*)+/i,''))||'Meeting',link:'',date:'',time:'',cancelled:false,likely:false,key:'Manuell:'+messageId});
+export const manualMeeting=(subject,messageId)=>({provider:'',title:cleanTitle(String(subject||'').replace(/^(?:(?:re|aw|fwd?|wg)\s*:\s*)+/i,''))||'Meeting',link:'',date:'',time:'',cancelled:false,moves:true,likely:false,key:'Manuell:'+messageId});
 const uhr=body=>/(\d{2}:\d{2}) Uhr/.exec(body||'')?.[1]||'';
 // The entry an email belongs to: the same invitation (join link or title), or else any meeting of the
 // organisation on the same day at a matching time, so an invite, its acceptance, a booking confirmation
-// and a reminder end up as one entry.
+// and a reminder end up as one entry. A personal Zoom room or a generic subject ("Terminbestätigung") is shared by
+// different meetings: an email naming another date only belongs to an entry with that key when it updates or cancels it.
 export function findMeeting(db,organisationId,meeting,date,time){
- const byKey=db.prepare('SELECT a.id,a.occurred_on AS date,a.body FROM meeting_refs r JOIN activities a ON a.id=r.activity_id WHERE a.organisation_id=? AND r.meeting_key=? ORDER BY a.created_at LIMIT 1').get(organisationId,meeting.key);
- if(byKey)return{...byKey,match:'key'};
+ const byKey=db.prepare('SELECT a.id,a.occurred_on AS date,a.body FROM meeting_refs r JOIN activities a ON a.id=r.activity_id WHERE a.organisation_id=? AND r.meeting_key=? ORDER BY a.created_at').all(organisationId,meeting.key);
+ const day=meeting.date||date,same=byKey.find(a=>a.date===day)||((meeting.updated||meeting.cancelled||!meeting.date)&&byKey.at(-1));
+ if(same)return{...same,match:'key'};
  if(!date)return null;const at=time??meeting.time;
  const sameDay=db.prepare("SELECT id,occurred_on AS date,body FROM activities WHERE organisation_id=? AND kind='Meeting' AND occurred_on=? ORDER BY created_at").all(organisationId,date).find(a=>!at||!uhr(a.body)||uhr(a.body)===at);
  return sameDay?{...sameDay,match:'date'}:null;
 }
-// One meeting per invitation: updated invitations move the existing entry, cancellations mark it,
-// other emails about the same meeting only add their contacts.
+// One meeting per invitation: the invitation itself (or an updated one) moves the existing entry, cancellations mark it,
+// other emails about the same meeting (acceptances, replies, reminders) only add their contacts.
 export function logMeeting(db,user,{organisationId,meeting,date,time,messageId,contactIds=[]}){
  const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Berlin'}).format(new Date());
  const m={...meeting,time:time??meeting.time},found=findMeeting(db,organisationId,meeting,date,m.time);let activityId=found?.id;
  if(found){
   // The same invitation moves the entry; any email about it can cancel it.
-  if(found.match==='key')db.prepare('UPDATE activities SET occurred_on=?,body=? WHERE id=?').run(date,meetingText(m),activityId);
-  if(found.match==='key'||meeting.cancelled){setMeetingCancelled(db,activityId,!!meeting.cancelled);db.prepare('UPDATE activities SET is_contact=0 WHERE id=?').run(activityId);settleMeetings(db);}
+  if(found.match==='key'&&meeting.moves!==false)db.prepare('UPDATE activities SET occurred_on=?,body=? WHERE id=?').run(date,meetingText(m),activityId);
+  if(found.match==='key'&&meeting.moves!==false||meeting.cancelled){setMeetingCancelled(db,activityId,!!meeting.cancelled);db.prepare('UPDATE activities SET is_contact=0 WHERE id=?').run(activityId);settleMeetings(db);}
  }
  else if(!found){
   if(meeting.cancelled)return null;

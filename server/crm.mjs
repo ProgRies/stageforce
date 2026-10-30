@@ -51,6 +51,23 @@ export function setMeetingCancelled(db,activityId,cancelled){if(cancelled)db.pre
 const communicationSQL="(a.message_id IS NOT NULL OR a.kind='Kontakt' OR a.kind='Notiz' OR lower(a.kind) LIKE '%mail%' OR lower(a.kind) LIKE '%telefon%' OR lower(a.kind) LIKE '%anruf%' OR lower(a.kind) LIKE '%phone%' OR lower(a.kind) LIKE '%call%' OR lower(a.kind) LIKE '%meeting%')";
 // Calls logged by hand (or turned from a note) carry the same outcome as a talked incoming call, but no call attempt.
 export const MANUAL_CALL='Anruf · Gespräch geführt';
+// A call result as stored and applied: "Gespräch geführt" (key talked) changes nothing by itself; the others are in CALL_OUTCOMES.
+export const TALKED={label:'Gespräch geführt',contacted:true,next:'Rückruf vereinbart'};
+export const callOutcome=key=>key==='talked'?TALKED:Object.hasOwn(CALL_OUTCOMES,key)?CALL_OUTCOMES[key]:null;
+const DEFAULT_STEPS=new Set([TALKED.next,...Object.values(CALL_OUTCOMES).map(o=>o.next)]);
+// Results only move a lead forward ("Termin vereinbart"): a customer at "Gewonnen" or an offer stays where it is.
+const EARLY_PHASES=['','Unbearbeitet','Kontaktaufnahme','Im Gespräch','Unklar'];
+// What a call result does beyond its timeline entry. With `due` (a date, or '' for no planned call) it sets the planned call; a next step
+// written by hand stays, only a result's own wording is replaced. Some results move the phase forward or hand off to Prüfen.
+export function applyCallResult(db,user,id,outcome,due){
+ if(due!==undefined){
+  const open=db.prepare('SELECT id,text FROM followups WHERE organisation_id=? AND completed_at IS NULL').get(id),text=open?.text.trim()&&!DEFAULT_STEPS.has(open.text)?open.text:outcome.next||'';
+  if(open)db.prepare('UPDATE followups SET text=?,due_date=?,owner=? WHERE id=?').run(text,due||null,user.id,open.id);
+  else if(due)db.prepare('INSERT INTO followups VALUES(?,?,?,?,?,NULL)').run(uid(),id,text,due,user.id);
+ }
+ if(outcome.phase&&EARLY_PHASES.includes(getOrg(db,id).phase))db.prepare('UPDATE organisations SET phase=? WHERE id=?').run(outcome.phase,id);
+ if(outcome.review&&!db.prepare('SELECT 1 FROM review_issues WHERE organisation_id=? AND resolved_at IS NULL AND text=?').get(id,outcome.review))db.prepare('INSERT INTO review_issues VALUES(?,?,?,NULL)').run(uid(),id,outcome.review);
+}
 const historyOrder=`a.occurred_on DESC, COALESCE(m.sent_at, ca.started_at, CASE WHEN a.kind IN ('Notiz','${MANUAL_CALL}') THEN a.created_at ELSE '' END) DESC, a.created_at DESC, a.rowid DESC`;
 const firstSender=a=>{try{const s=JSON.parse(a.sender_json||'[]')[0];return s?.email?s:null;}catch{return null;}};
 const sender=a=>{const s=firstSender(a);return s?contactName(s.name,s.email):'';};
@@ -82,11 +99,14 @@ export function applyFields(db,id,fields){for(const[c0,value]of Object.entries(f
  if('16'in fields||'17'in fields||'11'in fields){let f=db.prepare('SELECT * FROM followups WHERE organisation_id=? AND completed_at IS NULL').get(id);const text=fields[16]??f?.text??'',due=fields[17]??f?.due_date??'',owner=fields[11]??f?.owner??'';if(f)db.prepare('UPDATE followups SET text=?,due_date=?,owner=? WHERE id=?').run(text,due||null,owner,f.id);else if(text||due)db.prepare('INSERT INTO followups VALUES(?,?,?,?,?,NULL)').run(uid(),id,text,due||null,owner);}
  if('19'in fields){db.prepare('UPDATE review_issues SET resolved_at=? WHERE organisation_id=? AND resolved_at IS NULL').run(now(),id);if(fields[19])db.prepare('INSERT INTO review_issues VALUES(?,?,?,NULL)').run(uid(),id,fields[19]);}
 }
-export function save(db,user,b){const fields=fieldsValidated(b.fields);let note=b.note;if(note){if(!['Notiz','Anruf','Meeting'].includes(note.type)||!validDate(note.date)||note.date>(note.type==='Meeting'?latestMeeting():todayBerlin()))throw new Problem('Ungültige Notiz oder Datum.');note={type:note.type==='Anruf'?MANUAL_CALL:note.type,date:note.date,text:str(note.text),contacted:note.type==='Anruf'||note.type==='Meeting'&&note.date<=todayBerlin()};if(!note.text)throw new Problem('Notiz ist leer.');}
+export function save(db,user,b){const fields=fieldsValidated(b.fields);let note=b.note,outcome=null;if(note){if(!['Notiz','Anruf','Meeting'].includes(note.type)||!validDate(note.date)||note.date>(note.type==='Meeting'?latestMeeting():todayBerlin()))throw new Problem('Ungültige Notiz oder Datum.');
+ // A call logged by hand may name its result (the same ones as on the call card); without one it was a conversation. The result alone is enough text.
+ if(note.type==='Anruf'&&note.outcome!=null){outcome=['talked','not_reached','meeting','email'].includes(note.outcome)?callOutcome(note.outcome):null;if(!outcome)throw new Problem('Unbekanntes Anrufergebnis.');}
+ note={type:note.type==='Anruf'?(outcome?'Anruf · '+outcome.label:MANUAL_CALL):note.type,date:note.date,text:str(note.text)||(outcome?outcome.label:''),contacted:note.type==='Anruf'?outcome?.contacted!==false:note.type==='Meeting'&&note.date<=todayBerlin()};if(!note.text)throw new Problem('Notiz ist leer.');}
  if(typeof b.requestId!=='string'||b.requestId.length>100)throw new Problem('Anfrage-ID fehlt.');
  // A time only comes with the planned date (field 17); a new date without one clears the old time.
  const time=followUpTime(b.followUpTime);
- return transaction(db,()=>{const prior=db.prepare('SELECT * FROM requests WHERE id=?').get(b.requestId);if(prior){if(prior.user_id!==user.id||prior.organisation_id!==b.id)throw new Problem('Anfrage-ID bereits verwendet.',409);return{entity:entity(db,b.id,true),alreadySaved:true};}const o=getOrg(db,b.id);assertVersion(o,b.version);if('11'in fields)validOwner(db,fields[11]);if(!Object.keys(fields).length&&!note)throw new Problem('Keine Änderung.');const current=entity(db,b.id),before=current.values;applyFields(db,b.id,fields);if('17'in fields)setFollowUpTime(db,b.id,fields[17]?time:'');if(note)addActivity(db,b.id,user,note);const changes=Object.fromEntries(Object.entries(fields).map(([c,v])=>[HEADERS[+c],{from:before[+c],to:v}]));if('17'in fields&&current.followUpTime!==(fields[17]?time:''))changes['Wiedervorlage Uhrzeit']={from:current.followUpTime,to:fields[17]?time:''};audit(db,b.id,user,'update',changes);if(Object.keys(fields).length)addActivity(db,b.id,user,{type:'CRM-Änderung',text:Object.keys(changes).join(', '),date:todayBerlin()});db.prepare('UPDATE organisations SET version=version+1,updated_at=? WHERE id=?').run(now(),b.id);db.prepare('INSERT INTO requests VALUES(?,?,?,?)').run(b.requestId,user.id,b.id,now());reindex(db,b.id);return{entity:entity(db,b.id,true)};});}
+ return transaction(db,()=>{const prior=db.prepare('SELECT * FROM requests WHERE id=?').get(b.requestId);if(prior){if(prior.user_id!==user.id||prior.organisation_id!==b.id)throw new Problem('Anfrage-ID bereits verwendet.',409);return{entity:entity(db,b.id,true),alreadySaved:true};}const o=getOrg(db,b.id);assertVersion(o,b.version);if('11'in fields)validOwner(db,fields[11]);if(!Object.keys(fields).length&&!note)throw new Problem('Keine Änderung.');const current=entity(db,b.id),before=current.values;applyFields(db,b.id,fields);if(outcome)applyCallResult(db,user,b.id,outcome,'17'in fields?fields[17]:undefined);if('17'in fields)setFollowUpTime(db,b.id,fields[17]?time:'');if(note)addActivity(db,b.id,user,note);const changes=Object.fromEntries(Object.entries(fields).map(([c,v])=>[HEADERS[+c],{from:before[+c],to:v}]));if('17'in fields&&current.followUpTime!==(fields[17]?time:''))changes['Wiedervorlage Uhrzeit']={from:current.followUpTime,to:fields[17]?time:''};audit(db,b.id,user,'update',changes);if(Object.keys(fields).length)addActivity(db,b.id,user,{type:'CRM-Änderung',text:Object.keys(changes).join(', '),date:todayBerlin()});db.prepare('UPDATE organisations SET version=version+1,updated_at=? WHERE id=?').run(now(),b.id);db.prepare('INSERT INTO requests VALUES(?,?,?,?)').run(b.requestId,user.id,b.id,now());reindex(db,b.id);return{entity:entity(db,b.id,true)};});}
 export function createOrg(db,user,name){name=str(name,500);if(!name)throw new Problem('Name erforderlich.');return transaction(db,()=>{const id='STG-'+uid();db.prepare('INSERT INTO organisations(id,name,created_at,updated_at) VALUES(?,?,?,?)').run(id,name,now(),now());audit(db,id,user,'create',{name});reindex(db,id);return entity(db,id,true);});}
 export function activitySave(db,user,b){
  const text=str(b.text,12000);
@@ -193,7 +213,8 @@ export function confirmImport(db,user,b){
    const cid=found[0]?.id||addContact(db,id,{name:selected.name,e_mails:[selected.email]});contactIds.push(cid);
    db.prepare('INSERT OR IGNORE INTO activity_contacts VALUES(?,?)').run(aid,cid);
   }
-  if(direction==='outgoing')resolveReview(db,id,CALL_OUTCOMES.email.review);
+  // "E-Mail senden" is done once an email went to a client; a colleague's internal note or forward does not count.
+  if(direction==='outgoing'&&p.participants.some(a=>!a.internal&&(a.role==='recipient'||a.role==='cc')))resolveReview(db,id,CALL_OUTCOMES.email.review);
   applyFields(db,id,fields);audit(db,id,user,'email_import',{messageId:mid,direction,fields,contactIds});db.prepare('UPDATE organisations SET version=version+1,updated_at=? WHERE id=?').run(now(),id);db.prepare('INSERT INTO requests VALUES(?,?,?,?)').run('import:'+b.importId,user.id,id,now());db.prepare('DELETE FROM email_imports WHERE id=?').run(b.importId);reindex(db,id);return{entity:entity(db,id,true)};
  });
 }

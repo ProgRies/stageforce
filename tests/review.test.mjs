@@ -45,3 +45,12 @@ test('phone checks agree between compact lists and full records when primary num
   assert.equal(phone(compact),'+49 123456789');assert.equal(phone(full),phone(compact));
  }finally{db.close();}
 });
+
+test('a colleague\'s internal forward does not settle "E-Mail senden"; an email to the client does',async()=>{const{db,user}=await setup();try{
+ const org=createOrg(db,user,'Lead');call(db,user,org,'email');assert.equal(listData(db).review.length,1);
+ const internal=await parseEmail(Buffer.from(`From: Sam <sam@our-team.test>\r\nTo: Alex <alex@our-team.test>\r\nMessage-ID: <fwd-1@example.test>\r\nDate: Tue, 13 Oct 2026 10:00:00 +0200\r\nSubject: WG: Anfrage\r\n\r\nFYI\r\nVon: Pat <pat@customer.test>`),'alex@our-team.test');
+ let p=stageImport(db,user,internal);confirmImport(db,user,{importId:p.id,id:org.id,version:entity(db,org.id).version,date:'2026-10-13'});
+ assert.equal(listData(db).review.length,1);
+ p=stageImport(db,user,await outgoing('send-9'));confirmImport(db,user,{importId:p.id,id:org.id,version:entity(db,org.id).version,date:'2026-10-13',contactEmails:['pat@customer.test']});
+ assert.equal(listData(db).review.length,0);
+}finally{db.close();}});

@@ -1,4 +1,4 @@
-# StageForce Chrome extension · 0.4.21
+# StageForce Chrome extension · 0.4.22
 
 Adds **Add to StageForce** to Gmail: save the emails, contacts and meetings you confirm to the right organisation in your StageForce CRM, and start calls with the shared floating call card.
 
