@@ -1,4 +1,4 @@
-# StageForce 0.3.16 · One way to log a call · email and meeting fixes · extension 0.4.22
+# StageForce 0.3.16 · One way to log a call · email and meeting fixes · one key per computer · extension 0.4.22
 
 Publishes `ghcr.io/progries/stageforce:0.3.16`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.16` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. No database change; the schema stays at 13. Afterwards everyone reloads the extension in `chrome://extensions` and refreshes Gmail. A Gmail card from an extension that was not reloaded still works with the old one-tap buttons.
 
