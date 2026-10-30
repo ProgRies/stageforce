@@ -17,7 +17,10 @@ export function openDB(path=resolve(process.env.DATA_DIR||'data','crm.sqlite')){
   if(!has('users','must_change_password'))db.exec('ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0 CHECK(must_change_password IN (0,1))');
   if(!has('call_attempts','direction'))db.exec("ALTER TABLE call_attempts ADD COLUMN direction TEXT NOT NULL DEFAULT 'out'");
   // Sessions and browser keys from before MFA were never confirmed with a second factor: everyone signs in again once.
-  if(version>0&&version<10)db.exec('DELETE FROM sessions; DELETE FROM extension_keys;');});
+  if(version>0&&version<10)db.exec('DELETE FROM sessions; DELETE FROM extension_keys; DELETE FROM extension_devices;');
+  // Browser keys from the one-key-per-user table become devices, so connected extensions keep working. It runs on every start without
+  // a version bump: the previous release can still open this database, and a key it created after a rollback is picked up again here.
+  db.exec("INSERT OR IGNORE INTO extension_devices(id,user_id,label,token_hash,created_at,expires_at,last_used_at) SELECT lower(hex(randomblob(16))),user_id,'Browser',token_hash,created_at,expires_at,last_used_at FROM extension_keys");});
  if(path!==':memory:')chmodSync(path,0o600);return db;
 }
 export function transaction(db,fn){const nested=db.isTransaction,point='s'+uid().replaceAll('-','');db.exec(nested?'SAVEPOINT '+point:'BEGIN IMMEDIATE');try{const value=fn();db.exec(nested?'RELEASE '+point:'COMMIT');return value;}catch(e){db.exec(nested?'ROLLBACK TO '+point:'ROLLBACK');if(nested)db.exec('RELEASE '+point);throw e;}}

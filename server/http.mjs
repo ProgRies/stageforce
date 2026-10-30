@@ -2,7 +2,7 @@ import {appearance,saveAppearance} from './appearance.mjs';
 import {prepareCall,saveCall,cancelCall,openCall,draftCall,startIncoming} from './calls.mjs';
 import {mobileHome,mobileSearch} from './mobile.mjs';
 import {reserveQueue} from './leads.mjs';
-import {extensionStatus,extensionCreate,extensionRevoke,authorizeExtension,extensionAction} from './extension.mjs';
+import {extensionStatus,extensionCreate,extensionRenew,extensionRevoke,authorizeExtension,extensionAction} from './extension.mjs';
 import {createServer} from 'node:http';
 import {readFile} from 'node:fs/promises';
 import {resolve,extname} from 'node:path';
@@ -20,7 +20,7 @@ import {liveHub} from './live.mjs';
 import {locationSave,mapService} from './map.mjs';
 import {calendar} from './calendar.mjs';
 // Actions that only read, or only touch the caller's own settings and staging, are not announced to other tabs.
-const quiet=new Set(['calendar','appearanceSave','passwordChange','extensionStatus','extensionCreate','extensionRevoke','load','detail','history','search','imports','importPreview','importPosition','importDelete','message','check','messageStatus','threadStatus','meeting','lookup','callOpen','callDraft','mapSearch','securityEvents','mobileHome','mobileSearch','mobileDevices','mobileDeviceRevoke']);
+const quiet=new Set(['calendar','appearanceSave','passwordChange','extensionStatus','extensionCreate','extensionRenew','extensionRevoke','load','detail','history','search','imports','importPreview','importPosition','importDelete','message','check','messageStatus','threadStatus','meeting','lookup','callOpen','callDraft','mapSearch','securityEvents','mobileHome','mobileSearch','mobileDevices','mobileDeviceRevoke']);
 // The phone app names the device it was signed in on, so the list under Einstellungen says which phone is which.
 const deviceLabel=req=>{const ua=String(req.headers['user-agent']||'');return /iPhone/.test(ua)?'iPhone':/iPad/.test(ua)?'iPad':/Android/.test(ua)?'Android-Handy':'Handy';};
 const touched=(b,data)=>[b.id,b.other,b.into,b.organisationId,data?.entity?.id,data?.organisation?.id,data?.deleted];
@@ -111,12 +111,12 @@ export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:300
     data={user:publicUser({...session,must_change_password:0}),signedOut:ended.length};break;}
    case 'appearanceSave':data=saveAppearance(db,session,b);break;
    case 'extensionStatus':data=extensionStatus(db,session);break;
-   case 'extensionCreate':{
+   case 'extensionCreate':case 'extensionRenew':{
     // A browser key skips the sign-in for 90 days, so it needs a fresh code: a stolen session cookie alone cannot mint one.
     if(limited(db,'key-code:'+session.id,5))throw new Problem('Zu viele Versuche. Bitte in zehn Minuten erneut versuchen.',429,'rate_limited');
     if(!confirmCode(db,session.id,b.code)){logEvent(db,{event:'key_code_failed',user:session,ip:clientIP(req)});throw new Problem('Der Code stimmt nicht oder wurde schon benutzt. Bitte den nächsten Code aus der Authenticator-App eingeben.',403,'mfa_invalid');}
-    data=extensionCreate(db,session);logEvent(db,{event:'key_created',user:session,ip:clientIP(req)});break;}
-   case 'extensionRevoke':data=extensionRevoke(db,session);logEvent(db,{event:'key_revoked',user:session,ip:clientIP(req)});break;
+    data=b.action==='extensionRenew'?extensionRenew(db,session,b.id):extensionCreate(db,session,b.label);logEvent(db,{event:b.action==='extensionRenew'?'key_renewed':'key_created',user:session,ip:clientIP(req),detail:data.label});break;}
+   case 'extensionRevoke':data=extensionRevoke(db,session,b.id);logEvent(db,{event:'key_revoked',user:session,ip:clientIP(req),detail:data.label});break;
    case 'securityEvents':data={items:recentEvents(db,session.id)};break;
    case 'load':data=listData(db);break;
    case 'calendar':data=calendar(db,session,b);break;

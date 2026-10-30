@@ -76,7 +76,7 @@ test('sessions, browser keys and live streams need a confirmed second factor',()
  assert.equal((await fetch(base+'/api/live',{headers:{Cookie:'stage_session='+session.token}})).status,401);
  assert.equal((await fetch(base+'/api/integrations/extension',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+key},body:'{"action":"check"}'})).status,401);
  enableMfa(db,user.id,newSecret());assert.ok(getSession(db,req));
- resetMfa(db,user.id);assert.equal(db.prepare('SELECT count(*) n FROM sessions').get().n,0);assert.equal(db.prepare('SELECT count(*) n FROM extension_keys').get().n,0);
+ resetMfa(db,user.id);assert.equal(db.prepare('SELECT count(*) n FROM sessions').get().n,0);assert.equal(db.prepare('SELECT count(*) n FROM extension_keys').get().n,0);assert.equal(db.prepare('SELECT count(*) n FROM extension_devices').get().n,0);
  assert.equal(db.prepare('SELECT count(*) n FROM user_mfa').get().n,0);
 }));
 
@@ -84,7 +84,7 @@ test('upgrading an existing database signs everyone out and revokes browser keys
  const dir=mkdtempSync(join(tmpdir(),'stage-mfa-'));const path=join(dir,'crm.sqlite');let db=openDB(path);
  try{const id=await addUser(db,'old@example.test','Old',password);const user=db.prepare('SELECT * FROM users WHERE id=?').get(id);
   db.exec('DROP TABLE user_mfa; DROP TABLE mfa_recovery_codes; DROP TABLE login_challenges; PRAGMA user_version=9');createSession(db,user);extensionCreate(db,user);db.close();
-  db=openDB(path);assert.equal(db.prepare('PRAGMA user_version').get().user_version,13);assert.equal(db.prepare('SELECT count(*) n FROM sessions').get().n,0);assert.equal(db.prepare('SELECT count(*) n FROM extension_keys').get().n,0);
+  db=openDB(path);assert.equal(db.prepare('PRAGMA user_version').get().user_version,13);assert.equal(db.prepare('SELECT count(*) n FROM sessions').get().n,0);assert.equal(db.prepare('SELECT count(*) n FROM extension_keys').get().n,0);assert.equal(db.prepare('SELECT count(*) n FROM extension_devices').get().n,0);
   enableMfa(db,id,newSecret());createSession(db,user);db.close();db=openDB(path);assert.equal(db.prepare('SELECT count(*) n FROM sessions').get().n,1,'later restarts keep sessions');
  }finally{db.close();rmSync(dir,{recursive:true,force:true});}
 });
