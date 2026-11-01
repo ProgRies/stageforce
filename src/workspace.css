@@ -356,3 +356,6 @@
 @media(max-width:700px){.calendar-pane{padding:14px 12px 0;min-height:70dvh}.calendar-summary{margin-left:0;width:100%}}
 @media(prefers-reduced-motion:reduce){.calendar-day.slide-next,.calendar-day.slide-prev{animation:none}.calendar-event{transition:none}}
 .next-call .followup-when:has(>.next-call-day){grid-template-columns:max-content 128px;gap:12px}
+/* Deleting a note, call or meeting: a quiet red text button on the left of the editor, away from Speichern. */
+.activity-editor>div>.activity-delete{margin-right:auto;gap:6px;font-size:13px;color:#b4533f}.activity-editor>div>.activity-delete:hover{color:#8f3524}
+[data-theme="dark"] .activity-editor>div>.activity-delete{color:#f0a493}[data-theme="dark"] .activity-editor>div>.activity-delete:hover{color:#ffc4b6}

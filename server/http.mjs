@@ -1,6 +1,6 @@
 import {appearance,saveAppearance} from './appearance.mjs';
 import {prepareCall,saveCall,cancelCall,openCall,draftCall,startIncoming} from './calls.mjs';
-import {mobileHome,mobileSearch} from './mobile.mjs';
+import {mobileHome,mobileSearch,mobileOrg} from './mobile.mjs';
 import {reserveQueue} from './leads.mjs';
 import {extensionStatus,extensionCreate,extensionRenew,extensionRevoke,authorizeExtension,extensionAction} from './extension.mjs';
 import {createServer} from 'node:http';
@@ -12,7 +12,7 @@ import {scheduleSnapshots} from './snapshots.mjs';
 import {getSession,verifyPassword,createSession,limited,publicUser,mobileSessions,revokeMobileSession,changePassword} from './auth.mjs';
 import {startChallenge,challengeUser,completeChallenge,confirmCode} from './mfa.mjs';
 import {clientIP,logEvent,failuresSinceLastLogin,recentEvents,pruneEvents} from './security.mjs';
-import {Problem,listData,entity,history,search,save,createOrg,activitySave,contactSave,linkSave,reviewDone,stageImport,importPreview,confirmImport,timelinePosition} from './crm.mjs';
+import {Problem,listData,entity,history,search,save,createOrg,activitySave,activityDelete,contactSave,linkSave,reviewDone,stageImport,importPreview,confirmImport,timelinePosition} from './crm.mjs';
 import {inspectCSV,csvRecords,stageFastbill,fastbillBatches,fastbillRows,fastbillPreview,decideFastbill,deleteFastbillBatch,fetchFastbillPage} from './fastbill.mjs';
 import {parseEmail} from './email.mjs';
 import {deleteOrganisation,mergeOrganisations} from './lifecycle.mjs';
@@ -20,7 +20,7 @@ import {liveHub} from './live.mjs';
 import {locationSave,mapService} from './map.mjs';
 import {calendar} from './calendar.mjs';
 // Actions that only read, or only touch the caller's own settings and staging, are not announced to other tabs.
-const quiet=new Set(['calendar','appearanceSave','passwordChange','extensionStatus','extensionCreate','extensionRenew','extensionRevoke','load','detail','history','search','imports','importPreview','importPosition','importDelete','message','check','messageStatus','threadStatus','meeting','lookup','callOpen','callDraft','mapSearch','securityEvents','mobileHome','mobileSearch','mobileDevices','mobileDeviceRevoke']);
+const quiet=new Set(['calendar','appearanceSave','passwordChange','extensionStatus','extensionCreate','extensionRenew','extensionRevoke','load','detail','history','search','imports','importPreview','importPosition','importDelete','message','check','messageStatus','threadStatus','meeting','lookup','callOpen','callDraft','mapSearch','securityEvents','mobileHome','mobileSearch','mobileOrg','mobileDevices','mobileDeviceRevoke']);
 // The phone app names the device it was signed in on, so the list under Einstellungen says which phone is which.
 const deviceLabel=req=>{const ua=String(req.headers['user-agent']||'');return /iPhone/.test(ua)?'iPhone':/iPad/.test(ua)?'iPad':/Android/.test(ua)?'Android-Handy':'Handy';};
 const touched=(b,data)=>[b.id,b.other,b.into,b.organisationId,data?.entity?.id,data?.organisation?.id,data?.deleted];
@@ -133,10 +133,12 @@ export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:300
    case 'callIncoming':data=startIncoming(db,session,b);break;
    case 'mobileHome':data=mobileHome(db,session);break;
    case 'mobileSearch':data=mobileSearch(db,b.query);break;
+   case 'mobileOrg':data=mobileOrg(db,b.id);break;
    case 'mobileDevices':data={items:mobileSessions(db,session.id),current:session.kind==='mobile'};break;
    case 'mobileDeviceRevoke':{const hash=revokeMobileSession(db,session.id,b.id);if(hash){live.endSession(hash);logEvent(db,{event:'device_revoked',user:session,ip:clientIP(req)});}data={items:mobileSessions(db,session.id)};break;}
    case 'queueReserve':data=reserveQueue(db,session,b);break;
    case 'activitySave':data=activitySave(db,session,b);break;
+   case 'activityDelete':data=activityDelete(db,session,b);break;
    case 'contact':data=contactSave(db,session,b);break;
    case 'link':data=linkSave(db,session,b);break;
    case 'locationSave':data=locationSave(db,session,b);break;

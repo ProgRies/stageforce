@@ -34,6 +34,17 @@ checks its data at the desk, like a call that needs an email.
 
 An iPhone web app cannot read the caller's number or the call log, so the caller is chosen by hand.
 
+## Today and the organisation's timeline
+
+Below the lists, the start screen shows **today** as in the Follow-ups calendar: your planned calls (overdue ones first)
+and everyone's meetings in green. A tap opens the organisation.
+
+An organisation shows its contacts and, below them, its timeline. Tap an entry to read it. Notes, calls and meetings
+can be corrected (**Bearbeiten**) or deleted (**Löschen**, asked twice); **+ Notiz** adds a note. Emails are read-only.
+
+To call a contact yourself, tap the green button next to them: the phone dials, and the call card opens to log the
+result and the next call. After the call, come back to the app; the card is still there.
+
 ## Testing on your Mac and iPhone without deploying
 
 The phone app needs a secure context: the service worker, "Zum Home-Bildschirm" as a real app, and the random IDs used

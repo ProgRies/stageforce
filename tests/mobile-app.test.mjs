@@ -137,3 +137,9 @@ test('the phone app lists due calls of my organisations, also a date set by hand
  db.prepare("INSERT INTO followups VALUES('f1',?,'Rückruf',?,'',NULL)").run(mine.id,today);db.prepare("INSERT INTO followups VALUES('f2',?,'Rückruf',?,?,NULL)").run(theirs.id,today,user.id);
  assert.deepEqual(mobileHome(db,user).due.map(o=>o.name),['Meine Stadt']);assert.deepEqual(mobileHome(db,sam).due.map(o=>o.name),['Sams Stadt']);
 });
+test('the phone app opens one organisation by id, with its contacts and current version',async()=>{const{db,user}=await team();try{
+ const org=createOrg(db,user,'Stadtwerke Beispiel');addContact(db,org.id,{name:'Pat Example',telefone:['+49 30 1234567']},true);
+ const {mobileOrg}=await import('../server/mobile.mjs');
+ const r=mobileOrg(db,org.id);assert.equal(r.name,'Stadtwerke Beispiel');assert.equal(r.version,String(getOrg(db,org.id).version));assert.deepEqual(r.contacts.map(c=>c.name),['Pat Example']);
+ assert.throws(()=>mobileOrg(db,'nope'),e=>e.http===404);assert.throws(()=>mobileOrg(db,{}),e=>e.http===404);
+ }finally{db.close();}});
