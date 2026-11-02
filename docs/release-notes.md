@@ -1,3 +1,9 @@
+# Extension 0.4.23 · clearer quoted-history contacts
+
+Extension only: reload it in `chrome://extensions`. No server or database change.
+
+- A person found in the quoted history who is not a contact yet no longer shows a dark checkbox that can't be clicked. The card says "Add as contact to link this email" next to the add-contact button; once added, the checkbox appears and works as before.
+
 # StageForce 0.3.18 · Sidebar order · Importe moves to the top bar
 
 Publishes `ghcr.io/progries/stageforce:0.3.18`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.18` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. No database change; the extension is unchanged.
