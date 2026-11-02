@@ -1,3 +1,10 @@
+# StageForce 0.3.18 · Sidebar order · Importe moves to the top bar
+
+Publishes `ghcr.io/progries/stageforce:0.3.18`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.18` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. No database change; the extension is unchanged.
+
+- **Sidebar order:** Organisationen, Follow-ups, Prüfen, Anrufe, from top to bottom. Follow-ups is no longer indented under Anrufe.
+- **Importe:** leaves the sidebar. The .eml and FastBill import now opens from the envelope button in the top bar, next to the question mark. The introduction tour points to it there.
+
 # StageForce 0.3.17 · Today on the phone · timeline on the phone · delete notes, calls and meetings
 
 Publishes `ghcr.io/progries/stageforce:0.3.17`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.17` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. No database change; the extension is unchanged.
