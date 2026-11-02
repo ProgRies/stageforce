@@ -309,7 +309,6 @@
 .next-call-day{font-size:13px;color:var(--muted)}
 .next-call-select{max-width:340px;font:inherit;color:var(--ink);background:var(--surface-input);border:1px solid var(--line);border-radius:10px;padding:9px 12px;color-scheme:light dark}
 /* Follow-ups: the week of planned calls (indigo, amber once due) and meetings (green). */
-.nav-item.nav-sub{margin-top:-3px}
 .calendar-pane{flex:1;min-width:0;border-radius:21px;display:flex;flex-direction:column;overflow:hidden;background:rgba(255,255,255,.79);padding:20px 20px 0}
 [data-theme="dark"] .calendar-pane{background:var(--glass)}
 .calendar-head{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:0 4px 16px}
