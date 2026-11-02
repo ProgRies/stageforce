@@ -26,3 +26,5 @@ export function mobileSearch(db,query){
  const byName=words.map(id=>({id,name:getOrg(db,id).name.toLowerCase()})).sort((a,b)=>Number(!a.name.startsWith(name))-Number(!b.name.startsWith(name))||Number(!a.name.includes(name))-Number(!b.name.includes(name))).map(r=>r.id);
  return{items:[...new Set([...byPhone,...byName])].slice(0,12).map(id=>caller(db,id))};
 }
+// One organisation as the phone app shows it, for a tap on today's schedule and to pick up a new version before a note is added.
+export function mobileOrg(db,id){if(typeof id!=='string'||id.length>100)throw new Problem('Organisation nicht gefunden.',404);return caller(db,id);}

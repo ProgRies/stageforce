@@ -143,6 +143,36 @@ export function activitySave(db,user,b){
   return result();
  });
 }
+// Notes, calls and meetings can be deleted (emails cannot: they come in through the extension and stay as the record of what was sent).
+// The delete is final, so the whole entry goes into the audit log first, and it only goes through if nobody changed it since it was shown.
+export function activityDelete(db,user,b){
+ return transaction(db,()=>{
+  getOrg(db,b.id);
+  const activity=db.prepare('SELECT * FROM activities WHERE id=? AND organisation_id=?').get(b.activityId,b.id);
+  if(!activity)throw new Problem('Aktivität nicht gefunden.',404,'not_found');
+  if(activity.message_id||(!['Notiz','Meeting'].includes(activity.kind)&&!/telefon|anruf|phone|call/i.test(activity.kind)))throw new Problem('Nur Notizen, Anrufe und Meetings können gelöscht werden.');
+  if(typeof b.originalText!=='string'||activity.body!==b.originalText)throw new Problem('Dieser Eintrag wurde inzwischen geändert. Bitte den aktuellen Stand laden und erneut prüfen.',409,'conflict');
+  const call=db.prepare('SELECT * FROM call_attempts WHERE activity_id=?').get(activity.id);
+  const contactIds=db.prepare('SELECT contact_id FROM activity_contacts WHERE activity_id=?').all(activity.id).map(r=>r.contact_id);
+  const meeting=db.prepare('SELECT * FROM meeting_refs WHERE activity_id=?').get(activity.id)||null,cancelled=db.prepare('SELECT cancelled_at FROM meeting_status WHERE activity_id=?').get(activity.id)?.cancelled_at||null;
+  const sources=db.prepare('SELECT * FROM source_references WHERE activity_id=?').all(activity.id);
+  audit(db,b.id,user,'activity_delete',{activity,contactIds,...(call?{call}:{}),...(meeting?{meeting}:{}),...(cancelled?{cancelled}:{}),...(sources.length?{sources}:{})});
+  // The call attempt goes with its entry: left without one it would look like an open call again.
+  if(call)db.prepare('DELETE FROM call_attempts WHERE id=?').run(call.id);
+  db.prepare('DELETE FROM source_references WHERE activity_id=?').run(activity.id);
+  db.prepare('DELETE FROM activities WHERE id=?').run(activity.id);
+  // When this entry set the last contact, the last contact falls back to the newest remaining one. A date with no entry behind it
+  // (imported before activities were kept) is left alone.
+  const o=getOrg(db,b.id);
+  if(activity.is_contact&&activity.occurred_on&&o.last_contact===activity.occurred_on){
+   const latest=db.prepare('SELECT MAX(occurred_on) AS d FROM activities WHERE organisation_id=? AND is_contact=1').get(b.id).d||null;
+   db.prepare('UPDATE organisations SET last_contact=? WHERE id=?').run(latest,b.id);
+  }
+  db.prepare('UPDATE organisations SET version=version+1,updated_at=? WHERE id=?').run(now(),b.id);
+  reindex(db,b.id);
+  return{entity:entity(db,b.id,true),activityId:activity.id,deletedActivity:activity.id};
+ });
+}
 export function addContact(db,id,c,primary=false){const cid=uid();db.prepare('INSERT INTO contacts VALUES(?,?,?,?)').run(cid,contactName(c.name,c.e_mails?.[0]),c.rolle||'',c.legacy?JSON.stringify(c.legacy):null);db.prepare('INSERT INTO organisation_contacts VALUES(?,?,?)').run(id,cid,primary?1:0);for(const[k,list]of [['email',c.e_mails||[]],['phone',c.telefone||[]]])list.forEach((v,i)=>{if(v)db.prepare('INSERT OR IGNORE INTO contact_addresses VALUES(?,?,?,?,?)').run(uid(),cid,k,String(v),i);});return cid;}
 export function contactSave(db,user,b){const name=contactName(str(b.name||'',300),String(b.emails||'').split(/[\n,;]+/)[0]),role=str(b.role||'',500),emails=str(b.emails||'',2000).split(/[\n,;]+/).map(s=>s.trim().toLowerCase()).filter(Boolean),phones=[...new Set(str(b.phones||'',2000).split(/[\n;]+/).map(formatPhone).filter(Boolean))];if(emails.some(e=>!email(e)))throw new Problem('Ungültige E-Mail-Adresse.');if(!name&&!emails.length&&!phones.length)throw new Problem('Kontakt ist leer.');return transaction(db,()=>{assertVersion(getOrg(db,b.id),b.version);if(b.messageId&&!db.prepare('SELECT 1 FROM activities WHERE message_id=? AND organisation_id=?').get(b.messageId,b.id))throw new Problem('E-Mail gehört nicht zu dieser Organisation.',404);let cid=b.contactId;if(cid){if(!db.prepare('SELECT 1 FROM organisation_contacts WHERE organisation_id=? AND contact_id=?').get(b.id,cid))throw new Problem('Kontakt nicht gefunden.',404);db.prepare('UPDATE contacts SET name=?,role=? WHERE id=?').run(name,role,cid);db.prepare('DELETE FROM contact_addresses WHERE contact_id=?').run(cid);for(const[k,vs]of [['email',emails],['phone',phones]])vs.forEach((v,i)=>db.prepare('INSERT OR IGNORE INTO contact_addresses VALUES(?,?,?,?,?)').run(uid(),cid,k,v,i));}else cid=addContact(db,b.id,{name,rolle:role,e_mails:emails,telefone:phones});if(b.primary){db.prepare('UPDATE organisation_contacts SET is_primary=0 WHERE organisation_id=?').run(b.id);db.prepare('UPDATE organisation_contacts SET is_primary=1 WHERE organisation_id=? AND contact_id=?').run(b.id,cid);}else if(b.primary===false){db.prepare('UPDATE organisation_contacts SET is_primary=0 WHERE organisation_id=? AND contact_id=?').run(b.id,cid);}if(b.messageId)for(const a of db.prepare('SELECT id FROM activities WHERE message_id=? AND organisation_id=?').all(b.messageId,b.id))db.prepare('INSERT OR IGNORE INTO activity_contacts VALUES(?,?)').run(a.id,cid);audit(db,b.id,user,'contact',{contactId:cid,name,emails,phones,role});for(const row of db.prepare('SELECT organisation_id FROM organisation_contacts WHERE contact_id=?').all(cid)){db.prepare('UPDATE organisations SET version=version+1,updated_at=? WHERE id=?').run(now(),row.organisation_id);reindex(db,row.organisation_id);}addActivity(db,b.id,user,{type:'CRM-Änderung',text:'Kontakt aktualisiert: '+(name||emails[0]||phones[0]),date:todayBerlin()});return{entity:entity(db,b.id,true),contactId:cid};});}
 export function linkSave(db,user,b){const note=str(b.note||'',2000);return transaction(db,()=>{assertVersion(getOrg(db,b.id),b.version);getOrg(db,b.other);if(b.id===b.other)throw new Problem('Andere Organisation auswählen.');const[a,other]=[b.id,b.other].sort();db.prepare('INSERT INTO organisation_links VALUES(?,?,?,?) ON CONFLICT(a,b) DO UPDATE SET note=excluded.note').run(uid(),a,other,note);audit(db,b.id,user,'link',{other:b.other,note});for(const id of[a,other]){db.prepare('UPDATE organisations SET version=version+1,updated_at=? WHERE id=?').run(now(),id);reindex(db,id);}return{entity:entity(db,b.id,true)};});}

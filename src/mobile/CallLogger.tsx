@@ -1,5 +1,7 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {Phone,PhoneIncoming,MessageSquareText,UserPlus,Search,X,ChevronLeft,Settings,LogOut,Trash2,Sun,Moon,Monitor,Flag,MessageCircleCheck,CalendarClock,CalendarCheck,Mail,ThumbsDown,PhoneMissed,Check,Clock,History,LoaderCircle,Pause,Play,Building2,type LucideIcon} from 'lucide-react';
+import {Phone,PhoneIncoming,MessageSquareText,UserPlus,Search,X,ChevronLeft,Settings,LogOut,Trash2,Sun,Moon,Monitor,Flag,MessageCircleCheck,CalendarClock,CalendarCheck,Mail,ThumbsDown,PhoneMissed,Check,Clock,History,LoaderCircle,Pause,Play,Building2,PhoneOutgoing,type LucideIcon} from 'lucide-react';
+import TodaySchedule from './TodaySchedule';
+import OrgTimeline from './OrgTimeline';
 import {api} from '../api';
 import {useAppearance} from '../Appearance';
 import {todayBerlin,defaultNextCall,nextCallDay,type NextCall} from '../domain';
@@ -13,6 +15,13 @@ const clock=(ms:number)=>{const s=Math.max(0,Math.floor(ms/1000)),p=(v:number)=>
 const noteKey=(id:string)=>'stageforce-m-note:'+id;
 const keep=(id:string,value:string)=>{try{if(value)localStorage.setItem(noteKey(id),value);else localStorage.removeItem(noteKey(id));}catch{}};
 const kept=(id:string)=>{try{return localStorage.getItem(noteKey(id))||'';}catch{return'';}};
+// A call this phone dialled itself is remembered, so its card comes back after the phone app was in the background during the call.
+// Calls dialled on the desktop stay there.
+const OUT_KEY='stageforce-m-out';
+const dialled=()=>{try{return localStorage.getItem(OUT_KEY)||'';}catch{return'';}};
+const setDialled=(id:string)=>{try{if(id)localStorage.setItem(OUT_KEY,id);else localStorage.removeItem(OUT_KEY);}catch{}};
+// The number as the phone dials it; only numbers the server can call are offered.
+const dialable=(p:string)=>{const s=p.replace(/\(0\)/g,'').replace(/[^+\d]/g,'');return /^\+?\d{6,15}$/.test(s)?s:'';};
 // The same call button as on the desktop and in Gmail: phone, number, and the StageForce mark that says "this logs to the CRM".
 function CallButton({contact,onPick,disabled}:{contact:Contact;onPick:()=>void;disabled?:boolean}){
  return <button type="button" className="sf-phone-number m-call-button" disabled={disabled} onClick={onPick}><Phone size={18} aria-hidden="true"/><span><strong>{contact.name||'Ohne Namen'}</strong><small>{contact.phones[0]||'Keine Nummer gespeichert'}{contact.role?` · ${contact.role}`:''}</small></span><img src="/assets/stageforce-icon.svg" alt="" width="26" height="26"/></button>;
@@ -26,7 +35,7 @@ export default function CallLogger({user,onLogout}:{user:{name:string;email:stri
  const opened=useRef(new Date().toISOString());
  const go=(next:View)=>{setError('');setView(next);window.scrollTo({top:0});};
  // A call logged here and left open (the app was closed mid-call) comes back on the next open.
- const resume=useCallback(async()=>{try{const{call}=await api({action:'callOpen'});if(call?.direction==='in')setView(v=>v.kind==='call'&&v.call.callId===call.callId?v:{kind:'call',call:{...call,notes:call.notes||kept(call.callId)},isNew:false});else setView(v=>v.kind==='call'?{kind:'home'}:v);}catch{}},[]);
+ const resume=useCallback(async()=>{try{const{call}=await api({action:'callOpen'});if(call&&(call.direction==='in'||call.callId===dialled()))setView(v=>v.kind==='call'&&v.call.callId===call.callId?v:{kind:'call',call:{...call,notes:call.notes||kept(call.callId)},isNew:false});else setView(v=>v.kind==='call'?{kind:'home'}:v);}catch{}},[]);
  useEffect(()=>{resume();const back=()=>{if(document.visibilityState!=='visible')return;setView(v=>{if(v.kind==='home'||v.kind==='saved')opened.current=new Date().toISOString();return v.kind==='saved'?{kind:'home'}:v;});resume();};document.addEventListener('visibilitychange',back);return()=>document.removeEventListener('visibilitychange',back);},[resume]);
  async function start(body:object,isNew:boolean){
   if(busy)return;setBusy(true);setError('');
@@ -34,21 +43,29 @@ export default function CallLogger({user,onLogout}:{user:{name:string;email:stri
   catch(e:any){setError(e.status===409&&/note/i.test(e.message)?'Am Rechner ist noch ein Anruf mit Notiz offen. Bitte dort speichern oder verwerfen.':e.message||'Der Anruf konnte nicht angelegt werden.');}
   finally{setBusy(false);}
  }
+ // Calling a contact from the phone: the number is dialled by the phone itself (a tel: link), and the card to log the call opens here.
+ async function dial(org:Caller,contact:Contact,phone:string){
+  if(busy)return;setBusy(true);setError('');
+  try{const call=await api({action:'callPrepare',organisationId:org.id,contactId:contact.id,phone,requestId:crypto.randomUUID(),startedAt:new Date().toISOString()});setDialled(call.callId);go({kind:'call',call:{...call,notes:call.notes||kept(call.callId)},isNew:false});}
+  catch(e:any){setError(e.status===409||/note/i.test(e.message||'')?'Ein anderer Anruf mit Notiz ist noch offen. Bitte zuerst speichern oder verwerfen.':e.message||'Der Anruf konnte nicht angelegt werden.');}
+  finally{setBusy(false);}
+ }
+ async function openOrg(id:string){if(busy)return;setBusy(true);setError('');try{go({kind:'org',org:await api({action:'mobileOrg',id})});}catch(e:any){setError(e.message||'Organisation konnte nicht geladen werden.');}finally{setBusy(false);}}
  return <div className="m-app">
   <header className="m-top">
    {view.kind==='org'||view.kind==='new'?<button type="button" className="m-icon-button glass" aria-label="Zurück" onClick={()=>go({kind:'home'})}><ChevronLeft size={22}/></button>:<div className="m-brand small"><div className="m-mark"><i/><i/><i/></div><span>Stage <b>Force</b></span></div>}
    <button type="button" className="m-icon-button glass" aria-label="Einstellungen" onClick={()=>setSettings(true)}><Settings size={20}/></button>
   </header>
   {error&&<p role="alert" className="m-error glass">{error}</p>}
-  {view.kind==='home'&&<Home onPick={org=>go({kind:'org',org})} onNew={name=>go({kind:'new',name})}/>}
-  {view.kind==='org'&&<OrgStep org={view.org} busy={busy} onStart={start}/>}
+  {view.kind==='home'&&<Home onPick={org=>go({kind:'org',org})} onOpen={openOrg} onNew={name=>go({kind:'new',name})}/>}
+  {view.kind==='org'&&<OrgStep org={view.org} busy={busy} onStart={start} onDial={(contact,phone)=>dial(view.org,contact,phone)}/>}
   {view.kind==='new'&&<NewLead initial={view.name} busy={busy} onStart={start}/>}
-  {view.kind==='call'&&<LiveCallCard key={view.call.callId} call={view.call} isNew={view.isNew} onDone={(org,label)=>{keep(view.call.callId,'');go({kind:'saved',org,label});}} onDiscard={()=>{keep(view.call.callId,'');go({kind:'home'});}}/>}
+  {view.kind==='call'&&<LiveCallCard key={view.call.callId} call={view.call} isNew={view.isNew} onDone={(org,label)=>{keep(view.call.callId,'');setDialled('');go({kind:'saved',org,label});}} onDiscard={()=>{keep(view.call.callId,'');setDialled('');go({kind:'home'});}}/>}
   {view.kind==='saved'&&<Saved org={view.org} label={view.label} onNext={()=>{opened.current=new Date().toISOString();go({kind:'home'});}}/>}
   {settings&&<SettingsSheet user={user} onClose={()=>setSettings(false)} onLogout={()=>{setSettings(false);onLogout();}}/>}
  </div>;
 }
-function Home({onPick,onNew}:{onPick:(org:Caller)=>void;onNew:(name:string)=>void}){
+function Home({onPick,onOpen,onNew}:{onPick:(org:Caller)=>void;onOpen:(id:string)=>void;onNew:(name:string)=>void}){
  const[query,setQuery]=useState(''),[results,setResults]=useState<Caller[]|null>(null),[home,setHome]=useState<{due:Caller[];recent:Caller[]}|null>(null),[searching,setSearching]=useState(false);
  useEffect(()=>{let live=true;api({action:'mobileHome'}).then(r=>{if(live)setHome(r);}).catch(()=>{});return()=>{live=false;};},[]);
  useEffect(()=>{if(!query.trim()){setResults(null);setSearching(false);return;}setSearching(true);let live=true;const t=setTimeout(()=>api({action:'mobileSearch',query}).then(r=>{if(live)setResults(r.items);}).catch(()=>{}).finally(()=>{if(live)setSearching(false);}),180);return()=>{live=false;clearTimeout(t);};},[query]);
@@ -61,20 +78,22 @@ function Home({onPick,onNew}:{onPick:(org:Caller)=>void;onNew:(name:string)=>voi
    {home.due.length>0&&<><h2 className="m-label"><Clock size={14} aria-hidden="true"/>Heute fällig</h2><div className="m-list glass">{home.due.map(org=><OrgRow key={org.id} org={org} onPick={()=>onPick(org)}/>)}</div></>}
    {home.recent.length>0&&<><h2 className="m-label"><History size={14} aria-hidden="true"/>Zuletzt gesprochen</h2><div className="m-list glass">{home.recent.map(org=><OrgRow key={org.id} org={org} onPick={()=>onPick(org)}/>)}</div></>}
   </>:home&&<p className="m-hint">Tippe ein paar Buchstaben des Namens oder die letzten Ziffern der Nummer.</p>}
+  {!query.trim()&&<TodaySchedule onPick={item=>onOpen(item.organisationId)}/>}
   <div className="m-dock"><button type="button" className={`m-primary ${empty?'is-suggested':''}`} onClick={()=>onNew(empty?query.trim():'')}><UserPlus size={21} aria-hidden="true"/>Neuer Lead</button></div>
  </main>;
 }
-function OrgStep({org,busy,onStart}:{org:Caller;busy:boolean;onStart:(body:object,isNew:boolean)=>void}){
+function OrgStep({org,busy,onStart,onDial}:{org:Caller;busy:boolean;onStart:(body:object,isNew:boolean)=>void;onDial:(contact:Contact,phone:string)=>void}){
  const[other,setOther]=useState(!org.contacts.length),[name,setName]=useState(''),[phone,setPhone]=useState('');
  return <main className="m-screen">
   <section className="m-hero"><span className="m-eyebrow"><Building2 size={15} aria-hidden="true"/>{org.subtitle||org.status}</span><h1 className="m-title">{org.name}</h1></section>
-  {org.contacts.length>0&&<><h2 className="m-label">Wer ist dran?</h2><div className="m-stack">{org.contacts.map(c=><CallButton key={c.id} contact={c} disabled={busy} onPick={()=>onStart({organisationId:org.id,contactId:c.id},false)}/>)}</div></>}
+  {org.contacts.length>0&&<><h2 className="m-label">Wer ist dran?</h2><p className="m-hint m-contacts-hint">Tippe auf die Person, die anruft. Mit <PhoneOutgoing size={13} aria-label="Anrufen"/> rufst du selbst an.</p><div className="m-stack">{org.contacts.map(c=>{const number=c.phones.map(dialable).find(Boolean)||'',raw=c.phones.find(p=>dialable(p)===number)||'';return <div key={c.id} className="m-contact-line"><CallButton contact={c} disabled={busy} onPick={()=>onStart({organisationId:org.id,contactId:c.id},false)}/>{number&&<a className={`m-dial glass${busy?' is-disabled':''}`} href={'tel:'+number} aria-label={`${c.name||'Kontakt'} anrufen`} aria-disabled={busy} onClick={e=>{if(busy){e.preventDefault();return;}onDial(c,raw);}}><PhoneOutgoing size={21} aria-hidden="true"/></a>}</div>;})}</div></>}
   {other?<form className="m-form glass" onSubmit={e=>{e.preventDefault();onStart({organisationId:org.id,contactName:name,phone},false);}}>
    <h2>Neue Person</h2>
    <label className="m-field"><span>Name des Anrufers</span><input autoComplete="off" value={name} onChange={e=>setName(e.target.value)} placeholder="Vor- und Nachname"/></label>
    <label className="m-field"><span>Nummer · optional</span><input type="tel" inputMode="tel" autoComplete="off" value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+49 …"/></label>
    <button className="m-primary" disabled={busy||(!name.trim()&&!phone.trim())}><MessageSquareText size={20} aria-hidden="true"/>{busy?'Wird angelegt …':'Weiter zur Notiz'}</button>
-  </form>:<div className="m-dock"><button type="button" className="m-secondary glass" onClick={()=>setOther(true)}><UserPlus size={19} aria-hidden="true"/>Andere Person</button></div>}
+  </form>:<button type="button" className="m-secondary glass m-other-person" onClick={()=>setOther(true)}><UserPlus size={19} aria-hidden="true"/>Andere Person</button>}
+  <OrgTimeline key={org.id} orgId={org.id}/>
  </main>;
 }
 function NewLead({initial,busy,onStart}:{initial:string;busy:boolean;onStart:(body:object,isNew:boolean)=>void}){
@@ -112,7 +131,7 @@ function LiveCallCard({call,isNew,onDone,onDiscard}:{call:LiveCall;isNew:boolean
  async function discard(){setBusy(true);setError('');try{await api({action:'callCancel',callId:call.callId});onDiscard();}catch(e:any){setBusy(false);setError(e.message||'Verwerfen fehlgeschlagen.');}}
  return <main className="m-screen m-call">
   <section className="m-live glass" aria-label="Laufender Anruf">
-   <div className="m-live-top"><span className="m-pulse" aria-hidden="true"/><span>Eingehender Anruf</span><time>{clock(now-Date.parse(call.startedAt))}</time></div>
+   <div className="m-live-top"><span className="m-pulse" aria-hidden="true"/><span>{call.direction==='out'?'Ausgehender Anruf':'Eingehender Anruf'}</span><time>{clock(now-Date.parse(call.startedAt))}</time></div>
    <h1 className="m-title">{call.organisation.name}</h1>
    <p className="m-live-who">{[call.contact?.name,call.phone].filter(Boolean).join(' · ')||'Anrufer'}</p>
    {isNew&&<p className="m-flag"><Flag size={14} aria-hidden="true"/>Neu angelegt · wird in Prüfen markiert</p>}

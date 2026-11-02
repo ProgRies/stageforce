@@ -1,3 +1,14 @@
+# StageForce 0.3.17 · Today on the phone · timeline on the phone · delete notes, calls and meetings
+
+Publishes `ghcr.io/progries/stageforce:0.3.17`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.17` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. No database change; the extension is unchanged.
+
+- **Today on the phone:** below "Heute fällig" and "Zuletzt gesprochen", the start screen lists today from the Follow-ups calendar: your planned calls (overdue ones first), and everyone's meetings in green (a colleague's faded). A tap opens the organisation.
+- **Timeline on the phone:** an organisation shows its contacts and, below them, its timeline (calls, emails, notes, meetings), loaded page by page while scrolling. Tap an entry to read it; an email loads its text only then.
+- **Basic editing on the phone:** add a note, correct the text of a note, call or meeting, or delete one. Emails stay read-only.
+- **Calling from the phone:** the green button next to a contact dials the number and opens the call card ("Ausgehender Anruf") with Nicht erreicht, the result and the next call, as on the desktop. Tapping the person still logs an incoming call.
+- **Delete notes, calls and meetings:** in the CRM, under the pencil of an entry, **Löschen** asks twice before the entry is gone for everyone. Emails cannot be deleted, because they come in through the extension. The whole entry is kept in the audit log, a deleted call's call record goes with it, and the last contact date moves back to the newest remaining contact. A planned next call is not changed.
+- **Timeline cards no longer snap:** clicking the header of a card that is being edited used to close it and open it again at once. It now stays open.
+
 # StageForce 0.3.16 · One way to log a call · email and meeting fixes · one key per computer · extension 0.4.22
 
 Publishes `ghcr.io/progries/stageforce:0.3.16`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.16` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. One new table, `extension_devices`: existing extension keys are copied into it on start, so nobody has to reconnect, and the schema stays at 13. After a rollback to 0.3.15 only each person's newest computer stays connected. Afterwards everyone reloads the extension in `chrome://extensions` and refreshes Gmail. A Gmail card from an extension that was not reloaded still works with the old one-tap buttons.
