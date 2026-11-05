@@ -5,7 +5,7 @@ import {openDB} from '../server/db.mjs';
 import {addUser} from '../server/auth.mjs';
 import {createOrg,addContact,entity,save,history,listData} from '../server/crm.mjs';
 import {prepareCall,saveCall} from '../server/calls.mjs';
-import {todayBerlin,addDays,addMonths,followUpLabel,followUpDistance,FOLLOW_UP_PICKS} from '../src/domain.ts';
+import {todayBerlin,addDays,addMonths,followUpLabel,followUpDistance,FOLLOW_UP_PICKS,workday,resultDays,defaultNextCall} from '../src/domain.ts';
 async function setup(){const db=openDB(':memory:');const id=await addUser(db,'alex@team.test','Alex','long-password-1234');return{db,user:db.prepare('SELECT * FROM users WHERE id=?').get(id)};}
 function dial(db,user,name='Lead'){const org=createOrg(db,user,name),cid=addContact(db,org.id,{name:'Pat',telefone:['030 1234567']});return{org,start:()=>prepareCall(db,user,{organisationId:org.id,contactId:cid,phone:'030 1234567',startedAt:new Date().toISOString(),requestId:randomUUID()})};}
 const today=todayBerlin(),later=addMonths(today,3);
@@ -21,16 +21,16 @@ test('the call card can keep a planned call when a call comes before it',async()
  saveCall(db,user,{callId:start().callId,outcome:'email',keepFollowUp:true});
  assert.equal(entity(db,org.id).values[17],later);assert.deepEqual(listData(db).review.map(r=>r.text),['E-Mail senden']);
  // Unticked, the result moves the date as before.
- saveCall(db,user,{callId:start().callId,outcome:'not_reached',keepFollowUp:false});assert.equal(entity(db,org.id).values[17],addDays(today,2));
+ saveCall(db,user,{callId:start().callId,outcome:'not_reached',keepFollowUp:false});assert.equal(entity(db,org.id).values[17],workday(addDays(today,2)));
 }finally{db.close();}});
 test('keeping only applies to a planned call still ahead, and never to "Später anrufen"',async()=>{const{db,user}=await setup();try{
  const{org,start}=dial(db,user);edit(db,user,org.id,{17:today});
  assert.equal(start().followUp,today);
- saveCall(db,user,{callId:start().callId,outcome:'not_reached',keepFollowUp:true});assert.equal(entity(db,org.id).values[17],addDays(today,2));
+ saveCall(db,user,{callId:start().callId,outcome:'not_reached',keepFollowUp:true});assert.equal(entity(db,org.id).values[17],workday(addDays(today,2)));
  edit(db,user,org.id,{17:later});const sooner=addDays(today,5);
  saveCall(db,user,{callId:start().callId,outcome:'callback',callbackDate:sooner,keepFollowUp:true});assert.equal(entity(db,org.id).values[17],sooner);
  // Without the flag (the phone app) nothing changes.
- saveCall(db,user,{callId:start().callId,outcome:'no_interest'});assert.equal(entity(db,org.id).values[17],addDays(today,365));
+ saveCall(db,user,{callId:start().callId,outcome:'no_interest'});assert.equal(entity(db,org.id).values[17],workday(addDays(today,365)));
 }finally{db.close();}});
 test('a call logged by hand can set, keep or clear the planned call',async()=>{const{db,user}=await setup();try{
  const{org}=dial(db,user);
@@ -55,8 +55,19 @@ test('short labels for the planned call',()=>{
  assert.equal(addMonths('2026-11-30',3),'2027-02-28');assert.equal(addMonths('2026-10-28',12),'2027-10-28');
 });
 test('every next-call picker offers the same four picks, starting with today',async()=>{const{db,user}=await setup();try{
- assert.deepEqual(FOLLOW_UP_PICKS.map(([label,pick])=>[label,pick(today)]),[['Heute',today],['In 2 Tagen',addDays(today,2)],['1 Woche',addDays(today,7)],['1 Monat',addMonths(today,1)]]);
+ assert.deepEqual(FOLLOW_UP_PICKS.map(([label,pick])=>[label,pick(today)]),[['Heute',today],['In 2 Tagen',workday(addDays(today,2))],['1 Woche',workday(addDays(today,7))],['1 Monat',workday(addMonths(today,1))]]);
  // The call card and the phone app get them from the server.
  const{org,start}=dial(db,user),call=start();assert.deepEqual(call.nextPicks,FOLLOW_UP_PICKS.map(([label,pick])=>({label,date:pick(today)})));
  saveCall(db,user,{callId:call.callId,outcome:'talked',next:{kind:'date',date:today}});assert.equal(entity(db,org.id).values[17],today);
 }finally{db.close();}});
+test('a call planned ahead never lands on a weekend',()=>{
+ // Thu 5 Nov 2026: Sat 7 → Mon 9, Sun 8 → Mon 9, a weekday stays.
+ assert.equal(workday('2026-11-07'),'2026-11-09');assert.equal(workday('2026-11-08'),'2026-11-09');assert.equal(workday('2026-11-06'),'2026-11-06');
+ const thu='2026-11-05',sat='2026-11-07';
+ assert.deepEqual(FOLLOW_UP_PICKS.map(([label,pick])=>[label,pick(thu)]),[['Heute',thu],['In 2 Tagen','2026-11-09'],['1 Woche','2026-11-12'],['1 Monat','2026-12-07']]);
+ // "Heute" stays today, even on a Saturday.
+ assert.deepEqual(FOLLOW_UP_PICKS.map(([,pick])=>pick(sat)),[sat,'2026-11-09','2026-11-16','2026-12-07']);
+ // Result defaults (phone app, Anruf tab) and the days sent to the call card, which adds them to today itself.
+ assert.deepEqual(defaultNextCall('not_reached','',thu),{kind:'date',date:'2026-11-09'});
+ assert.equal(resultDays(2,thu),4);assert.equal(resultDays(7,thu),7);assert.equal(resultDays(14,'2026-11-07'),16);
+});
