@@ -71,6 +71,18 @@ test('the week shows my planned calls and everyone\'s meetings',async()=>{const{
  assert.throws(()=>calendar(db,alex,{from:addDays(week,1)}),/Woche/);
  assert.equal(history(db,mine.id,0,'communication').items[0].art,'Meeting');
 }finally{db.close();}});
+test('a planned call of an organisation nobody owns shows in the week',async()=>{const{db,alex,sam}=await setup();try{
+ const open=createOrg(db,alex,'Niemandes Lead'),planned=createOrg(db,alex,'Von Sam geplant'),owned=createOrg(db,alex,'Sams Lead');
+ // Set from the organisation header with nobody responsible: the call is on everyone's list, so it shows for everyone.
+ edit(db,alex,open.id,{17:today});
+ assert.equal(entity(db,open.id).values[11],'');
+ // Unowned, but Sam planned it: it shows for Sam only, as on the phone app.
+ db.prepare('INSERT INTO followups VALUES(?,?,?,?,?,NULL)').run(randomUUID(),planned.id,'Rückruf',today,sam.id);
+ edit(db,alex,owned.id,{11:sam.id,17:today});
+ assert.deepEqual(calendar(db,alex,{from:week}).followUps.map(f=>f.name),['Niemandes Lead']);
+ assert.deepEqual(calendar(db,sam,{from:week}).followUps.map(f=>f.name),['Niemandes Lead','Sams Lead','Von Sam geplant']);
+ assert.deepEqual(dayItems(calendar(db,alex,{from:week}),today).map(i=>i.name),['Niemandes Lead']);
+}finally{db.close();}});
 test('meeting times, weeks and week numbers',()=>{
  assert.equal(meetingTime('Zoom · 14:30 Uhr · Kickoff'),'14:30');assert.equal(meetingTime('Termin am 12.10. um 9.15 Uhr'),'09:15');
  assert.equal(meetingTime('Termin am 12.10.2026'),'');assert.equal(meetingTime('Meeting'),'');
