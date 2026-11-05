@@ -6,6 +6,7 @@ import {addUser} from '../server/auth.mjs';
 import {history} from '../server/crm.mjs';
 import {extensionAction} from '../server/extension.mjs';
 import {detectMeeting,meetingDate} from '../server/meetings.mjs';
+import {addDays,todayBerlin} from '../src/domain.ts';
 const origin='http://localhost:3000';
 const msg={mailbox:'alex@team.test',from:{name:'Pat',email:'pat@customer.test'},recipients:[{email:'alex@team.test',name:'Alex'}],timestamp:'2026-10-13T10:07:00Z',timestampRaw:'13.10.2026, 12:07',direction:'incoming',sourceUrl:'https://mail.google.com/mail/u/0/#inbox/example',contactEmails:['pat@customer.test']};
 async function setup(){const db=openDB(':memory:');const id=await addUser(db,msg.mailbox,'Alex','long-password-1234');return{db,user:db.prepare('SELECT * FROM users WHERE id=?').get(id)};}
@@ -88,15 +89,17 @@ test('invite, acceptance, reminder and booking confirmation of one meeting stay 
 });
 
 test('an acceptance or reply about a logged meeting adds to it but never moves it; only the (updated) invitation does',async()=>{const{db,user}=await setup();try{
+ // Dates relative to today, so the meeting stays in the future (a past one counts as contact).
+ const day=addDays(todayBerlin(),30),later=addDays(day,1),when=(d,t)=>{const x=new Date(d+'T12:00:00Z'),f=o=>new Intl.DateTimeFormat('de-DE',{...o,timeZone:'UTC'}).format(x);return `${f({weekday:'short'}).replace(/\.?$/,'.')} ${x.getUTCDate()}. ${f({month:'short'}).replace(/\.?$/,'.')} ${x.getUTCFullYear()} ${t}`;};
  const link='https://us02web.zoom.us/j/999888777',org={newOrganisation:'Customer'};
- const first=save(db,user,{...org,gmailMessageId:'i1',originalSubject:'Einladung: Demo @ Do. 5. Nov. 2026 10:00',originalBody:link,links:[link],meeting:{log:true,date:'2026-11-05',time:'10:00'}});
+ const first=save(db,user,{...org,gmailMessageId:'i1',originalSubject:'Einladung: Demo @ '+when(day,'10:00'),originalBody:link,links:[link],meeting:{log:true,date:day,time:'10:00'}});
  const id=first.organisation.id,meetings=()=>db.prepare("SELECT occurred_on,body,is_contact FROM activities WHERE kind='Meeting'").all().map(r=>({...r}));
  // The popup of older extensions sent the reply's own date; the reply still leaves the meeting where it is.
- save(db,user,{organisationId:id,version:first.organisation.version,gmailMessageId:'i2',originalSubject:'Akzeptiert: Demo @ Do. 5. Nov. 2026 10:00',originalBody:link,links:[link],timestamp:'2026-10-14T08:00:00Z',timestampRaw:'14.10.2026, 10:00',meeting:{log:true,date:'2026-10-14',time:''}});
- assert.deepEqual(meetings(),[{occurred_on:'2026-11-05',body:'Zoom · 10:00 Uhr · Demo',is_contact:0}]);
+ save(db,user,{organisationId:id,version:first.organisation.version,gmailMessageId:'i2',originalSubject:'Akzeptiert: Demo @ '+when(day,'10:00'),originalBody:link,links:[link],timestamp:'2026-10-14T08:00:00Z',timestampRaw:'14.10.2026, 10:00',meeting:{log:true,date:'2026-10-14',time:''}});
+ assert.deepEqual(meetings(),[{occurred_on:day,body:'Zoom · 10:00 Uhr · Demo',is_contact:0}]);
  const v=db.prepare('SELECT version FROM organisations WHERE id=?').get(id).version;
- save(db,user,{organisationId:id,version:String(v),gmailMessageId:'i3',originalSubject:'Aktualisierte Einladung: Demo @ Fr. 6. Nov. 2026 11:00',originalBody:link,links:[link],timestamp:'2026-10-15T08:00:00Z',timestampRaw:'15.10.2026, 10:00',meeting:{log:true,date:'2026-11-06',time:'11:00'}});
- assert.deepEqual(meetings().map(m=>m.occurred_on),['2026-11-06']);
+ save(db,user,{organisationId:id,version:String(v),gmailMessageId:'i3',originalSubject:'Aktualisierte Einladung: Demo @ '+when(later,'11:00'),originalBody:link,links:[link],timestamp:'2026-10-15T08:00:00Z',timestampRaw:'15.10.2026, 10:00',meeting:{log:true,date:later,time:'11:00'}});
+ assert.deepEqual(meetings().map(m=>m.occurred_on),[later]);
 }finally{db.close();}});
 
 test('a date without a year in a late-year email lands in the next year',()=>{
