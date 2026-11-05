@@ -67,12 +67,13 @@ export const BOOKING_URL = "https://calendar.google.com/calendar/u/0/appointment
 export function addDays(date:string,days:number){const d=new Date(date+"T12:00:00Z");d.setUTCDate(d.getUTCDate()+days);return d.toISOString().slice(0,10);}
 export function addMonths(date:string,months:number){const d=new Date(date+"T12:00:00Z"),day=d.getUTCDate();d.setUTCDate(1);d.setUTCMonth(d.getUTCMonth()+months);d.setUTCDate(Math.min(day,new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,0)).getUTCDate()));return d.toISOString().slice(0,10);}
 // The one planned call of an organisation ("Wiedervorlage"): quick picks, a short label for list chips and how far away it is.
-export const FOLLOW_UP_PICKS:[string,(today:string)=>string][]=[["1 Woche",t=>addDays(t,7)],["2 Wochen",t=>addDays(t,14)],["1 Monat",t=>addMonths(t,1)],["3 Monate",t=>addMonths(t,3)],["6 Monate",t=>addMonths(t,6)],["1 Jahr",t=>addMonths(t,12)]];
+// The same four picks everywhere a next call is planned (header popover, Anruf tab, call card, phone app); anything else via the date field.
+export const FOLLOW_UP_PICKS:[string,(today:string)=>string][]=[["Heute",t=>t],["In 2 Tagen",t=>addDays(t,2)],["1 Woche",t=>addDays(t,7)],["1 Monat",t=>addMonths(t,1)]];
 // After a call (call card, Anruf tab, phone app) the result and the next call are picked separately, then saved with one button.
 // A result preselects its next call: a planned call still ahead stays ("Unverändert"), otherwise `days` from today, if it has any.
 export const CALL_RESULTS=[{key:"talked",label:"Gespräch geführt",days:null},{key:"not_reached",label:"Nicht erreicht",days:2},{key:"meeting",label:"Termin vereinbart",days:14},{key:"email",label:"E-Mail nötig",days:7}] as const;
 export type CallResult=typeof CALL_RESULTS[number]["key"];
-export const CALL_NEXT_PICKS:[string,(today:string)=>string][]=[["In 2 Tagen",t=>addDays(t,2)],["In 1 Woche",t=>addDays(t,7)],["In 2 Wochen",t=>addDays(t,14)],["In 1 Monat",t=>addMonths(t,1)],["In 3 Monaten",t=>addMonths(t,3)],["In 6 Monaten",t=>addMonths(t,6)],["In 1 Jahr",t=>addMonths(t,12)]];
+export const CALL_NEXT_PICKS=FOLLOW_UP_PICKS;
 // "Sa., 31.10." for the next-call field; with the year when it is not this year's.
 export function nextCallDay(date:string,today=todayBerlin()){const d=new Date(date+"T12:00:00Z");return new Intl.DateTimeFormat("de-DE",{weekday:"short",day:"2-digit",month:"2-digit",timeZone:"UTC"}).format(d)+(date.slice(0,4)!==today.slice(0,4)?date.slice(2,4):"");}
 export type NextCall={kind:'keep'}|{kind:'none'}|{kind:'date';date:string;time?:string}|null;

@@ -5,7 +5,7 @@ import {openDB} from '../server/db.mjs';
 import {addUser} from '../server/auth.mjs';
 import {createOrg,addContact,entity,save,history,listData} from '../server/crm.mjs';
 import {prepareCall,saveCall} from '../server/calls.mjs';
-import {todayBerlin,addDays,addMonths,followUpLabel,followUpDistance} from '../src/domain.ts';
+import {todayBerlin,addDays,addMonths,followUpLabel,followUpDistance,FOLLOW_UP_PICKS} from '../src/domain.ts';
 async function setup(){const db=openDB(':memory:');const id=await addUser(db,'alex@team.test','Alex','long-password-1234');return{db,user:db.prepare('SELECT * FROM users WHERE id=?').get(id)};}
 function dial(db,user,name='Lead'){const org=createOrg(db,user,name),cid=addContact(db,org.id,{name:'Pat',telefone:['030 1234567']});return{org,start:()=>prepareCall(db,user,{organisationId:org.id,contactId:cid,phone:'030 1234567',startedAt:new Date().toISOString(),requestId:randomUUID()})};}
 const today=todayBerlin(),later=addMonths(today,3);
@@ -54,3 +54,9 @@ test('short labels for the planned call',()=>{
  assert.equal(followUpDistance('2027-01-28',t),'in 3 Monaten');assert.equal(followUpDistance('2026-11-03',t),'in 6 Tagen');
  assert.equal(addMonths('2026-11-30',3),'2027-02-28');assert.equal(addMonths('2026-10-28',12),'2027-10-28');
 });
+test('every next-call picker offers the same four picks, starting with today',async()=>{const{db,user}=await setup();try{
+ assert.deepEqual(FOLLOW_UP_PICKS.map(([label,pick])=>[label,pick(today)]),[['Heute',today],['In 2 Tagen',addDays(today,2)],['1 Woche',addDays(today,7)],['1 Monat',addMonths(today,1)]]);
+ // The call card and the phone app get them from the server.
+ const{org,start}=dial(db,user),call=start();assert.deepEqual(call.nextPicks,FOLLOW_UP_PICKS.map(([label,pick])=>({label,date:pick(today)})));
+ saveCall(db,user,{callId:call.callId,outcome:'talked',next:{kind:'date',date:today}});assert.equal(entity(db,org.id).values[17],today);
+}finally{db.close();}});
