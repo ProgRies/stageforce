@@ -1,3 +1,11 @@
+# StageForce 0.3.19 · Shorter next-call picks · no weekend calls · hint when nobody is responsible
+
+Publishes `ghcr.io/progries/stageforce:0.3.19`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.19` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. No database change; the extension is unchanged (the call card gets the new picks from the server).
+
+- **Next-call picks:** everywhere a next call is planned (Nächster Anruf in the organisation header, the Anruf tab, the Gmail call card, the phone app) the quick picks are now **Heute**, **In 2 Tagen**, **1 Woche** and **1 Monat**, plus the date and time field for anything else.
+- **No calls on the weekend:** a pick or a result's default that would land on a Saturday or Sunday moves to the following Monday (Nicht erreicht: 2 days, E-Mail nötig: 1 week, Termin: 2 weeks). "Heute" and a date picked by hand stay as chosen.
+- **Nobody responsible:** when nobody is Zuständig, the Nächster Anruf popover says the call won't appear in anyone's Follow-ups calendar, with **Übernehmen** to take the organisation over in one click.
+
 # Extension 0.4.23 · clearer quoted-history contacts
 
 Extension only: reload it in `chrome://extensions`. No server or database change.
