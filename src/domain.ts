@@ -67,18 +67,23 @@ export const BOOKING_URL = "https://calendar.google.com/calendar/u/0/appointment
 export function addDays(date:string,days:number){const d=new Date(date+"T12:00:00Z");d.setUTCDate(d.getUTCDate()+days);return d.toISOString().slice(0,10);}
 export function addMonths(date:string,months:number){const d=new Date(date+"T12:00:00Z"),day=d.getUTCDate();d.setUTCDate(1);d.setUTCMonth(d.getUTCMonth()+months);d.setUTCDate(Math.min(day,new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,0)).getUTCDate()));return d.toISOString().slice(0,10);}
 // The one planned call of an organisation ("Wiedervorlage"): quick picks, a short label for list chips and how far away it is.
-export const FOLLOW_UP_PICKS:[string,(today:string)=>string][]=[["1 Woche",t=>addDays(t,7)],["2 Wochen",t=>addDays(t,14)],["1 Monat",t=>addMonths(t,1)],["3 Monate",t=>addMonths(t,3)],["6 Monate",t=>addMonths(t,6)],["1 Jahr",t=>addMonths(t,12)]];
+// The same four picks everywhere a next call is planned (header popover, Anruf tab, call card, phone app); anything else via the date field.
+// A call planned ahead never lands on a weekend: Saturday and Sunday move to the Monday after. "Heute" stays today.
+export function workday(date:string){const day=new Date(date+"T12:00:00Z").getUTCDay();return day===6?addDays(date,2):day===0?addDays(date,1):date;}
+export const FOLLOW_UP_PICKS:[string,(today:string)=>string][]=[["Heute",t=>t],["In 2 Tagen",t=>workday(addDays(t,2))],["1 Woche",t=>workday(addDays(t,7))],["1 Monat",t=>workday(addMonths(t,1))]];
+// Days from today to a result's next call, moved off the weekend; the call card adds them to today itself.
+export function resultDays(days:number,today=todayBerlin()){return Math.round((Date.parse(workday(addDays(today,days))+"T12:00:00Z")-Date.parse(today+"T12:00:00Z"))/86400000);}
 // After a call (call card, Anruf tab, phone app) the result and the next call are picked separately, then saved with one button.
 // A result preselects its next call: a planned call still ahead stays ("Unverändert"), otherwise `days` from today, if it has any.
 export const CALL_RESULTS=[{key:"talked",label:"Gespräch geführt",days:null},{key:"not_reached",label:"Nicht erreicht",days:2},{key:"meeting",label:"Termin vereinbart",days:14},{key:"email",label:"E-Mail nötig",days:7}] as const;
 export type CallResult=typeof CALL_RESULTS[number]["key"];
-export const CALL_NEXT_PICKS:[string,(today:string)=>string][]=[["In 2 Tagen",t=>addDays(t,2)],["In 1 Woche",t=>addDays(t,7)],["In 2 Wochen",t=>addDays(t,14)],["In 1 Monat",t=>addMonths(t,1)],["In 3 Monaten",t=>addMonths(t,3)],["In 6 Monaten",t=>addMonths(t,6)],["In 1 Jahr",t=>addMonths(t,12)]];
+export const CALL_NEXT_PICKS=FOLLOW_UP_PICKS;
 // "Sa., 31.10." for the next-call field; with the year when it is not this year's.
 export function nextCallDay(date:string,today=todayBerlin()){const d=new Date(date+"T12:00:00Z");return new Intl.DateTimeFormat("de-DE",{weekday:"short",day:"2-digit",month:"2-digit",timeZone:"UTC"}).format(d)+(date.slice(0,4)!==today.slice(0,4)?date.slice(2,4):"");}
 export type NextCall={kind:'keep'}|{kind:'none'}|{kind:'date';date:string;time?:string}|null;
 export function defaultNextCall(result:string,planned:string,today=todayBerlin()):NextCall{
  if(planned&&planned>today)return{kind:'keep'};
- const days=CALL_RESULTS.find(r=>r.key===result)?.days;return days?{kind:'date',date:addDays(today,days)}:null;
+ const days=CALL_RESULTS.find(r=>r.key===result)?.days;return days?{kind:'date',date:workday(addDays(today,days))}:null;
 }
 export function followUpLabel(date:string,today=todayBerlin()){if(date<today)return "Anruf fällig seit "+meetingWhen(date,today).replace(/^\S+ /,"");if(date===today)return "Anruf heute";const when=meetingWhen(date,today);return "Anruf "+when+(date.slice(0,4)!==today.slice(0,4)&&!/^(heute|morgen)$/.test(when)?date.slice(2,4):"");}
 export function followUpDistance(date:string,today=todayBerlin()){const days=Math.round((Date.parse(date+"T12:00:00Z")-Date.parse(today+"T12:00:00Z"))/86400000);if(days<0)return days===-1?"seit gestern":`seit ${-days} Tagen`;if(days===0)return "heute";if(days===1)return "morgen";if(days<14)return `in ${days} Tagen`;if(days<60)return `in ${Math.round(days/7)} Wochen`;const months=Math.round(days/30.4);return months<12?`in ${months} Monaten`:months<18?"in einem Jahr":`in ${Math.round(months/12)} Jahren`;}

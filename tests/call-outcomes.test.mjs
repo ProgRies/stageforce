@@ -6,7 +6,7 @@ import {addUser} from '../server/auth.mjs';
 import {createOrg,addContact,entity,listData,history,getOrg,activitySave,save} from '../server/crm.mjs';
 import {prepareCall,saveCall,cancelCall,openCall,draftCall} from '../server/calls.mjs';
 import {deleteOrganisation} from '../server/lifecycle.mjs';
-import {todayBerlin,addDays,buildQueue,callable} from '../src/domain.ts';
+import {todayBerlin,addDays,workday,buildQueue,callable} from '../src/domain.ts';
 async function setup(){const db=openDB(':memory:');const id=await addUser(db,'alex@team.test','Alex','long-password-1234');return{db,user:db.prepare('SELECT * FROM users WHERE id=?').get(id)};}
 function dial(db,user,name='Lead'){const org=createOrg(db,user,name),cid=addContact(db,org.id,{name:'Pat',telefone:['030 1234567']});return{org,start:()=>prepareCall(db,user,{organisationId:org.id,contactId:cid,phone:'030 1234567',startedAt:new Date().toISOString(),requestId:randomUUID()}).callId};}
 const today=todayBerlin();
@@ -15,7 +15,7 @@ test('each result logs the call and schedules the next one for the caller',async
  const cases={not_reached:[2,'Anruf · Nicht erreicht',null],email:[7,'Anruf · E-Mail nötig',today],meeting:[14,'Anruf · Termin',today],no_interest:[365,'Anruf · Kein Interesse',today]};
  for(const[outcome,[days,kind,contact]]of Object.entries(cases)){const{org,start}=dial(db,user,outcome);saveCall(db,user,{callId:start(),notes:'',outcome});
   const e=entity(db,org.id),h=history(db,org.id,0,'communication').items[0];
-  assert.equal(e.values[17],addDays(today,days),outcome);assert.equal(h.art,kind);assert.equal(h.text,kind.slice(8));assert.equal(getOrg(db,org.id).last_contact,contact,outcome);
+  assert.equal(e.values[17],workday(addDays(today,days)),outcome);assert.equal(h.art,kind);assert.equal(h.text,kind.slice(8));assert.equal(getOrg(db,org.id).last_contact,contact,outcome);
   assert.equal(db.prepare('SELECT owner FROM followups WHERE organisation_id=? AND completed_at IS NULL').get(org.id).owner,user.id);}
  const phases=Object.fromEntries(listData(db).entities.map(e=>[e.values[1],e.values[10]]));
  assert.equal(phases.meeting,'Termin vereinbart');assert.equal(phases.no_interest,'Aktuell kein Bedarf');assert.equal(phases.not_reached,'Unbearbeitet');

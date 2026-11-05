@@ -8,7 +8,7 @@ import {prepareCall,saveCall} from '../server/calls.mjs';
 import {logMeeting} from '../server/meetings.mjs';
 import {calendar,meetingTime} from '../server/calendar.mjs';
 import {deleteOrganisation} from '../server/lifecycle.mjs';
-import {todayBerlin,addDays,mondayOf,isoWeek,dayItems} from '../src/domain.ts';
+import {todayBerlin,addDays,workday,mondayOf,isoWeek,dayItems} from '../src/domain.ts';
 async function setup(){const db=openDB(':memory:');const users=[];for(const[email,name]of[['alex@team.test','Alex'],['sam@team.test','Sam']]){const id=await addUser(db,email,name,'long-password-1234');users.push(db.prepare('SELECT * FROM users WHERE id=?').get(id));}return{db,alex:users[0],sam:users[1]};}
 const edit=(db,user,id,fields,extra={})=>save(db,user,{id,version:entity(db,id).version,requestId:randomUUID(),fields,...extra});
 const today=todayBerlin(),week=mondayOf(today),later=addDays(week,9);
@@ -36,7 +36,7 @@ test('"Später anrufen" can set a time; other results and older images drop it',
  // Kept: date and time stay.
  saveCall(db,alex,{callId:call.callId,outcome:'not_reached',keepFollowUp:true});assert.equal(entity(db,org.id).followUpTime,'11:15');
  assert.throws(()=>saveCall(db,alex,{callId:start().callId,outcome:'callback',callbackDate:later,callbackTime:'later'}),/Uhrzeit/);
- saveCall(db,alex,{callId:start().callId,outcome:'not_reached'});assert.equal(entity(db,org.id).followUpTime,'');assert.equal(entity(db,org.id).values[17],addDays(today,2));
+ saveCall(db,alex,{callId:start().callId,outcome:'not_reached'});assert.equal(entity(db,org.id).followUpTime,'');assert.equal(entity(db,org.id).values[17],workday(addDays(today,2)));
  // An older image moves the date in place: the stored time was for the old date and no longer shows.
  saveCall(db,alex,{callId:start().callId,outcome:'callback',callbackDate:later,callbackTime:'08:00'});
  db.prepare('UPDATE followups SET due_date=? WHERE organisation_id=?').run(addDays(later,3),org.id);assert.equal(entity(db,org.id).followUpTime,'');

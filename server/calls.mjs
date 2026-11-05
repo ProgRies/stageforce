@@ -1,5 +1,5 @@
 import {uid,now,transaction,reindex} from './db.mjs';
-import {formatPhone,CALL_OUTCOMES,CALL_RESULTS,CALL_NEXT_PICKS,BOOKING_URL,addDays,validDate,todayBerlin} from '../src/domain.ts';
+import {formatPhone,CALL_OUTCOMES,CALL_RESULTS,CALL_NEXT_PICKS,BOOKING_URL,addDays,workday,resultDays,validDate,todayBerlin} from '../src/domain.ts';
 import {claimOnCall} from './leads.mjs';
 import {Problem,getOrg,contacts,createOrg,addContact,audit,addActivity,assertVersion,followUpTime,setFollowUpTime,plannedCall,applyCallResult,callOutcome,TALKED} from './crm.mjs';
 const field=(v,max=1000)=>{if(typeof v!=='string'||v.length>max||v.includes('\0'))throw new Problem('Invalid field.');return v.trim();};
@@ -62,7 +62,8 @@ const OUTCOMES=[...Object.entries(CALL_OUTCOMES).filter(([key])=>key!=='no_inter
 const INCOMING=[SAVE,...OUTCOMES.filter(o=>o.key!=='not_reached'&&o.key!=='talked')];
 const safeDial=p=>{try{return p?dialNumber(p):'';}catch{return'';}};
 const RESULTS=CALL_RESULTS.map(({key,label,days})=>({key,label,days}));
-function callView(db,r){const o=getOrg(db,r.organisation_id),today=todayBerlin();return{results:r.direction==='in'?RESULTS.filter(x=>x.key!=='not_reached'):RESULTS,nextPicks:CALL_NEXT_PICKS.map(([label,pick])=>({label,date:pick(today)})),today,callId:r.id,organisation:{id:o.id,name:o.name,version:String(o.version)},contact:contacts(db,o.id).find(c=>c.id===r.contact_id),phone:r.phone,dial:safeDial(r.phone),direction:r.direction==='in'?'in':'out',startedAt:r.started_at,notes:db.prepare('SELECT notes FROM call_drafts WHERE call_id=?').get(r.id)?.notes||'',outcomes:r.direction==='in'?INCOMING:OUTCOMES,bookingUrl:BOOKING_URL,...plannedCall(db,o.id)};}
+// Result `days` count from today and skip the weekend, so cards that add them to today themselves land on a workday too.
+function callView(db,r){const o=getOrg(db,r.organisation_id),today=todayBerlin();const results=RESULTS.map(x=>x.days?{...x,days:resultDays(x.days,today)}:x);return{results:r.direction==='in'?results.filter(x=>x.key!=='not_reached'):results,nextPicks:CALL_NEXT_PICKS.map(([label,pick])=>({label,date:pick(today)})),today,callId:r.id,organisation:{id:o.id,name:o.name,version:String(o.version)},contact:contacts(db,o.id).find(c=>c.id===r.contact_id),phone:r.phone,dial:safeDial(r.phone),direction:r.direction==='in'?'in':'out',startedAt:r.started_at,notes:db.prepare('SELECT notes FROM call_drafts WHERE call_id=?').get(r.id)?.notes||'',outcomes:r.direction==='in'?INCOMING:OUTCOMES,bookingUrl:BOOKING_URL,...plannedCall(db,o.id)};}
 // An unsaved call from the last twelve hours is still open; older attempts were abandoned and are left alone.
 const openAttempt=(db,user)=>db.prepare('SELECT * FROM call_attempts WHERE user_id=? AND activity_id IS NULL AND started_at>? ORDER BY started_at DESC LIMIT 1').get(user.id,new Date(Date.now()-12*3600000).toISOString());
 export function openCall(db,user){const row=openAttempt(db,user);return{call:row?callView(db,row):null};}
@@ -86,7 +87,7 @@ export function saveCall(db,user,b){return transaction(db,()=>{
   else keep=!!planned;
  }else if(outcome?.days!=null){
   // Older cards: one tap sets the result's own date; "Später anrufen" brings a picked date and time, "Behalten" keeps a planned call ahead.
-  due=b.outcome==='callback'&&b.callbackDate?field(b.callbackDate,10):addDays(todayBerlin(),outcome.days);if(!validDate(due)||due<todayBerlin())throw new Problem('Check the call-back date.');
+  due=b.outcome==='callback'&&b.callbackDate?field(b.callbackDate,10):workday(addDays(todayBerlin(),outcome.days));if(!validDate(due)||due<todayBerlin())throw new Problem('Check the call-back date.');
   time=b.outcome==='callback'?followUpTime(b.callbackTime):'';
   if(b.keepFollowUp===true&&b.outcome!=='callback'&&!!planned&&planned>todayBerlin()){keep=true;due=undefined;}
  }
