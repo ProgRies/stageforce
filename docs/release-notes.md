@@ -1,3 +1,10 @@
+# StageForce 0.3.21 · Rename an organisation
+
+Publishes `ghcr.io/progries/stageforce:0.3.21`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.21` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. No database change; the extension is unchanged.
+
+- **Rename an organisation:** the pencil next to the name in the organisation header opens the name for editing. ✓ or Enter saves, ✕ or Esc cancels. The new name shows everywhere, search finds it, and the Änderungsprotokoll records the old and new name.
+- A name another organisation already has (ignoring letter case) is refused, with a pointer to **Organisation verwalten → Zusammenführen** for duplicates. Names are limited to 500 characters, the same as when creating one.
+
 # StageForce 0.3.20 · Lead lists: old notes on the timeline, every imported lead in Prüfen
 
 Publishes `ghcr.io/progries/stageforce:0.3.20`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.20` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. No database change; the extension is unchanged.
