@@ -138,3 +138,18 @@ test('a new organisation is a Kunde only when an invoice export shows a real bil
  const rows=fastbillRows(db,user,{batchId:stage(db,user,'Kundennummer;Firmenname\n1;Alpha\n2;Beta\n3;Gamma\n4;Delta').id}).items;
  assert.deepEqual(rows.map(r=>decideFastbill(db,user,{rowId:r.id,decision:'create',confirmDuplicate:true}).entity.values[9]),['Kunde','Lead','Lead','Lead']);
  }finally{db.close();}});
+
+test('lead list rows carry their old note to the timeline and land in Prüfen; plain rows keep their fingerprint',()=>{const{db,user}=setup();try{
+ const plain=csvRecords('Firma;E-Mail\nExample Studio;pat@example.test')[0];assert.ok(!('note'in plain)&&!('review'in plain));
+ const csv='Firma;Ansprechpartner;Position;E-Mail;Telefon;Website;Verlaufsnotiz;Prüfhinweis\nLandkreis Test;;Pressestelle;presse@kreis-test.de;0711 123456;https://www.kreis-test.de/;"Termin gehabt\nWiedervorlage: ab Juni";Alte Leadliste: prüfen, ob schon Kunde';
+ assert.equal(inspectCSV(csv).mapping.note,6);assert.equal(inspectCSV(csv).mapping.review,7);
+ const b=stage(db,user,csv,{scope:'alte-leadliste'}),r=first(db,user,b);assert.equal(fastbillPreview(db,user,r.id).payload.note,'Termin gehabt\nWiedervorlage: ab Juni');
+ const o=decideFastbill(db,user,{rowId:r.id,decision:'create'}).entity;
+ assert.equal(o.values[9],'Lead');assert.equal(o.values[19],'Alte Leadliste: prüfen, ob schon Kunde');
+ const item=reviewItems(db).find(x=>x.id===o.id);assert.ok(item);assert.equal(item.last.text,'Termin gehabt\nWiedervorlage: ab Juni');
+ assert.ok(history(db,o.id).items.some(a=>a.art==='Notiz'&&a.text==='Termin gehabt\nWiedervorlage: ab Juni'&&!a.is_contact));
+ // Assigning to an existing organisation also brings the note and the handoff, once.
+ const existing=createOrg(db,user,'Kreis Zwei'),b2=stage(db,user,csv.replace('Landkreis Test','Kreis Zwei').replace(/presse@kreis-test.de/,'info@kreis-zwei.de'),{scope:'alte-leadliste'}),r2=first(db,user,b2);
+ decideFastbill(db,user,{rowId:r2.id,decision:'applied',id:existing.id,version:existing.version});
+ assert.equal(entity(db,existing.id).values[19],'Alte Leadliste: prüfen, ob schon Kunde');assert.equal(db.prepare('SELECT count(*) n FROM review_issues WHERE organisation_id=?').get(existing.id).n,1);
+ }finally{db.close();}});

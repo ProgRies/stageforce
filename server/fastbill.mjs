@@ -14,6 +14,8 @@ export const COLUMNS={
  city:['Ort','Stadt','city'],website:['Website','Webseite','Internet'],url:['FastBill URL','FastBill-Kundenseite','customer_url'],
  reference:['Rechnungsnummer','invoice_number'],date:['Datum','Rechnungsdatum','invoice_date'],title:['Titel','invoice_title'],description:['Beschreibung','description'],
  documentType:['Typ','type'],canceled:['Storniert?','is_canceled'],state:['Rechnungsstatus','state'],
+ // Only for hand-made lead lists (not in FastBill exports): a note for the timeline and a Prüfen handoff.
+ note:['Verlaufsnotiz'],review:['Prüfhinweis'],
 };
 // Strict quoted CSV reader: no evaluation, spreadsheet formulas remain plain text.
 export function parseCSV(text){
@@ -42,6 +44,8 @@ export function csvRecords(text,mapping,kind='customers'){
 }
 function record(v,kind){
  const r={kind,customerId:clean(v.customerId),customerNumber:clean(v.customerNumber),name:clean(v.name),contactName:clean(v.contactName||[v.firstName,v.lastName].filter(Boolean).join(' ')),role:clean(v.role),email:clean(v.email).toLowerCase(),phones:[v.phone,v.phone2,v.mobile].map(x=>clean(x)).filter(Boolean),city:clean(v.city),website:clean(v.website),url:clean(v.url),reference:clean(v.reference),date:clean(v.date),title:clean(v.title),description:clean(v.description,12000),documentType:clean(v.documentType),canceled:clean(v.canceled),state:clean(v.state)};
+ // Added only when present, so the fingerprints of plain FastBill rows (and remembered decisions) stay the same.
+ const note=clean(v.note,12000),review=clean(v.review,500);if(note)r.note=note;if(review)r.review=review;
  r.phones=[...new Set(r.phones)];if(!r.name&&!r.contactName&&!r.customerNumber&&!r.customerId)throw new Problem('Eine Zeile hat weder Namen noch Kundenkennung. Bitte Export/Spaltenzuordnung prüfen.');
  if(!r.name)r.name=r.contactName||'Kunde '+(r.customerNumber||r.customerId);
  return r;
@@ -154,6 +158,9 @@ export function decideFastbill(db,user,b){return transaction(db,()=>{
   const changes=Object.fromEntries(Object.entries(fields).map(([k,v])=>[k,{from:before[+k],to:v}]));
   audit(db,o.id,user,'fastbill_import',{...provenance,fields:changes,contactId,contactChanges});
   addActivity(db,o.id,user,{type:'CRM-Änderung',text:'FastBill-Zuordnung geprüft'+(note?': '+note:'.'),date:todayBerlin(),contacted:false});
+  // A lead list row can carry its old notes and ask for a second look in Prüfen, whether new or assigned.
+  if(p.note)addActivity(db,o.id,user,{type:'Notiz',text:p.note,date:todayBerlin(),contacted:false});
+  if(p.review&&!db.prepare('SELECT 1 FROM review_issues WHERE organisation_id=? AND resolved_at IS NULL AND text=?').get(o.id,p.review))db.prepare('INSERT INTO review_issues VALUES(?,?,?,NULL)').run(uid(),o.id,p.review);
   db.prepare('UPDATE organisations SET version=version+1,updated_at=? WHERE id=?').run(now(),o.id);reindex(db,o.id);
  }
  db.prepare('INSERT INTO fastbill_decisions VALUES(?,?,?,?,?,?,?)').run(r.scope,r.fingerprint,b.decision,orgId,user.id,now(),note);
