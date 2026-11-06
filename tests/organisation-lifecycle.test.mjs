@@ -57,3 +57,21 @@ test('merging moves emails, contacts, links and follow-ups into the target witho
   assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(),[]);
  }finally{db.close();}
 });
+
+test('renaming an organisation updates the name, search and log, and refuses empty or duplicate names',async()=>{
+ const{db,user}=await setup();try{
+  const org=createOrg(db,user,'Tübingen'),other=createOrg(db,user,'Landkreis Reutlingen');
+  const rename=(id,name)=>save(db,user,{id,version:getOrg(db,id).version,requestId:randomUUID(),fields:{1:name}});
+  await assert.rejects(async()=>rename(org.id,'  '),/Name erforderlich/);
+  await assert.rejects(async()=>rename(org.id,'landkreis reutlingen'),e=>e.code==='duplicate');
+  await assert.rejects(async()=>rename(org.id,'x'.repeat(501)),/zu lange/);
+  const r=rename(org.id,'  Stadt Tübingen ');
+  assert.equal(r.entity.values[1],'Stadt Tübingen');
+  assert.equal(getOrg(db,org.id).name,'Stadt Tübingen');
+  assert.ok(search(db,"Stadt Tübingen").includes(org.id));
+  assert.match(db.prepare("SELECT changes_json FROM audit_log WHERE organisation_id=? ORDER BY rowid DESC LIMIT 1").get(org.id)?.changes_json||'',/Tübingen/);
+  // Same name, other letter case, is fine for the organisation itself.
+  assert.equal(rename(org.id,'STADT TÜBINGEN').entity.values[1],'STADT TÜBINGEN');
+  assert.equal(getOrg(db,other.id).name,'Landkreis Reutlingen');
+ }finally{db.close();}
+});
