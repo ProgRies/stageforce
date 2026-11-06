@@ -1,3 +1,10 @@
+# StageForce 0.3.20 · Lead lists: old notes on the timeline, every imported lead in Prüfen
+
+Publishes `ghcr.io/progries/stageforce:0.3.20`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.20` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. No database change; the extension is unchanged.
+
+- **Lead lists through the CSV import (Importe → FastBill → CSV):** two optional columns. **Verlaufsnotiz** puts the old note on the organisation's timeline as a Notiz. **Prüfhinweis** puts the organisation in **Prüfen** with that text, so each imported lead gets checked once. Both work for "Als neue Organisation hinzufügen" and for "Zuordnen".
+- The import preview shows both fields. Plain FastBill exports work exactly as before, and their remembered decisions stay.
+
 # StageForce 0.3.19 · Shorter next-call picks · no weekend calls · hint when nobody is responsible
 
 Publishes `ghcr.io/progries/stageforce:0.3.19`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.19` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. No database change; the extension is unchanged (the call card gets the new picks from the server).
