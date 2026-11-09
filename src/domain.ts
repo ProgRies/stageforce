@@ -92,6 +92,23 @@ export function activityLabel(kind:string){return kind.startsWith("Anruf · ")?k
 export type ReviewItem = {id:string;text:string;last:{kind:string;text:string;subject:string;date:string;author:string}|null};
 export function normalize(s: string) { return s.toLowerCase().normalize("NFKD").replace(/\p{M}/gu,""); }
 export function searchText(e: Entity) { return normalize(e.values.map(v=>String(v)).join(" ")); }
+// Organisation search: names first (starting with what was typed, then containing every word), then the other
+// master data (city, contact, summary …). Organisations found only in emails, notes or further contacts by the
+// server's full-text search come separately, so the list can fold them away. Each group is sorted by name.
+export function rankSearch(entities: Entity[], query: string, serverIds: string[]|null, index?: Map<string,string>) {
+  const q=normalize(query).trim().replace(/\s+/g," "),terms=q.split(" ").filter(Boolean),server=new Set(serverIds||[]);
+  const byName=(a:Entity,b:Entity)=>text(a,1).localeCompare(text(b,1),"de");
+  if(!terms.length)return{main:[...entities].sort(byName),other:[] as Entity[]};
+  const tiers:Entity[][]=[[],[],[]],other:Entity[]=[];
+  for(const e of entities){
+    const name=normalize(text(e,1));
+    if(name.startsWith(q))tiers[0].push(e);
+    else if(terms.every(t=>name.includes(t)))tiers[1].push(e);
+    else if(terms.every(t=>(index?.get(e.id)??searchText(e)).includes(t)))tiers[2].push(e);
+    else if(server.has(e.id))other.push(e);
+  }
+  return{main:tiers.flatMap(t=>t.sort(byName)),other:other.sort(byName)};
+}
 export function contactAge(e: Entity, today=todayBerlin()): number | null { const d=dateISO(e.values[15]);return d?Math.max(0,Math.floor((Date.parse(today)-Date.parse(d))/86400000)):null; }
 export function contactLabel(e: Entity) { const days=contactAge(e);return days===null?"Kontakt unbekannt":days===0?"Heute kontaktiert":days===1?"Gestern kontaktiert":`Vor ${days} Tagen`; }
 // A scheduled follow-up wins: a future date keeps the organisation out, a due date brings it back
