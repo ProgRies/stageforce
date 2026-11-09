@@ -1,6 +1,7 @@
 import {useMemo,useState} from 'react';
 import qrcode from 'qrcode-generator';
-import {Copy,Download,ShieldCheck,Smartphone} from 'lucide-react';
+import {Check,Copy,Download,ShieldCheck,Smartphone} from 'lucide-react';
+import {useCopy} from './useCopy';
 import {request} from './api';
 export type MfaStep={mfa:'setup',secret:string,uri:string,email:string}|{mfa:'verify'};
 export type MfaResult={user:any,csrf:string,appearance:any,recoveryCodes?:string[],recoveryLeft?:number,security?:{passwords:number,codes:number,since:number|null}};
@@ -31,16 +32,16 @@ export function MfaChallenge({step,onDone,onRestart,device}:{step:MfaStep,onDone
 }
 // Shown exactly once, right after setup, and again as a reminder when a recovery code was used.
 export function RecoveryCodes({result,onContinue}:{result:MfaResult,onContinue:()=>void}){
- const[saved,setSaved]=useState(false),[copied,setCopied]=useState(false);const codes=result.recoveryCodes;
+ const[saved,setSaved]=useState(false),clip=useCopy(),copied=!!clip.copied;const codes=result.recoveryCodes;
  if(!codes)return <div className="login-card glass mfa-card"><div className="mfa-heading"><ShieldCheck size={22} aria-hidden="true"/><h1>Wiederherstellungscode benutzt</h1></div><p>Du hast dich mit einem Wiederherstellungscode angemeldet. Es {result.recoveryLeft===1?'bleibt noch 1 Code':`bleiben noch ${result.recoveryLeft} Codes`}.</p><p>Ist dein Handy weg oder neu, bitte den Administrator, deine Zwei-Faktor-Anmeldung zurückzusetzen. Bei der nächsten Anmeldung richtest du die App dann neu ein und bekommst frische Codes.</p><button className="button primary wide" onClick={onContinue}>Weiter</button></div>;
  const text=`Stage Force Wiederherstellungscodes (${result.user.email})\nJeder Code funktioniert genau einmal.\n\n${codes.join('\n')}\n`;
- const copy=async()=>{try{await navigator.clipboard.writeText(text);setCopied(true);}catch{}};
+ const copy=()=>clip.copy(text);
  const download=()=>{const url=URL.createObjectURL(new Blob([text],{type:'text/plain'}));const a=document.createElement('a');a.href=url;a.download='stageforce-wiederherstellungscodes.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
  return <div className="login-card glass mfa-card">
   <div className="mfa-heading"><ShieldCheck size={22} aria-hidden="true"/><h1>Codes sichern</h1></div>
   <p>Die App ist eingerichtet. Falls du dein Handy verlierst, kommst du mit einem dieser Codes trotzdem hinein. Sie werden nur jetzt angezeigt.</p>
   <ol className="mfa-codes">{codes.map(c=><li key={c}><code>{c}</code></li>)}</ol>
-  <div className="mfa-actions"><button type="button" className="button secondary" onClick={copy}><Copy size={15} aria-hidden="true"/>{copied?'Kopiert':'Kopieren'}</button><button type="button" className="button secondary" onClick={download}><Download size={15} aria-hidden="true"/>Als Datei</button></div>
+  <div className="mfa-actions"><button type="button" className="button secondary" onClick={copy}>{copied?<Check size={15} aria-hidden="true"/>:<Copy size={15} aria-hidden="true"/>}<span role="status">{copied?'Kopiert':'Kopieren'}</span></button><button type="button" className="button secondary" onClick={download}><Download size={15} aria-hidden="true"/>Als Datei</button></div>
   <label className="mfa-confirm"><input type="checkbox" checked={saved} onChange={e=>setSaved(e.target.checked)}/>Ich habe die Codes sicher abgelegt, z. B. im Passwort-Manager.</label>
   <button className="button primary wide" disabled={!saved} onClick={onContinue}>Weiter zu Stage Force</button>
  </div>;
