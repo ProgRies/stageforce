@@ -364,3 +364,6 @@
 /* Deleting a note, call or meeting: a quiet red text button on the left of the editor, away from Speichern. */
 .activity-editor>div>.activity-delete{margin-right:auto;gap:6px;font-size:13px;color:#b4533f}.activity-editor>div>.activity-delete:hover{color:#8f3524}
 [data-theme="dark"] .activity-editor>div>.activity-delete{color:#f0a493}[data-theme="dark"] .activity-editor>div>.activity-delete:hover{color:#ffc4b6}
+/* Copy-to-clipboard feedback: the icon briefly turns into a checkmark with a small "Kopiert" label. */
+.copy-state{display:inline-flex;align-items:center;gap:4px;flex:none}.copy-label{font-size:11px;font-weight:600;animation:copy-pop .18s ease-out}.contact-email.is-copied .copy-state svg{animation:copy-pop .18s ease-out}
+@keyframes copy-pop{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:none}}
