@@ -2,6 +2,7 @@ import {useConfirm} from './ConfirmDialog';
 import {api,request} from "./api";
 import ImportHub from "./ImportHub";
 import OrganisationView from "./OrganisationView";
+import type {EmailMoved} from "./EmailMove";
 import CreateOrganisation from "./CreateOrganisation";
 import SystemSettings from "./SystemSettings";
 import GuidedTour from "./GuidedTour";
@@ -62,6 +63,7 @@ export default function Desk({user}:{user:User}){
   async function moreHistory(){if(historyPaging.current)return;const identity=historyIdentity.current;historyPaging.current=true;try{const r=await api({action:"history",id:selected,offset:historyItems.length,kind:"communication"});if(historyIdentity.current===identity){setHistoryItems(v=>[...v,...r.items.filter((x:any)=>!v.some(i=>i.ereignis_id===x.ereignis_id))]);setHistoryTotal(r.total);}}catch(e:any){setToast(e.message);}finally{historyPaging.current=false;}}
   function saved(updated?:Entity){if(updated){setDetail(current=>selected===updated.id?updated:current);setData(current=>current?{...current,entities:current.entities.map(e=>e.id===updated.id?updated:e)}:current);}return refresh(true);}
   function activityDeleted(result:{entity:Entity;activityId:string}){setHistoryItems(items=>items.filter(h=>h.ereignis_id!==result.activityId));setHistoryTotal(n=>Math.max(0,n-1));saved(result.entity);}
+  function emailsMoved(result:EmailMoved){const gone=new Set(result.moved);setHistoryItems(items=>items.filter(h=>!gone.has(h.ereignis_id)));setHistoryTotal(n=>Math.max(0,n-gone.size));saved(result.entity);setToast(`Nach „${result.into.name}“ verschoben`+(result.unusedContacts.length?` · ${result.unusedContacts.join(', ')} hat hier keine Einträge mehr`:''));}
   function activitySaved(result:{entity:Entity;activityId:string;kind?:string;text:string;date?:string;cancelled?:boolean}){setHistoryItems(items=>{const next=items.map(h=>h.ereignis_id===result.activityId?{...h,text:result.text,...(result.kind?{art:result.kind}:{}),...(result.date?{datum:result.date,meeting_cancelled:!!result.cancelled}:{})}:h);return result.date?[...next].sort((a,b)=>(b.datum||'').localeCompare(a.datum||'')):next;});saved(result.entity);}
   // A calendar entry opens its organisation in the organisation view.
   async function openFromCalendar(id:string){if(saving)return;setMode("orgs");setReviewOnly(false);setSelected(id);detailRef.current?.scrollTo({top:0});}
@@ -126,7 +128,7 @@ export default function Desk({user}:{user:User}){
         </section>
         <section className="detail-pane glass" ref={detailRef}>
           {entity&&warn.length>0&&<div className="review-bar" role="status"><AlertCircle size={18}/><p>{warn.join("\n")}</p><button className="button secondary" disabled={saving||inlineSaving||inlinePending} onClick={reviewDone}><Check size={16}/>Erledigt</button></div>}
-          {detailError&&<p className="save-error">{detailError}</p>}{detailLoading&&<p className="muted">Details werden geladen …</p>}{entity?<OrganisationView key={entity.id+":"+viewEpoch} accountEmail={user?.email||""} users={data?.users||[]} onPendingChange={setInlinePending} onBusyChange={setInlineSaving} entity={entity} entities={entities} links={links} history={historyItems} historyTotal={historyTotal} loading={detailLoading} onMore={moreHistory} onPick={pick} onSaved={saved} onActivitySaved={activitySaved} onActivityDeleted={activityDeleted} onRemoved={removed} callReason={mode==="calls"?selectedQueue?.reason:undefined} onSkip={skip}/>:<div className="detail-empty"><div className="empty-art"><Users size={44} strokeWidth={1.1}/></div><h2>{mode==="calls"?"Ein Gespräch nach dem anderen.":"Alles beginnt mit einem Kontakt."}</h2><p>{mode==="calls"?"Erstelle deine Tagesliste und starte links mit dem ersten Anruf.":"Suche eine Organisation oder wähle sie links aus."}</p></div>}
+          {detailError&&<p className="save-error">{detailError}</p>}{detailLoading&&<p className="muted">Details werden geladen …</p>}{entity?<OrganisationView key={entity.id+":"+viewEpoch} accountEmail={user?.email||""} users={data?.users||[]} onPendingChange={setInlinePending} onBusyChange={setInlineSaving} entity={entity} entities={entities} links={links} history={historyItems} historyTotal={historyTotal} loading={detailLoading} onMore={moreHistory} onPick={pick} onSaved={saved} onActivitySaved={activitySaved} onActivityDeleted={activityDeleted} onEmailsMoved={emailsMoved} onRemoved={removed} callReason={mode==="calls"?selectedQueue?.reason:undefined} onSkip={skip}/>:<div className="detail-empty"><div className="empty-art"><Users size={44} strokeWidth={1.1}/></div><h2>{mode==="calls"?"Ein Gespräch nach dem anderen.":"Alles beginnt mit einem Kontakt."}</h2><p>{mode==="calls"?"Erstelle deine Tagesliste und starte links mit dem ersten Anruf.":"Suche eine Organisation oder wähle sie links aus."}</p></div>}
         </section></>}
       </div>
     </div>
