@@ -370,3 +370,15 @@
 /* Copy-to-clipboard feedback: the icon briefly turns into a checkmark with a small "Kopiert" label. */
 .copy-state{display:inline-flex;align-items:center;gap:4px;flex:none}.copy-label{font-size:11px;font-weight:600;animation:copy-pop .18s ease-out}.contact-email.is-copied .copy-state svg{animation:copy-pop .18s ease-out}
 @keyframes copy-pop{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:none}}
+/* Moving an email to another organisation: an inline panel under the email, like the activity editor. */
+.email-move-open{margin-top:12px;gap:6px}
+.email-move{margin-top:14px;border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:var(--surface-input,#fff8)}
+.email-move header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.email-move header strong{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:590}
+.email-move fieldset{border:0;padding:0;margin:0;min-width:0;display:flex!important;flex-direction:column;gap:12px}
+.email-move fieldset>*{width:100%;min-width:0}
+.email-move-group p{font-size:13px;line-height:1.6}
+.email-move-group .checkbox{align-items:flex-start;line-height:1.5}
+.email-move-notes{margin:0;padding-left:18px;font-size:12px;line-height:1.65;color:var(--theme-text-secondary,#6e8596);display:grid;gap:4px}
+.email-move-notes .warning{color:var(--amber,#a07842)}
+.email-move-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
