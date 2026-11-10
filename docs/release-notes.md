@@ -1,10 +1,11 @@
-# StageForce 0.3.22 · Data checks in Prüfen: FastBill links and map pins
+# StageForce 0.3.22 · Move an email to another organisation · data checks in Prüfen · better search · copy feedback
 
-Publishes `ghcr.io/progries/stageforce:0.3.22`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.22` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. No database change; the extension is unchanged.
+Publishes `ghcr.io/progries/stageforce:0.3.22`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.22` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. No database change and no new settings; the extension is unchanged.
 
-- **Prüfen** gets three buttons above the list: **Übergaben** (the existing list, still the default), **FastBill** and **Kartenpins**, each with its count.
-- **FastBill** lists every Kunde and Ehemaliger Kunde without a valid FastBill link. **Kartenpins** lists every organisation without a pin on the map, Kunden first.
-- An organisation leaves these lists as soon as the link or pin is saved. The checks are worked out from the loaded data and write nothing, so the existing Prüfen points, **Erledigt** and the sidebar count are unchanged.
+- **Move an email saved to the wrong organisation:** an opened email on the timeline has **Andere Organisation zuordnen …**. Pick the right organisation; the other saved emails of the same Gmail conversation are offered too (ticked by default). Linked contacts are matched to an existing contact in the target by email address, or copied there; a meeting logged from the email moves with it. The old organisation keeps its contacts, follow-up and Prüfen points, and its Letzter Kontakt falls back to the newest remaining contact entry. Both organisations get a CRM-Änderung entry and an Änderungsprotokoll record, and the step can be undone by moving the email back.
+- **Prüfen** gets three buttons above the list: **Übergaben** (the existing list, still the default), **FastBill** and **Kartenpins**, each with its count. **FastBill** lists every Kunde and Ehemaliger Kunde without a valid FastBill link. **Kartenpins** lists every organisation without a pin on the map, Kunden first. An organisation leaves these lists as soon as the link or pin is saved. The checks are worked out from the loaded data and write nothing, so the existing Prüfen points, **Erledigt** and the sidebar count are unchanged.
+- **Organisation search:** results whose name starts with the search come first, then names containing every word, then other master data. Organisations found only in emails or notes are folded under a line you can open.
+- **Copy buttons** (contact email addresses, recovery codes, extension keys) briefly show a checkmark with "Kopiert" and then return to normal.
 
 # StageForce 0.3.21 · Rename an organisation
 
