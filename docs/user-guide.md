@@ -6,7 +6,7 @@ Everyone on the team sees and edits the same data. There are no per-organisation
 
 ## Organisations
 
-The sidebar switches between **Organisationen**, **Anrufe** (your call list), **Prüfen** and **Importe**. The list searches names, places, contacts and the full text of the timeline. If an organisation is missing, create it straight from the search results; the form warns about similar existing names.
+The sidebar switches between **Organisationen**, **Anrufe** (your call list), **Prüfen** and **Importe**. The list searches names, places, contacts and the full text of the timeline. Name matches come first; organisations found only in emails, notes or further contacts are folded under one line at the end. If an organisation is missing, create it straight from the search results; the form warns about similar existing names.
 
 The header of an organisation holds:
 
@@ -31,6 +31,8 @@ To take a contact from an email, select the person's details in the opened email
 ## The timeline
 
 The newest entry is on top: emails (blue), calls (purple), meetings and notes (amber). A closed email card names the sender and shows the first lines of the email on one line. Open a card for the full text. Emails show their envelope and the contacts they were saved with. Calls, notes and meetings have a pencil to correct them; the date, author and linked contacts stay, and the edit lands in the change log.
+
+An email saved to the wrong organisation can be moved: open it and choose **Andere Organisation zuordnen …**, then pick the right organisation. Other saved emails of the same Gmail conversation are offered too. Its contacts are linked to the matching contact there (same email address) or copied over, and a meeting logged from the email moves with it. Both organisations record the move in the change log; moving it back undoes it.
 
 **Notiz hinzufügen** records a note or a meeting. A note never counts as client contact. A meeting does, once its day has come.
 
@@ -94,6 +96,8 @@ The list only takes organisations you own or nobody owns, and none that a collea
 | E-Mail senden | a call with **E-Mail nötig** | when an outgoing email to the organisation is saved, or with **Erledigt** |
 | Neu aus Anruf angelegt · Daten prüfen | an organisation created in the phone app | **Erledigt** |
 | E-Mail-Adresse fehlt (FastBill-Import) | a FastBill customer added without an email address | **Erledigt** |
+
+Above the list, **Übergaben** shows these points (the default). Two more buttons run data checks on every organisation: **FastBill** lists Kunden and ehemalige Kunden without a valid FastBill link, and **Kartenpins** lists organisations without a pin on the map, Kunden first. There is no **Erledigt** for these: set the link or the pin and the organisation drops off the list. The sidebar count only counts the points above.
 
 **Erledigt** in the organisation view closes all open points and records that in the change log.
 
