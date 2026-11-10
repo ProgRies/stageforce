@@ -95,6 +95,8 @@ The list only takes organisations you own or nobody owns, and none that a collea
 | Neu aus Anruf angelegt · Daten prüfen | an organisation created in the phone app | **Erledigt** |
 | E-Mail-Adresse fehlt (FastBill-Import) | a FastBill customer added without an email address | **Erledigt** |
 
+Above the list, **Übergaben** shows these points (the default). Two more buttons run data checks on every organisation: **FastBill** lists Kunden and ehemalige Kunden without a valid FastBill link, and **Kartenpins** lists organisations without a pin on the map, Kunden first. There is no **Erledigt** for these: set the link or the pin and the organisation drops off the list. The sidebar count only counts the points above.
+
 **Erledigt** in the organisation view closes all open points and records that in the change log.
 
 ## Map

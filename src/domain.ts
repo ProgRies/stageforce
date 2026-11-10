@@ -156,3 +156,24 @@ export function dayItems(week:CalendarWeek,day:string):CalendarItem[]{
  const rank=(i:CalendarItem)=>i.overdue?0:i.time?2:1;
  return [...calls,...meetings].sort((a,b)=>rank(a)-rank(b)||(a.overdue||"").localeCompare(b.overdue||"")||a.time.localeCompare(b.time)||(a.kind===b.kind?0:a.kind==="meeting"?-1:1)||a.name.localeCompare(b.name,"de"));
 }
+
+// On-demand data checks in Prüfen. They are worked out from the loaded list and never stored,
+// so the organisation drops off as soon as the missing link or pin is set.
+export type DataCheck = "fastbill" | "pins";
+export const DATA_CHECKS: Record<DataCheck,{label:string;hint:string;empty:string}> = {
+  fastbill:{label:"FastBill",hint:"Kunden und ehemalige Kunden ohne FastBill-Link",empty:"Alle Kunden haben einen FastBill-Link."},
+  pins:{label:"Kartenpins",hint:"Organisationen ohne Pin auf der Karte",empty:"Alle Organisationen haben einen Kartenpin."},
+};
+const FASTBILL_STATUSES = ["Kunde","Ehemaliger Kunde"];
+export function dataCheckIssue(e: Entity, check: DataCheck): string {
+  if(check==="fastbill"){
+    if(!FASTBILL_STATUSES.includes(text(e,9)))return "";
+    return fastbillURL(e.values[3])?"":text(e,3).trim()?"FastBill-Link ungültig":"FastBill-Link fehlt";
+  }
+  return e.location?"":"Kein Kartenpin";
+}
+// Kunden first, then everything else by name, so the organisations that matter most are on top.
+export function dataCheckList(entities: Entity[], check: DataCheck): Entity[] {
+  const rank=(e:Entity)=>text(e,9)==="Kunde"?0:text(e,9)==="Ehemaliger Kunde"?1:2;
+  return entities.filter(e=>dataCheckIssue(e,check)).sort((a,b)=>rank(a)-rank(b)||text(a,1).localeCompare(text(b,1),"de"));
+}

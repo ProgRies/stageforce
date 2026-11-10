@@ -1,3 +1,11 @@
+# StageForce 0.3.22 · Data checks in Prüfen: FastBill links and map pins
+
+Publishes `ghcr.io/progries/stageforce:0.3.22`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.22` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. No database change; the extension is unchanged.
+
+- **Prüfen** gets three buttons above the list: **Übergaben** (the existing list, still the default), **FastBill** and **Kartenpins**, each with its count.
+- **FastBill** lists every Kunde and Ehemaliger Kunde without a valid FastBill link. **Kartenpins** lists every organisation without a pin on the map, Kunden first.
+- An organisation leaves these lists as soon as the link or pin is saved. The checks are worked out from the loaded data and write nothing, so the existing Prüfen points, **Erledigt** and the sidebar count are unchanged.
+
 # StageForce 0.3.21 · Rename an organisation
 
 Publishes `ghcr.io/progries/stageforce:0.3.21`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.21` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. No database change; the extension is unchanged.
