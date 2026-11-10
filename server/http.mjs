@@ -16,11 +16,12 @@ import {Problem,listData,entity,history,search,save,createOrg,activitySave,activ
 import {inspectCSV,csvRecords,stageFastbill,fastbillBatches,fastbillRows,fastbillPreview,decideFastbill,deleteFastbillBatch,fetchFastbillPage} from './fastbill.mjs';
 import {parseEmail} from './email.mjs';
 import {deleteOrganisation,mergeOrganisations} from './lifecycle.mjs';
+import {emailMovePreview,emailMove} from './emailmove.mjs';
 import {liveHub} from './live.mjs';
 import {locationSave,mapService} from './map.mjs';
 import {calendar} from './calendar.mjs';
 // Actions that only read, or only touch the caller's own settings and staging, are not announced to other tabs.
-const quiet=new Set(['calendar','appearanceSave','passwordChange','extensionStatus','extensionCreate','extensionRenew','extensionRevoke','load','detail','history','search','imports','importPreview','importPosition','importDelete','message','check','messageStatus','threadStatus','meeting','lookup','callOpen','callDraft','mapSearch','securityEvents','mobileHome','mobileSearch','mobileOrg','mobileDevices','mobileDeviceRevoke']);
+const quiet=new Set(['calendar','appearanceSave','passwordChange','extensionStatus','extensionCreate','extensionRenew','extensionRevoke','load','detail','history','search','imports','importPreview','importPosition','importDelete','message','check','messageStatus','threadStatus','meeting','lookup','callOpen','callDraft','mapSearch','securityEvents','mobileHome','mobileSearch','mobileOrg','mobileDevices','mobileDeviceRevoke','emailMovePreview']);
 // The phone app names the device it was signed in on, so the list under Einstellungen says which phone is which.
 const deviceLabel=req=>{const ua=String(req.headers['user-agent']||'');return /iPhone/.test(ua)?'iPhone':/iPad/.test(ua)?'iPad':/Android/.test(ua)?'Android-Handy':'Handy';};
 const touched=(b,data)=>[b.id,b.other,b.into,b.organisationId,data?.entity?.id,data?.organisation?.id,data?.deleted];
@@ -146,6 +147,8 @@ export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:300
    case 'reviewDone':data=reviewDone(db,session,b);break;
    case 'organisationDelete':data=deleteOrganisation(db,session,b);break;
    case 'organisationMerge':data=mergeOrganisations(db,session,b);break;
+   case 'emailMovePreview':data=emailMovePreview(db,session,b);break;
+   case 'emailMove':data=emailMove(db,session,b);break;
    case 'imports':data={items:db.prepare('SELECT id,payload_json FROM email_imports WHERE user_id=? AND expires_at>? ORDER BY rowid DESC').all(session.id,Date.now()).map(r=>{const p=JSON.parse(r.payload_json);return{id:r.id,subject:p.subject,sentAt:p.sentAt,direction:p.direction};})};break;
    case 'importPreview':data=importPreview(db,session,b.importId);break;
    case 'importPosition':data=timelinePosition(db,session,b);break;
