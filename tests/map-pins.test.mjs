@@ -53,3 +53,9 @@ test('place search sends only the typed text and returns clean results',async()=
  await assert.rejects(mapService({searchURL:'https://search.test',fetcher:async()=>{throw Error('offline');}}).search('x'),/nicht erreichbar/);
  await assert.rejects(mapService({tileURL:'',fetcher}).tile(1,1,1),/deaktiviert/);
 });
+
+test('pins are coloured by relationship status',async()=>{const {pinKind,PIN_KINDS}=await import('../src/domain.ts');
+ const e=status=>{const values=[];values[9]=status;return{id:'x',row:1,values,version:'1'};};
+ assert.deepEqual(['Kunde','Partner / Agentur','Lead','Unklar','Ehemaliger Kunde','',' Kunde '].map(s=>pinKind(e(s))),['client','partner','lead','other','other','other','client']);
+ assert.deepEqual(PIN_KINDS.map(k=>k.kind),['client','partner','lead']);
+});

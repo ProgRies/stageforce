@@ -23,6 +23,10 @@ export function contactName(name:unknown,address:unknown):string {
  if(!/\p{L}/u.test(local))return '';
  return local.split(/[._-]+/).filter(Boolean).map(part=>part.charAt(0).toLocaleUpperCase()+part.slice(1).toLocaleLowerCase()).join(' ').slice(0,300);
 }
+// Map pin colour per relationship status; Unklar and Ehemaliger Kunde keep the neutral grey pin.
+export type PinKind='client'|'partner'|'lead'|'other';
+export const PIN_KINDS:{kind:Exclude<PinKind,'other'>;label:string}[]=[{kind:'client',label:'Kunde'},{kind:'partner',label:'Partner / Agentur'},{kind:'lead',label:'Lead'}];
+export function pinKind(e:Entity):PinKind{const s=text(e,9).trim();return s==='Kunde'?'client':s==='Partner / Agentur'?'partner':s==='Lead'?'lead':'other';}
 export function organisationSubtitle(e:Entity){const city=text(e,4).trim(),type=text(e,2).trim();return city&&city!=='Unklar'?city:type&&type!=='Unklar'?type:'';}
 export function jsonList(value: unknown): any[] { try { const x = JSON.parse(String(value || "[]")); return Array.isArray(x) ? x : []; } catch { return []; } }
 export function todayBerlin() { return new Intl.DateTimeFormat("sv-SE",{timeZone:"Europe/Berlin",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date()); }
