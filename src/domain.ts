@@ -162,17 +162,23 @@ export function dayItems(week:CalendarWeek,day:string):CalendarItem[]{
 }
 
 // On-demand data checks in Prüfen. They are worked out from the loaded list and never stored,
-// so the organisation drops off as soon as the missing link or pin is set.
-export type DataCheck = "fastbill" | "pins";
+// so the organisation drops off as soon as the missing link, pin or owner is set.
+export type DataCheck = "fastbill" | "pins" | "owner";
 export const DATA_CHECKS: Record<DataCheck,{label:string;hint:string;empty:string}> = {
   fastbill:{label:"FastBill",hint:"Kunden und ehemalige Kunden ohne FastBill-Link",empty:"Alle Kunden haben einen FastBill-Link."},
   pins:{label:"Kartenpins",hint:"Organisationen ohne Pin auf der Karte",empty:"Alle Organisationen haben einen Kartenpin."},
+  owner:{label:"Zuweisen",hint:"Leads, für die niemand zuständig ist",empty:"Jeder Lead hat jemanden, der zuständig ist."},
 };
 const FASTBILL_STATUSES = ["Kunde","Ehemaliger Kunde"];
 export function dataCheckIssue(e: Entity, check: DataCheck): string {
   if(check==="fastbill"){
     if(!FASTBILL_STATUSES.includes(text(e,9)))return "";
     return fastbillURL(e.values[3])?"":text(e,3).trim()?"FastBill-Link ungültig":"FastBill-Link fehlt";
+  }
+  // Same rule as the call lists (callableBy): an owner name that matches no team account counts as nobody.
+  if(check==="owner"){
+    if(text(e,9)!=="Lead"||e.ownerId)return "";
+    return text(e,11).trim()?`„${text(e,11).trim()}“ ist kein Teammitglied`:"Niemand zuständig";
   }
   return e.location?"":"Kein Kartenpin";
 }
