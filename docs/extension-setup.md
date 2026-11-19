@@ -35,7 +35,7 @@ In the inbox list, a small **✓ CRM** mark shows conversations whose latest ema
 
 ### Meetings
 
-The popup always offers **Also log as meeting** with a date and time. It is ticked automatically for video-call invitations (Zoom, Teams, Google Meet, Webex, GoTo, Whereby, Jitsi, Skype) and for calendar or booking confirmations such as "Akzeptiert:", "Terminbestätigung" or Calendly's "New Event:". Several emails about the same meeting stay one timeline entry; an updated invitation moves it and a cancellation marks it **Abgesagt**. Declines and counter-proposals are ignored.
+The popup always offers **Also log as meeting** with a date and time. It is ticked automatically for video-call invitations (Zoom, Teams, Google Meet, Webex, GoTo, Whereby, Jitsi, Skype) and for calendar or booking confirmations such as "Akzeptiert:", "Terminbestätigung" or Calendly's "New Event:". Several emails about the same meeting stay one timeline entry; an updated invitation moves it and a cancellation marks it **Abgesagt**. Declines and counter-proposals are ignored. Google Calendar and booking-tool notifications come from one shared address (such as calendar-notification@google.com), so that address never picks an organisation and is never offered as a contact: choose the organisation yourself.
 
 ## Calling from Gmail
 

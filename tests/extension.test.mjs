@@ -73,6 +73,26 @@ test('lookup reads headers only, selects exact matches, leaves domain-only or am
  assert.throws(()=>action(db,user,{...envelope,mailbox:'someone@team.test'}),/mailbox/);
  }finally{db.close();}
 });
+test('a Google Calendar notification never selects the organisation that once stored its shared sender address',async()=>{
+ const{db,user}=await setup();try{
+ // Saving one calendar email with the sender ticked used to store calendar-notification@google.com as a contact; every later
+ // acceptance, from anyone, then went to that organisation.
+ const wrong=createOrg(db,user,'Stadtmarketing');addContact(db,wrong.id,{name:'Old guest (Google Kalender)',e_mails:['calendar-notification@google.com']});
+ const right=createOrg(db,user,'Volksbank');
+ const accepted={...msg,from:{name:'Gioena De Giosa (Google Kalender)',email:'Calendar-Notification@google.com'},originalSubject:'Angenommen: Social Wall Stage / Volksbank - Mo 23. Nov. 2026 2PM - 2:30PM (MEZ) (alex@team.test)',subject:'Angenommen: Social Wall Stage',originalBody:'Gioena De Giosa hat diese Einladung angenommen.\nmeet.google.com/abc-defg-hij',contactEmails:[]};
+ const r=action(db,user,{...accepted,action:'lookup'});
+ assert.equal(r.organisation,null);assert.deepEqual(r.candidates,[]);assert.deepEqual(r.participants,[]);
+ assert.deepEqual(action(db,user,{...accepted,action:'lookup',quoted:[{email:'calendar-notification@google.com',name:'x'}]}).quoted,[]);
+ // Saved to the organisation the user picks, with its meeting, and the shared address is not offered or stored as a contact there.
+ assert.throws(()=>action(db,user,{...accepted,action:'save',confirmed:true,requestId:randomUUID(),organisationId:right.id,version:getOrg(db,right.id).version,contactEmails:['calendar-notification@google.com']}),/contacts/);
+ action(db,user,{...accepted,action:'save',confirmed:true,requestId:randomUUID(),organisationId:right.id,version:getOrg(db,right.id).version,meeting:{log:true,date:'2026-11-23',time:'14:00'}});
+ assert.equal(db.prepare("SELECT count(*) n FROM activities WHERE organisation_id=? AND kind='Meeting'").get(right.id).n,1);
+ assert.equal(db.prepare("SELECT count(*) n FROM activities WHERE organisation_id=? AND kind='Meeting'").get(wrong.id).n,0);
+ assert.equal(db.prepare('SELECT count(*) n FROM organisation_contacts WHERE organisation_id=?').get(right.id).n,0);
+ // A real person's address still selects their organisation.
+ addContact(db,right.id,{e_mails:['gioena@volksbank.test']});assert.equal(action(db,user,{...accepted,action:'lookup',from:{name:'Gioena',email:'gioena@volksbank.test'}}).organisation.id,right.id);
+ }finally{db.close();}
+});
 test('atomic save, links, source attribution, duplicate retries and cross-user ownership',async()=>{
  const{db,user}=await setup();try{
  const b={...msg,action:'save',confirmed:true,requestId:randomUUID(),newOrganisation:'Customer',linked:{name:'Agency'}};

@@ -204,6 +204,10 @@ export function linkSave(db,user,b){const note=str(b.note||'',2000);return trans
 export function stageImport(db,user,payload){db.prepare('DELETE FROM email_imports WHERE expires_at<?').run(Date.now());const count=db.prepare('SELECT count(*) AS n FROM email_imports WHERE user_id=?').get(user.id).n;if(count>=30)throw new Problem('Bitte vorhandene Importe prüfen oder verwerfen.',429);const id=uid();db.prepare('INSERT INTO email_imports VALUES(?,?,?,?)').run(id,user.id,JSON.stringify(payload),Date.now()+86400000);return importPreview(db,user,id);}
 export const publicDomains=new Set(['gmail.com','googlemail.com','outlook.com','hotmail.com','live.com','yahoo.com','yahoo.de','gmx.de','gmx.net','web.de','icloud.com','me.com','aol.com','t-online.de','proton.me','protonmail.com']);
 const domainOf=value=>String(value||'').toLowerCase().split('@')[1]||'';
+// Calendar and booking tools send every notification from one shared address ("Gioena De Giosa (Google Kalender)" <calendar-notification@google.com>).
+// Such an address says nothing about who wrote: it never selects an organisation and is never offered as a contact.
+const NOTIFICATION_SENDERS=new Set(['calendar-notification@google.com','notifications@calendly.com','no-reply@calendly.com','no-reply@zoom.us','noreply@zoom.us']);
+export const notificationSender=address=>NOTIFICATION_SENDERS.has(String(address||'').trim().toLowerCase());
 // INTERNAL_DOMAINS lists further company domains (comma separated), e.g. shared aliases on a second domain.
 export function ourAddresses(db,user,mailbox=''){
  const team=new Set(db.prepare('SELECT email FROM users').all().map(u=>u.email.toLowerCase()));team.add(user.email.toLowerCase());if(mailbox)team.add(mailbox.toLowerCase());
@@ -213,10 +217,10 @@ export function ourAddresses(db,user,mailbox=''){
 }
 function mailParticipants(db,p,user){
  const {team,domains}=ourAddresses(db,user,p.mailbox);
- const people=new Map();for(const [role,list]of [['sender',p.sender],['recipient',p.recipients],['cc',p.cc]])for(const a of list||[]){const address=String(a.email).toLowerCase();if(!people.has(address))people.set(address,{name:contactName(a.name,address),email:address,role,internal:team.has(address)||domains.has(domainOf(address))});}
+ const people=new Map();for(const [role,list]of [['sender',p.sender],['recipient',p.recipients],['cc',p.cc]])for(const a of list||[]){const address=String(a.email).toLowerCase();if(!people.has(address)&&!notificationSender(address))people.set(address,{name:contactName(a.name,address),email:address,role,internal:team.has(address)||domains.has(domainOf(address))});}
  // Only explicit forwarded/quoted address headers, never arbitrary addresses in prose.
  let quotedHeaders=0;for(const line of String(p.original||'').split('\n')){const header=line.replace(/^\s*>\s*/,'').match(/^\s*(From|Von|To|An|Cc):\s*(.+)$/i);if(!header)continue;if(++quotedHeaders>30)break;
-  for(const m of header[2].slice(0,2000).matchAll(/(?:([^<>;,]*?)\s*<)?([A-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[A-Z0-9.-]+\.[A-Z]{2,})>?/gi)){const address=m[2].toLowerCase();if(!people.has(address)&&email(address))people.set(address,{name:(m[1]||'').trim().replace(/^"|"$/g,'').slice(0,300),email:address,role:'quoted',internal:team.has(address)||domains.has(domainOf(address))});}
+  for(const m of header[2].slice(0,2000).matchAll(/(?:([^<>;,]*?)\s*<)?([A-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[A-Z0-9.-]+\.[A-Z]{2,})>?/gi)){const address=m[2].toLowerCase();if(!people.has(address)&&email(address)&&!notificationSender(address))people.set(address,{name:(m[1]||'').trim().replace(/^"|"$/g,'').slice(0,300),email:address,role:'quoted',internal:team.has(address)||domains.has(domainOf(address))});}
   if(people.size>200)break;
  }
  return [...people.values()].slice(0,200);
