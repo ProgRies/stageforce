@@ -5,7 +5,7 @@ import {prepareCall,saveCall,cancelCall,openCall,draftCall,mergePhones,dialNumbe
 import {randomBytes,createHash,randomUUID} from 'node:crypto';
 import {hashToken,limited,email} from './auth.mjs';
 import {transaction,now} from './db.mjs';
-import {Problem,ourAddresses,matchEmail,stageImport,confirmImport,getOrg,contacts,createOrg,linkSave,contactSave,assertVersion} from './crm.mjs';
+import {Problem,ourAddresses,notificationSender,matchEmail,stageImport,confirmImport,getOrg,contacts,createOrg,linkSave,contactSave,assertVersion} from './crm.mjs';
 const brief=o=>({id:o.id,name:o.name,version:String(o.version)});
 const field=(v,max=1000)=>{if(typeof v!=='string'||v.length>max||v.includes('\0'))throw new Problem('Invalid field.');return v.trim();};
 // Each computer gets its own browser key, so one can be renewed or revoked while the others stay connected.
@@ -155,7 +155,7 @@ export function extensionAction(db,user,b,origin){
   const known=selected?contacts(db,selected.id):[];
   const linked=selected?db.prepare('SELECT o.id,o.name,o.version FROM organisation_links l JOIN organisations o ON o.id=CASE WHEN l.a=? THEN l.b ELSE l.a END WHERE l.a=? OR l.b=?').all(selected.id,selected.id,selected.id).map(brief):[];
   // Authors found in the quoted history (only when the user includes it); colleagues are dropped here because only the server knows INTERNAL_DOMAINS.
-  let quoted;if(b.quoted!==undefined){if(!Array.isArray(b.quoted)||b.quoted.length>30)throw new Problem('Invalid participants.');const ours=ourAddresses(db,user,b.mailbox),header=new Set(p.participants.filter(a=>a.role!=='quoted').map(a=>a.email));quoted=[...new Map(b.quoted.map(a=>{const e=field(a?.email,254).toLowerCase();if(!email(e))throw new Problem('Check the quoted addresses.');return[e,field(a.name||'',300)];})).entries()].filter(([e])=>!ours.internal(e)&&!header.has(e)).map(([e,name])=>{const c=known.find(c=>c.e_mails.some(x=>x.toLowerCase()===e)),crm=crmContact(db,e);return{email:e,name:contactName(c?.name||crm?.name||name,e),known:!!c,contactId:c?.id,phones:c?.telefone||[],crm};});}
+  let quoted;if(b.quoted!==undefined){if(!Array.isArray(b.quoted)||b.quoted.length>30)throw new Problem('Invalid participants.');const ours=ourAddresses(db,user,b.mailbox),header=new Set(p.participants.filter(a=>a.role!=='quoted').map(a=>a.email));quoted=[...new Map(b.quoted.map(a=>{const e=field(a?.email,254).toLowerCase();if(!email(e))throw new Problem('Check the quoted addresses.');return[e,field(a.name||'',300)];})).entries()].filter(([e])=>!ours.internal(e)&&!header.has(e)&&!notificationSender(e)).map(([e,name])=>{const c=known.find(c=>c.e_mails.some(x=>x.toLowerCase()===e)),crm=crmContact(db,e);return{email:e,name:contactName(c?.name||crm?.name||name,e),known:!!c,contactId:c?.id,phones:c?.telefone||[],crm};});}
   // With no client address in the email, the organisation's two most recently active contacts are offered instead.
   return{quoted,organisation:selected,conversation:!!conversation,direction:p.direction,candidates,suggested:known.slice(0,2).map(c=>({contactId:c.id,email:c.e_mails[0]||'',name:contactName(c.name,c.e_mails[0]),phones:c.telefone,known:true})),participants:p.participants.filter(a=>!a.internal&&a.role!=='quoted').map(a=>{const c=known.find(c=>c.e_mails.some(e=>e.toLowerCase()===a.email)),crm=crmContact(db,a.email);return{...a,name:contactName(c?.name&&!c.name.includes('@')?c.name:crm?.name||a.name,a.email),known:!!c,contactId:c?.id,phones:c?.telefone||[],crm};}),linked:linked.length===1?linked[0]:null};
  }
