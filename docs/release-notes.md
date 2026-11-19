@@ -1,3 +1,11 @@
+# StageForce 0.3.24 · Delete a contact · calendar notifications no longer pick an organisation
+
+Publishes `ghcr.io/progries/stageforce:0.3.24`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.24` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. No database change and no new settings; the extension is unchanged.
+
+- **Calendar notifications:** Google Calendar, Calendly and Zoom send every notification from one shared address (e.g. `calendar-notification@google.com`). These addresses no longer select an organisation, no longer count for matching and are never offered as contacts, in the Gmail popup and in the email import. Before, once such an address was saved as a contact, every later calendar email (and its meeting) was filed under that organisation.
+- **Delete a contact:** in the contact editor (pencil), **Kontakt löschen** under **Speichern**, after a confirmation. In the phone app: **Bearbeiten** next to "Wer ist dran?", tap the person, **Kontakt löschen**. Emails and calls with that person stay in the timeline (a call keeps the name), the organisation gets a "Kontakt gelöscht" entry, and the Änderungsprotokoll keeps the full contact. A contact that also belongs to another organisation is only removed here.
+- Existing contacts holding a shared calendar address are not changed automatically. They no longer match anything and can now be deleted with **Kontakt löschen**.
+
 # StageForce 0.3.23 · Coloured map pins · Zuweisen in Prüfen · edit contacts in the phone app
 
 Publishes `ghcr.io/progries/stageforce:0.3.23`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.23` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. No database change and no new settings; the extension is unchanged.
