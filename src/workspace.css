@@ -383,11 +383,5 @@
 .email-move-notes .warning{color:var(--amber,#a07842)}
 .email-move-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
 .review-checks{padding-top:0;gap:2px}.review-checks .filter{white-space:nowrap;padding:6px 9px}.review-checks .filter{display:inline-flex;align-items:center;gap:5px}.review-checks .filter small{font-size:11px;font-weight:600;color:var(--theme-text-muted,#a0adb6)}.review-checks .filter.active small{color:inherit;opacity:.75}
-/* Prüfen › Zuweisen: four checks no longer fit one line in the list pane. Each lead gets an owner picker under its name. */
+/* Prüfen: four checks no longer fit one line in the list pane. */
 .review-checks{flex-wrap:wrap;row-gap:4px}
-.entity-row{display:contents}
-.assign-item{position:relative}
-.assign-item .entity-item{padding-bottom:50px}
-.assign-owner{position:absolute;left:9px;right:34px;bottom:12px;height:32px;border:1px solid var(--line);border-radius:8px;padding:0 9px;font-size:13px;background:var(--theme-surface,#fff9);color:var(--theme-text-secondary,#5d7a90);cursor:pointer}
-.assign-owner:disabled{opacity:.6;cursor:default}
-[data-theme="dark"] .assign-owner{background:#ffffff0d}
