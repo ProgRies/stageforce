@@ -29,6 +29,12 @@ sign in inside the installed app.
 3. Type the note. It is saved on the server as you type, so switching to the Phone app (iOS may restart the PWA) loses nothing.
 4. Pick the result and the next call, then tap **Speichern**, as on the desktop call card.
 
+While the call card is open, scroll down past **Speichern** to see the organisation's timeline, as on the organisation
+screen. It is read-only during a call: tap an entry to read it; changes and new notes wait until after the call.
+
+If the caller gives you a new number, tap the pencil next to their name in the call card and change it there (see
+"Changing a contact" below). The call is still logged with the number it started with.
+
 Every organisation created from a call is listed in **Prüfen** ("Neu aus Anruf angelegt · Daten prüfen") until someone
 checks its data at the desk, like a call that needs an email.
 
@@ -44,6 +50,15 @@ can be corrected (**Bearbeiten**) or deleted (**Löschen**, asked twice); **+ No
 
 To call a contact yourself, tap the green button next to them: the phone dials, and the call card opens to log the
 result and the next call. After the call, come back to the app; the card is still there.
+
+## Changing a contact
+
+Tap **Bearbeiten** next to "Wer ist dran?" on an organisation. Each contact gets a pencil, and **Neuer Kontakt** adds one.
+A tap opens the contact: change the name, the role or the numbers (**Weitere Nummer** adds one, the first number is the one the
+phone dials) and tap **Speichern**. The change applies right away for everyone and is logged in the organisation's
+changes ("Kontakt aktualisiert") as on the desktop. E-mail addresses are not edited on the phone and stay as they are. If a colleague changed the same contact
+in the meantime, the app shows their version instead of overwriting it; check it and save again. **Fertig** returns to the
+call buttons.
 
 ## Testing on your Mac and iPhone without deploying
 

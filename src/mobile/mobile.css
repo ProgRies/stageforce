@@ -255,3 +255,14 @@ svg{flex-shrink:0}
 .m-event-text strong.is-text{font-weight:550;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .m-event.is-open .m-event-text strong.is-text{display:none}
 .m-other-person{min-height:50px;font-size:16px}
+/* Contact editing: the edit chip next to "Wer ist dran?", the contact sheet, the pencil next to the caller in the call card. */
+.m-contacts-head{margin-top:2px}
+.m-contact-sheet{max-height:92dvh;overflow-y:auto;overscroll-behavior:contain;background:#f7f7fd}
+[data-theme="dark"] .m-contact-sheet{background:#1a2040}
+.m-sheet-backdrop:has(.m-contact-sheet){background:rgba(12,16,34,.45)}
+.m-phone-field{display:flex;align-items:flex-end;gap:8px}.m-phone-field>.m-field{flex:1;min-width:0}.m-phone-field>.m-icon-button{flex:none;margin-bottom:4px}
+.m-live-who{display:flex;align-items:center;gap:8px}.m-live-who>span{min-width:0;overflow-wrap:anywhere}
+.m-live-edit{flex:none;display:grid;place-items:center;width:32px;height:32px;padding:0;border:0;border-radius:50%;background:color-mix(in srgb,var(--soft) 14%,transparent);color:var(--soft);cursor:pointer}
+.m-live-edit:disabled{opacity:.6}
+/* The organisation's history below the call card, after a thin divider, so the controls above stay as they are. */
+.m-call-history{margin-top:18px;padding-top:6px;border-top:1px solid var(--line)}

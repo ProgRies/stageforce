@@ -7,7 +7,7 @@ const digits=s=>String(s||'').replace(/\D/g,'');
 function caller(db,id){
  const o=getOrg(db,id),place=[o.city,o.type].find(v=>v&&v!=='Unklar')||'';
  return{id:o.id,name:o.name,version:String(o.version),subtitle:place,status:o.status,
-  contacts:contacts(db,id).map(c=>({id:c.id,name:c.name,role:c.rolle,phones:c.telefone,primary:c.primary}))};
+  contacts:contacts(db,id).map(c=>({id:c.id,name:c.name,role:c.rolle,phones:c.telefone,emails:c.e_mails,primary:c.primary}))};
 }
 // What a call is most likely about: the planned calls due today of the organisations the user is responsible for (as in the
 // Follow-ups week, so a date set by hand counts too; without a responsible person, the one who planned it), then the organisations they spoke to last.
@@ -26,5 +26,6 @@ export function mobileSearch(db,query){
  const byName=words.map(id=>({id,name:getOrg(db,id).name.toLowerCase()})).sort((a,b)=>Number(!a.name.startsWith(name))-Number(!b.name.startsWith(name))||Number(!a.name.includes(name))-Number(!b.name.includes(name))).map(r=>r.id);
  return{items:[...new Set([...byPhone,...byName])].slice(0,12).map(id=>caller(db,id))};
 }
-// One organisation as the phone app shows it, for a tap on today's schedule and to pick up a new version before a note is added.
+// One organisation as the phone app shows it, for a tap on today's schedule and to pick up a new version before a note is added
+// or a contact is saved. The contact's e-mail addresses come along so saving a changed number from the phone keeps them.
 export function mobileOrg(db,id){if(typeof id!=='string'||id.length>100)throw new Problem('Organisation nicht gefunden.',404);return caller(db,id);}
