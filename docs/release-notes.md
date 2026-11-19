@@ -1,3 +1,12 @@
+# StageForce 0.3.23 · Coloured map pins · Zuweisen in Prüfen · edit contacts in the phone app
+
+Publishes `ghcr.io/progries/stageforce:0.3.23`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.23` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. No database change and no new settings; the extension is unchanged.
+
+- **Map pins by relationship status:** on the big map, other organisations' pins are green for Kunden, blue for Partner and Agenturen, amber for Leads and grey for everything else. The open organisation keeps its larger pin, and a small legend sits in the bottom-left corner.
+- **Prüfen → Zuweisen:** a fourth data check next to Übergaben, FastBill and Kartenpins. It lists every Lead nobody is responsible for, including Leads whose owner name matches no team account. Open the Lead and pick the person in its **Zuständig** dropdown; it then drops off the list. Nothing is stored for the check.
+- **Phone app, contacts:** **Bearbeiten** next to "Wer ist dran?" lets you change a contact's name, role and phone numbers, or add a new contact. The call card has a pencil next to the caller's name for the same thing mid-call; the call is still logged with the number it started with. E-mail addresses are kept as they are. A save logs "Kontakt aktualisiert" in the organisation's changes, and if a colleague changed the contact in the meantime the app shows their version instead of overwriting it.
+- **Phone app, call card:** scroll below the card to see the organisation's timeline (read-only during the call).
+
 # StageForce 0.3.22 · Move an email to another organisation · data checks in Prüfen · better search · copy feedback
 
 Publishes `ghcr.io/progries/stageforce:0.3.22`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.22` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. No database change and no new settings; the extension is unchanged.

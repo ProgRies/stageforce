@@ -103,7 +103,7 @@ Above the list, **Übergaben** shows these points (the default). Three more butt
 
 ## Map
 
-**Pin auf Karte setzen** at the bottom of the right column opens the map. Search a place (it starts with the organisation's town) or click the map, drag the pin to the right spot and save. Once a pin is set, a small preview shows it; click it for the full map with all other pinned organisations. Hover a pin for its name and click **Öffnen** to jump there. **Pin ändern** moves or removes the pin.
+**Pin auf Karte setzen** at the bottom of the right column opens the map. Search a place (it starts with the organisation's town) or click the map, drag the pin to the right spot and save. Once a pin is set, a small preview shows it; click it for the full map with all other pinned organisations. Other pins are coloured by relationship status (green Kunde, blue Partner or Agentur, amber Lead, grey the rest), with a legend in the corner. Hover a pin for its name and click **Öffnen** to jump there. **Pin ändern** moves or removes the pin.
 
 Map tiles and the place search go through the CRM server, so your browser never contacts the map provider.
 
