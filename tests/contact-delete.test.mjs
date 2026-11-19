@@ -1,0 +1,64 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+import {openDB} from '../server/db.mjs';
+import {addUser} from '../server/auth.mjs';
+import {createOrg,addActivity,contactSave,contactDelete,entity,search,history,contacts,getOrg} from '../server/crm.mjs';
+import {prepareCall,saveCall} from '../server/calls.mjs';
+async function fixture(){const db=openDB(':memory:');const id=await addUser(db,'contacts@example.test','Cleaner','long-password-1234');const user=db.prepare('SELECT * FROM users WHERE id=?').get(id);return{db,user,org:createOrg(db,user,'Contact delete test')};}
+const version=(db,id)=>getOrg(db,id).version;
+const count=(db,sql,...a)=>db.prepare(sql).get(...a).n;
+const save=(db,user,org,fields)=>contactSave(db,user,{id:org.id,version:version(db,org.id),emails:'',phones:'',...fields}).contactId;
+test('a contact without history is removed completely, logged in the timeline and kept in the audit log',async()=>{const{db,user,org}=await fixture();try{
+ const keep=save(db,user,org,{name:'Real Person',emails:'real@venue.test'});
+ const cid=save(db,user,org,{name:'',emails:'calendar-notification@google.com',primary:true});
+ assert(search(db,'google.com').includes(org.id));
+ const before=Number(version(db,org.id));
+ const r=contactDelete(db,user,{id:org.id,version:String(before),contactId:cid});
+ assert.equal(Number(r.entity.version),before+1);
+ assert.deepEqual(contacts(db,org.id).map(c=>c.id),[keep]);
+ assert.equal(count(db,'SELECT count(*) n FROM contacts WHERE id=?',cid),0);
+ assert.equal(count(db,'SELECT count(*) n FROM contact_addresses WHERE contact_id=?',cid),0);
+ assert(!search(db,'google.com').includes(org.id));
+ assert.equal(r.entity.values[12],'');assert.equal(r.entity.values[13],'');
+ const entry=history(db,org.id,0,'all').items.find(h=>h.text.startsWith('Kontakt gelöscht'));
+ assert.equal(entry.text,'Kontakt gelöscht: Calendar Notification');assert.equal(entry.art,'CRM-Änderung');
+ const log=JSON.parse(db.prepare("SELECT changes_json FROM audit_log WHERE action='contact_delete'").get().changes_json);
+ assert.deepEqual({emails:log.emails,primary:log.primary,shared:log.shared,kept:log.kept},{emails:['calendar-notification@google.com'],primary:true,shared:false,kept:false});
+ }finally{db.close();}});
+test('emails and calls of a deleted contact stay in the timeline; the call keeps the name',async()=>{const{db,user,org}=await fixture();try{
+ db.prepare("INSERT INTO messages(id,dedupe_key,subject,sender_json,recipients_json,body,direction,sent_at) VALUES('m1','k1','Angebot','[{\"email\":\"anna@venue.test\"}]','[]','Body','incoming','2026-10-01T10:00:00Z')").run();
+ const mail=addActivity(db,org.id,user,{type:'E-Mail',text:'Angebot',date:'2026-10-01',messageId:'m1',contacted:true});
+ const cid=save(db,user,org,{name:'Anna Beispiel',emails:'anna@venue.test',phones:'+493012345678',messageId:'m1'});
+ const p=prepareCall(db,user,{organisationId:org.id,contactId:cid,phone:'+493012345678',requestId:randomUUID(),startedAt:new Date().toISOString()});
+ saveCall(db,user,{callId:p.callId,notes:'Talked',outcome:'talked',next:{kind:'none'}});
+ const activities=count(db,'SELECT count(*) n FROM activities WHERE organisation_id=?',org.id);
+ contactDelete(db,user,{id:org.id,version:version(db,org.id),contactId:cid});
+ assert.equal(contacts(db,org.id).length,0);
+ assert.equal(count(db,'SELECT count(*) n FROM activities WHERE organisation_id=?',org.id),activities+1);
+ assert.equal(count(db,'SELECT count(*) n FROM activities WHERE id=?',mail),1);
+ assert.equal(count(db,'SELECT count(*) n FROM call_attempts WHERE contact_id=?',cid),1);
+ assert.equal(count(db,'SELECT count(*) n FROM activity_contacts WHERE contact_id=?',cid),0);
+ assert.equal(count(db,'SELECT count(*) n FROM contact_addresses WHERE contact_id=?',cid),0);
+ const items=history(db,org.id,0,'all').items;
+ assert.equal(items.find(h=>h.call_phone)?.call_contact,'Anna Beispiel');
+ assert(items.some(h=>h.ereignis_id===mail));
+ }finally{db.close();}});
+test('a contact shared with another organisation is only unlinked here',async()=>{const{db,user,org}=await fixture();try{
+ const other=createOrg(db,user,'Other venue');
+ const cid=save(db,user,org,{name:'Shared Person',emails:'shared@venue.test'});
+ db.prepare('INSERT INTO organisation_contacts VALUES(?,?,0)').run(other.id,cid);
+ contactDelete(db,user,{id:org.id,version:version(db,org.id),contactId:cid});
+ assert.equal(contacts(db,org.id).length,0);
+ assert.deepEqual(contacts(db,other.id).map(c=>c.e_mails),[['shared@venue.test']]);
+ }finally{db.close();}});
+test('a delete is refused for other organisations, unknown contacts and stale views, and changes nothing',async()=>{const{db,user,org}=await fixture();try{
+ const other=createOrg(db,user,'Other venue');
+ const cid=save(db,user,org,{name:'Stays',emails:'stays@venue.test'});
+ const audits=()=>count(db,'SELECT count(*) n FROM audit_log'),a=audits(),v=version(db,org.id);
+ assert.throws(()=>contactDelete(db,user,{id:other.id,version:version(db,other.id),contactId:cid}),e=>e.code==='not_found');
+ assert.throws(()=>contactDelete(db,user,{id:org.id,version:v,contactId:'nope'}),e=>e.code==='not_found');
+ assert.throws(()=>contactDelete(db,user,{id:org.id,version:v,contactId:{}}),e=>e.code==='not_found');
+ assert.throws(()=>contactDelete(db,user,{id:org.id,version:String(Number(v)-1),contactId:cid}),e=>e.code==='conflict');
+ assert.equal(audits(),a);assert.equal(version(db,org.id),v);assert.equal(contacts(db,org.id).length,1);
+ }finally{db.close();}});

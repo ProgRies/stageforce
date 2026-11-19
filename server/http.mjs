@@ -12,7 +12,7 @@ import {scheduleSnapshots} from './snapshots.mjs';
 import {getSession,verifyPassword,createSession,limited,publicUser,mobileSessions,revokeMobileSession,changePassword} from './auth.mjs';
 import {startChallenge,challengeUser,completeChallenge,confirmCode} from './mfa.mjs';
 import {clientIP,logEvent,failuresSinceLastLogin,recentEvents,pruneEvents} from './security.mjs';
-import {Problem,listData,entity,history,search,save,createOrg,activitySave,activityDelete,contactSave,linkSave,reviewDone,stageImport,importPreview,confirmImport,timelinePosition} from './crm.mjs';
+import {Problem,listData,entity,history,search,save,createOrg,activitySave,activityDelete,contactSave,contactDelete,linkSave,reviewDone,stageImport,importPreview,confirmImport,timelinePosition} from './crm.mjs';
 import {inspectCSV,csvRecords,stageFastbill,fastbillBatches,fastbillRows,fastbillPreview,decideFastbill,deleteFastbillBatch,fetchFastbillPage} from './fastbill.mjs';
 import {parseEmail} from './email.mjs';
 import {deleteOrganisation,mergeOrganisations} from './lifecycle.mjs';
@@ -141,6 +141,7 @@ export function makeServer(db,{origin=process.env.APP_URL||'http://localhost:300
    case 'activitySave':data=activitySave(db,session,b);break;
    case 'activityDelete':data=activityDelete(db,session,b);break;
    case 'contact':data=contactSave(db,session,b);break;
+   case 'contactDelete':data=contactDelete(db,session,b);break;
    case 'link':data=linkSave(db,session,b);break;
    case 'locationSave':data=locationSave(db,session,b);break;
    case 'mapSearch':if(limited(db,'map-search:'+session.id,30,60000))throw new Problem('Bitte kurz warten.',429);data={items:await map.search(b.query)};break;

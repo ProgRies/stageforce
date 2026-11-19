@@ -1,9 +1,10 @@
 import PhoneCall from './PhoneCall';
 import type {ContactSuggestion} from './contactExtraction';
 import {useEffect,useId,useState} from 'react';
-import {X,Plus,Link2,UserRound,Copy,Check,Pencil,ChevronDown} from 'lucide-react';
+import {X,Plus,Link2,UserRound,Copy,Check,Pencil,ChevronDown,Trash2} from 'lucide-react';
 import {useCopy} from './useCopy';
 import {api} from './api';
+import {useConfirm} from './ConfirmDialog';
 import OrganisationPicker from './OrganisationPicker';
 import {contactName,jsonList,type Entity,type EntityLink} from './domain';
 type Props={extracted?:ContactSuggestion;entity:Entity;entities:Entity[];links:EntityLink[];disabled:boolean;onSaved:(entity?:Entity)=>void;onPick:(id:string)=>void;onDirtyChange:(dirty:boolean)=>void;onBusyChange:(busy:boolean)=>void};
@@ -18,6 +19,10 @@ export default function EntityTools({extracted,entity,entities,links,disabled,on
  function pick(id:string){setSourceMessage(undefined);setSuggestion(null);if(!id)setExpanded(true);const c=contacts.find(c=>c.id===id);setCid(id);setName(contactName(c?.name,c?.e_mails?.[0]));setRole(c?.rolle||'');setEmails((c?.e_mails||[]).join('; '));setPhones((c?.telefone||[]).join('; '));setVersion(entity.version);setError('');setMode('contact');}
  function close(){if(busy)return;setMode('');setError('');setSuggestion(null);setSourceMessage(undefined);}
  async function save(){if(busy||conflict)return;setBusy(true);setError('');try{const result=await api(mode==='contact'?{action:'contact',id:entity.id,version,contactId:cid||null,name,role,emails,phones,messageId:sourceMessage}:{action:'link',id:entity.id,version,other,note});setMode('');onSaved(result.entity);}catch(e:any){setError(e.message);if(e.status==='conflict')onSaved();}finally{setBusy(false);}}
+ // Deleting keeps emails and calls in the timeline; the server also logs it there and keeps the contact in the audit log.
+ async function remove(){if(busy||conflict||!cid)return;const c=contacts.find(c=>c.id===cid),label=contactName(c?.name,c?.e_mails?.[0])||c?.e_mails?.[0]||'diesen Kontakt';
+  if(!await confirm(`„${label}“ von dieser Organisation löschen? E-Mails und Anrufe bleiben im Verlauf.`,'Kontakt löschen'))return;
+  setBusy(true);setError('');try{const result=await api({action:'contactDelete',id:entity.id,version,contactId:cid});setMode('');onSaved(result.entity);}catch(e:any){setError(e.message);if(e.status==='conflict')onSaved();}finally{setBusy(false);}}
  function applySuggestion(draft:ContactSuggestion,id:string){
   const c=contacts.find(c=>c.id===id);setCid(id);setName(c?.name||draft.name);setRole(c?.rolle||draft.role||'');
   setEmails([...new Set([...(c?.e_mails||[]),...draft.emails])].join('; '));
@@ -25,7 +30,7 @@ export default function EntityTools({extracted,entity,entities,links,disabled,on
   setSourceMessage(draft.messageId);setSuggestion(draft);setVersion(entity.version);setError('');setMode('contact');setExpanded(true);
  }
  useEffect(()=>{if(!extracted)return;const matches=contacts.filter(c=>c.e_mails.some((email:string)=>extracted.emails.includes(email.toLowerCase())));applySuggestion(extracted,matches.length===1?matches[0].id:'');},[extracted]);
- const clip=useCopy();
+ const clip=useCopy(),confirm=useConfirm();
  async function copy(value:string,key:string){if(!await clip.copy(value,key))setError('Bitte die E-Mail-Adresse markieren und kopieren.');}
  const editor=mode&&<form className="inline-contact-editor" onSubmit={e=>{e.preventDefault();save();}}><header><strong>{mode==='contact'?(cid?'Kontakt bearbeiten':'Neuer Kontakt'):'Verknüpfen'}</strong>{!(mode==='contact'&&cid)&&<button type="button" className="icon-button" disabled={busy} onClick={close} aria-label="Bearbeitung abbrechen"><X size={17}/></button>}</header><fieldset disabled={busy||disabled}>
   {suggestion&&<label className="field extraction-target"><span>Zu Kontakt</span><select aria-label="Extrahierten Kontakt zuordnen" value={cid} onChange={e=>applySuggestion(suggestion,e.target.value)}><option value="">Neuen Kontakt anlegen</option>{contacts.map(c=><option key={c.id} value={c.id}>{c.name||c.e_mails[0]||'Kontakt'}</option>)}</select></label>}
@@ -33,7 +38,8 @@ export default function EntityTools({extracted,entity,entities,links,disabled,on
   {suggestion&&<p className="muted extraction-review">Vorschlag aus der markierten E-Mail · bitte prüfen.</p>}
   {error&&<p className="save-error" role="alert">{error}</p>}
   {conflict&&<p className="save-error" role="alert">Der Datensatz wurde inzwischen geändert. Bitte Eingaben kopieren, die Bearbeitung schließen und erneut öffnen.</p>}
-  <button className="button primary wide" disabled={conflict||(mode==='link'&&!other)}>{busy?'Speichert …':'Speichern'}</button></fieldset></form>;
+  <button className="button primary wide" disabled={conflict||(mode==='link'&&!other)}>{busy?'Speichert …':'Speichern'}</button>
+  {mode==='contact'&&cid&&!suggestion&&<button type="button" className="text-button contact-delete" disabled={conflict} onClick={remove}><Trash2 size={14} aria-hidden="true"/>Kontakt löschen</button>}</fieldset></form>;
  return <section className="inline-contacts" data-tour="contacts">
   <div className="section-heading"><h3>Kontakte <small>{contacts.length}</small></h3><button className="icon-button" disabled={disabled||!!mode} title="Kontakt hinzufügen" aria-label="Kontakt hinzufügen" onClick={()=>pick('')}><Plus size={17}/></button></div>
   {mode==='contact'&&!cid&&editor}

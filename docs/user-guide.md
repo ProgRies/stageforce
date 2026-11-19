@@ -28,6 +28,8 @@ The pencil on a contact edits its name, role, email addresses and phone numbers 
 
 To take a contact from an email, select the person's details in the opened email and choose **Kontakt extrahieren**. Review the suggestion, then save it as a new contact or add it to an existing one.
 
+To remove a contact, open it with the pencil and choose **Kontakt löschen** under **Speichern**, then confirm (in the phone app: **Bearbeiten** next to "Wer ist dran?", tap the person, **Kontakt löschen**). Emails and calls with that person stay in the timeline, and the organisation's changes get a "Kontakt gelöscht" entry. The full contact is kept in the Änderungsprotokoll. If the same contact also belongs to another organisation, it is only removed here.
+
 ## The timeline
 
 The newest entry is on top: emails (blue), calls (purple), meetings and notes (amber). A closed email card names the sender and shows the first lines of the email on one line. Open a card for the full text. Emails show their envelope and the contacts they were saved with. Calls, notes and meetings have a pencil to correct them; the date, author and linked contacts stay, and the edit lands in the change log.
