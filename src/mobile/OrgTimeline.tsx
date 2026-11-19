@@ -3,13 +3,14 @@ import {CalendarCheck,Mail,MessageSquare,Phone,Pencil,Trash2,Plus,Check,X,Loader
 import {api} from '../api';
 import {activityLabel,formatDate,todayBerlin} from '../domain';
 // The organisation's timeline on the phone: the same entries as "Aktivitäten" on the desktop, loaded a page at a time while
-// scrolling. Kept basic on purpose: add a note, fix the text of a note, call or meeting, or delete one (asked twice). Emails are read-only.
+// scrolling. During a call it is shown read-only below the call card (readOnly), so a stray tap cannot change the history mid-call.
+// Otherwise kept basic on purpose: add a note, fix the text of a note, call or meeting, or delete one (asked twice). Emails are read-only.
 type Item={ereignis_id:string;datum:string|null;art:string;text:string;autor_name:string;message_id:string|null;subject?:string;direction?:string;sender_name?:string;preview?:string;sent_at?:string;meeting_cancelled?:boolean;call_contact?:string};
 type Kind='meeting'|'note'|'email'|'call'|'contact';
 const kindOf=(h:Item):Kind=>h.art==='Meeting'?'meeting':h.art==='Notiz'?'note':h.art==='Kontakt'?'contact':h.message_id||/mail/i.test(h.art)&&!h.art.startsWith('Anruf')?'email':'call';
 const NAMES:Record<Kind,string>={meeting:'Meeting',note:'Notiz',email:'E-Mail',call:'Anruf',contact:'Kontakt'};
 const time=(iso?:string)=>iso?new Intl.DateTimeFormat('de-DE',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Berlin'}).format(new Date(iso)):'';
-export default function OrgTimeline({orgId}:{orgId:string}){
+export default function OrgTimeline({orgId,readOnly=false}:{orgId:string;readOnly?:boolean}){
  const[items,setItems]=useState<Item[]>([]),[total,setTotal]=useState(0),[loading,setLoading]=useState(true),[error,setError]=useState('');
  const[open,setOpen]=useState(''),[edit,setEdit]=useState<{id:string;text:string;original:string}|null>(null),[confirm,setConfirm]=useState<{id:string;step:1|2}|null>(null),[busy,setBusy]=useState(false),[itemError,setItemError]=useState('');
  const[note,setNote]=useState<string|null>(null),[mails,setMails]=useState<Record<string,string>>({});
@@ -39,13 +40,13 @@ export default function OrgTimeline({orgId}:{orgId:string}){
   catch(e:any){setError(e.message||'Notiz konnte nicht gespeichert werden.');}
   finally{setBusy(false);}}
  return <section className="m-timeline" aria-label="Verlauf">
-  <div className="m-timeline-head"><h2 className="m-label"><History size={14} aria-hidden="true"/>Verlauf{total?` · ${total}`:''}</h2>{note===null&&<button type="button" className="m-chip-button" disabled={busy||!!edit} onClick={()=>{noteRequest.current=null;setNote('');}}><Plus size={16} aria-hidden="true"/>Notiz</button>}</div>
+  <div className="m-timeline-head"><h2 className="m-label"><History size={14} aria-hidden="true"/>Verlauf{total?` · ${total}`:''}</h2>{!readOnly&&note===null&&<button type="button" className="m-chip-button" disabled={busy||!!edit} onClick={()=>{noteRequest.current=null;setNote('');}}><Plus size={16} aria-hidden="true"/>Notiz</button>}</div>
   {note!==null&&<div className="m-sheet-inline glass">
    <label className="m-note-plain"><span>Neue Notiz</span><textarea autoFocus rows={4} maxLength={12000} value={note} disabled={busy} onChange={e=>{setNote(e.target.value);noteRequest.current=null;}} placeholder="Was möchtest du festhalten?"/></label>
    <div className="m-pair"><button type="button" className="m-secondary glass" disabled={busy} onClick={()=>setNote(null)}>Abbrechen</button><button type="button" className="m-primary" disabled={busy||!note.trim()} onClick={addNote}><Check size={18} aria-hidden="true"/>{busy?'Speichert …':'Speichern'}</button></div>
   </div>}
   {error&&<p role="alert" className="m-error glass">{error}</p>}
-  {loading&&!items.length?<div className="m-list glass m-today-loading" aria-busy="true"/>:items.length?<ol className="m-events">{items.map(h=>{const kind=kindOf(h),isOpen=open===h.ereignis_id,editing=edit?.id===h.ereignis_id,asking=confirm?.id===h.ereignis_id,editable=kind!=='email'&&kind!=='contact',Icon=kind==='meeting'?CalendarCheck:kind==='email'?Mail:kind==='call'?Phone:MessageSquare;
+  {loading&&!items.length?<div className="m-list glass m-today-loading" aria-busy="true"/>:items.length?<ol className="m-events">{items.map(h=>{const kind=kindOf(h),isOpen=open===h.ereignis_id,editing=edit?.id===h.ereignis_id,asking=confirm?.id===h.ereignis_id,editable=!readOnly&&kind!=='email'&&kind!=='contact',Icon=kind==='meeting'?CalendarCheck:kind==='email'?Mail:kind==='call'?Phone:MessageSquare;
    const title=kind==='email'?h.subject||'E-Mail':kind==='call'?activityLabel(h.art).replace(/^Anruf · /,''):(kind==='meeting'||kind==='note')&&h.text?h.text:NAMES[kind];
    const meta=kind==='email'?(h.direction==='outgoing'?'Gesendet':'Erhalten')+(h.sender_name?' · '+h.sender_name:''):[NAMES[kind],h.call_contact].filter(Boolean).join(' · ');
    const body=kind==='email'?(h.text&&h.text!==h.subject?h.text:h.preview||''):h.text;

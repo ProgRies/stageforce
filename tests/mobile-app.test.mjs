@@ -143,3 +143,21 @@ test('the phone app opens one organisation by id, with its contacts and current 
  const r=mobileOrg(db,org.id);assert.equal(r.name,'Stadtwerke Beispiel');assert.equal(r.version,String(getOrg(db,org.id).version));assert.deepEqual(r.contacts.map(c=>c.name),['Pat Example']);
  assert.throws(()=>mobileOrg(db,'nope'),e=>e.http===404);assert.throws(()=>mobileOrg(db,{}),e=>e.http===404);
  }finally{db.close();}});
+
+test('a contact changed on the phone keeps its e-mail addresses; a stale version is refused; a new contact can be added',async()=>{const{db,user}=await team();try{
+ const {mobileOrg}=await import('../server/mobile.mjs');const {contactSave}=await import('../server/crm.mjs');
+ const org=createOrg(db,user,'Stadt Lüneburg');addContact(db,org.id,{name:'Anna Becker',rolle:'Kulturamt',e_mails:['anna.becker@example.test'],telefone:['+49 4131 309 3344']},true);
+ const before=mobileOrg(db,org.id),anna=before.contacts[0];
+ assert.deepEqual(anna.emails,['anna.becker@example.test'],'the phone gets the addresses it has to send back');
+ // What the sheet sends: the typed name, role and numbers, the e-mails as loaded, and the version loaded right before.
+ const send=(o,c,b)=>contactSave(db,user,{id:org.id,version:o.version,contactId:c?.id||null,name:b.name,role:b.role,phones:b.phones.join('\n'),emails:(c?.emails||[]).join('\n')});
+ send(before,anna,{name:'Anna Becker',role:'Kulturamt',phones:['+49 171 5550123','+49 4131 309 3344']});
+ const after=mobileOrg(db,org.id).contacts[0];
+ assert.equal(after.phones.length,2);assert.match(after.phones[0],/171/,'the first number is the one the phone dials');
+ assert.deepEqual(after.emails,['anna.becker@example.test'],'saving from the phone does not drop the e-mail address');
+ assert.equal(after.primary,true,'the primary contact stays primary');
+ assert.throws(()=>send(before,anna,{name:'Anna',role:'',phones:[]}),e=>e.http===409&&e.code==='conflict','an old version is not overwritten');
+ const fresh=mobileOrg(db,org.id);send(fresh,null,{name:'Jonas Weber',role:'Technik',phones:['+49 171 2345678']});
+ assert.deepEqual(mobileOrg(db,org.id).contacts.map(c=>c.name).sort(),['Anna Becker','Jonas Weber']);
+ assert.ok(db.prepare("SELECT 1 FROM activities WHERE organisation_id=? AND body='Kontakt aktualisiert: Anna Becker'").get(org.id),'the change shows in the timeline as on the desktop');
+ }finally{db.close();}});

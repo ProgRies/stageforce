@@ -1,11 +1,12 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {Phone,PhoneIncoming,MessageSquareText,UserPlus,Search,X,ChevronLeft,Settings,LogOut,Trash2,Sun,Moon,Monitor,Flag,MessageCircleCheck,CalendarClock,CalendarCheck,Mail,ThumbsDown,PhoneMissed,Check,Clock,History,LoaderCircle,Pause,Play,Building2,PhoneOutgoing,type LucideIcon} from 'lucide-react';
+import {Phone,PhoneIncoming,MessageSquareText,UserPlus,Search,X,ChevronLeft,Settings,LogOut,Trash2,Sun,Moon,Monitor,Flag,MessageCircleCheck,CalendarClock,CalendarCheck,Mail,ThumbsDown,PhoneMissed,Check,Clock,History,LoaderCircle,Pause,Play,Building2,PhoneOutgoing,Pencil,Plus,type LucideIcon} from 'lucide-react';
 import TodaySchedule from './TodaySchedule';
 import OrgTimeline from './OrgTimeline';
+import ContactSheet from './ContactSheet';
 import {api} from '../api';
 import {useAppearance} from '../Appearance';
 import {todayBerlin,defaultNextCall,nextCallDay,type NextCall} from '../domain';
-type Contact={id:string;name:string;role:string;phones:string[];primary:boolean};
+type Contact={id:string;name:string;role:string;phones:string[];emails?:string[];primary:boolean};
 type Caller={id:string;name:string;version:string;subtitle:string;status:string;contacts:Contact[]};
 type Outcome={key:string;label:string;next:string};
 type LiveCall={callId:string;organisation:{id:string;name:string;version:string};contact?:{id:string;name:string};phone:string;dial:string;direction:'in'|'out';startedAt:string;notes:string;outcomes:Outcome[];results:{key:string;label:string;days:number|null}[];nextPicks:{label:string;date:string}[];followUp:string|null;bookingUrl:string};
@@ -58,7 +59,7 @@ export default function CallLogger({user,onLogout}:{user:{name:string;email:stri
   </header>
   {error&&<p role="alert" className="m-error glass">{error}</p>}
   {view.kind==='home'&&<Home onPick={org=>go({kind:'org',org})} onOpen={openOrg} onNew={name=>go({kind:'new',name})}/>}
-  {view.kind==='org'&&<OrgStep org={view.org} busy={busy} onStart={start} onDial={(contact,phone)=>dial(view.org,contact,phone)}/>}
+  {view.kind==='org'&&<OrgStep org={view.org} onOrg={org=>setView(v=>v.kind==='org'&&v.org.id===org.id?{kind:'org',org}:v)} busy={busy} onStart={start} onDial={(contact,phone)=>dial(view.org,contact,phone)}/>}
   {view.kind==='new'&&<NewLead initial={view.name} busy={busy} onStart={start}/>}
   {view.kind==='call'&&<LiveCallCard key={view.call.callId} call={view.call} isNew={view.isNew} onDone={(org,label)=>{keep(view.call.callId,'');setDialled('');go({kind:'saved',org,label});}} onDiscard={()=>{keep(view.call.callId,'');setDialled('');go({kind:'home'});}}/>}
   {view.kind==='saved'&&<Saved org={view.org} label={view.label} onNext={()=>{opened.current=new Date().toISOString();go({kind:'home'});}}/>}
@@ -82,17 +83,22 @@ function Home({onPick,onOpen,onNew}:{onPick:(org:Caller)=>void;onOpen:(id:string
   <div className="m-dock"><button type="button" className={`m-primary ${empty?'is-suggested':''}`} onClick={()=>onNew(empty?query.trim():'')}><UserPlus size={21} aria-hidden="true"/>Neuer Lead</button></div>
  </main>;
 }
-function OrgStep({org,busy,onStart,onDial}:{org:Caller;busy:boolean;onStart:(body:object,isNew:boolean)=>void;onDial:(contact:Contact,phone:string)=>void}){
+function OrgStep({org,onOrg,busy,onStart,onDial}:{org:Caller;onOrg:(org:Caller)=>void;busy:boolean;onStart:(body:object,isNew:boolean)=>void;onDial:(contact:Contact,phone:string)=>void}){
  const[other,setOther]=useState(!org.contacts.length),[name,setName]=useState(''),[phone,setPhone]=useState('');
+ // "Bearbeiten" turns the contact list into an edit list; a tap opens the contact in a sheet (also for a new contact).
+ const[editing,setEditing]=useState(false),[sheet,setSheet]=useState<Contact|null|'new'>(null);
  return <main className="m-screen">
   <section className="m-hero"><span className="m-eyebrow"><Building2 size={15} aria-hidden="true"/>{org.subtitle||org.status}</span><h1 className="m-title">{org.name}</h1></section>
-  {org.contacts.length>0&&<><h2 className="m-label">Wer ist dran?</h2><p className="m-hint m-contacts-hint">Tippe auf die Person, die anruft. Mit <PhoneOutgoing size={13} aria-label="Anrufen"/> rufst du selbst an.</p><div className="m-stack">{org.contacts.map(c=>{const number=c.phones.map(dialable).find(Boolean)||'',raw=c.phones.find(p=>dialable(p)===number)||'';return <div key={c.id} className="m-contact-line"><CallButton contact={c} disabled={busy} onPick={()=>onStart({organisationId:org.id,contactId:c.id},false)}/>{number&&<a className={`m-dial glass${busy?' is-disabled':''}`} href={'tel:'+number} aria-label={`${c.name||'Kontakt'} anrufen`} aria-disabled={busy} onClick={e=>{if(busy){e.preventDefault();return;}onDial(c,raw);}}><PhoneOutgoing size={21} aria-hidden="true"/></a>}</div>;})}</div></>}
-  {other?<form className="m-form glass" onSubmit={e=>{e.preventDefault();onStart({organisationId:org.id,contactName:name,phone},false);}}>
+  <div className="m-timeline-head m-contacts-head"><h2 className="m-label">{editing?'Kontakte bearbeiten':org.contacts.length?'Wer ist dran?':'Kontakte'}</h2><button type="button" className="m-chip-button" disabled={busy} onClick={()=>setEditing(!editing)}>{editing?<><Check size={16} aria-hidden="true"/>Fertig</>:<><Pencil size={15} aria-hidden="true"/>Bearbeiten</>}</button></div>
+  {editing?<div className="m-list glass">{org.contacts.map(c=><button key={c.id} type="button" className="m-row" onClick={()=>setSheet(c)}><span className="m-row-icon"><Pencil size={17} aria-hidden="true"/></span><span className="m-row-text"><strong>{c.name||'Ohne Namen'}</strong><small>{[c.phones.join(', ')||'Keine Nummer gespeichert',c.role].filter(Boolean).join(' · ')}</small></span></button>)}<button type="button" className="m-row" onClick={()=>setSheet('new')}><span className="m-row-icon"><Plus size={18} aria-hidden="true"/></span><span className="m-row-text"><strong>Neuer Kontakt</strong></span></button></div>
+  :org.contacts.length>0&&<><p className="m-hint m-contacts-hint">Tippe auf die Person, die anruft. Mit <PhoneOutgoing size={13} aria-label="Anrufen"/> rufst du selbst an.</p><div className="m-stack">{org.contacts.map(c=>{const number=c.phones.map(dialable).find(Boolean)||'',raw=c.phones.find(p=>dialable(p)===number)||'';return <div key={c.id} className="m-contact-line"><CallButton contact={c} disabled={busy} onPick={()=>onStart({organisationId:org.id,contactId:c.id},false)}/>{number&&<a className={`m-dial glass${busy?' is-disabled':''}`} href={'tel:'+number} aria-label={`${c.name||'Kontakt'} anrufen`} aria-disabled={busy} onClick={e=>{if(busy){e.preventDefault();return;}onDial(c,raw);}}><PhoneOutgoing size={21} aria-hidden="true"/></a>}</div>;})}</div></>}
+  {sheet&&<ContactSheet orgId={org.id} contact={sheet==='new'?null:sheet} onClose={()=>setSheet(null)} onSaved={fresh=>onOrg({...org,version:fresh.version,contacts:fresh.contacts})}/>}
+  {!editing&&(other?<form className="m-form glass" onSubmit={e=>{e.preventDefault();onStart({organisationId:org.id,contactName:name,phone},false);}}>
    <h2>Neue Person</h2>
    <label className="m-field"><span>Name des Anrufers</span><input autoComplete="off" value={name} onChange={e=>setName(e.target.value)} placeholder="Vor- und Nachname"/></label>
    <label className="m-field"><span>Nummer · optional</span><input type="tel" inputMode="tel" autoComplete="off" value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+49 …"/></label>
    <button className="m-primary" disabled={busy||(!name.trim()&&!phone.trim())}><MessageSquareText size={20} aria-hidden="true"/>{busy?'Wird angelegt …':'Weiter zur Notiz'}</button>
-  </form>:<button type="button" className="m-secondary glass m-other-person" onClick={()=>setOther(true)}><UserPlus size={19} aria-hidden="true"/>Andere Person</button>}
+  </form>:<button type="button" className="m-secondary glass m-other-person" onClick={()=>setOther(true)}><UserPlus size={19} aria-hidden="true"/>Andere Person</button>)}
   <OrgTimeline key={org.id} orgId={org.id}/>
  </main>;
 }
@@ -111,6 +117,11 @@ function NewLead({initial,busy,onStart}:{initial:string;busy:boolean;onStart:(bo
 }
 function LiveCallCard({call,isNew,onDone,onDiscard}:{call:LiveCall;isNew:boolean;onDone:(org:string,label:string)=>void;onDiscard:()=>void}){
  const[notes,setNotes]=useState(call.notes||''),[now,setNow]=useState(Date.now()),[result,setResult]=useState(''),[next,setNext]=useState<NextCall>(null),[touched,setTouched]=useState(false),[custom,setCustom]=useState(false),[confirm,setConfirm]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[synced,setSynced]=useState(true);
+ // The pencil next to the caller opens the contact for a changed number mid-call. The call keeps the number it was logged with;
+ // the card shows the contact's new first number once the old one is no longer saved.
+ const[who,setWho]=useState({name:call.contact?.name||'',phone:call.phone}),[sheet,setSheet]=useState<Contact|null>(null),[opening,setOpening]=useState(false);
+ async function editCaller(){if(!call.contact||opening)return;setOpening(true);setError('');try{const org:Caller=await api({action:'mobileOrg',id:call.organisation.id});const c=org.contacts.find(x=>x.id===call.contact!.id);if(c)setSheet(c);else setError('Der Kontakt ist bei dieser Organisation nicht mehr gespeichert.');}catch(e:any){setError(e.message||'Kontakt konnte nicht geladen werden.');}finally{setOpening(false);}}
+ function updated(org:{contacts:Contact[]},id:string){const c=org.contacts.find(x=>x.id===id);if(c)setWho(w=>({name:c.name,phone:!w.phone||c.phones.includes(w.phone)?w.phone:c.phones[0]||w.phone}));}
  const drafted=useRef(call.notes||''),timer=useRef<ReturnType<typeof setTimeout>>(undefined),latest=useRef(notes);latest.current=notes;
  const flush=useCallback(()=>{clearTimeout(timer.current);const value=latest.current;if(value===drafted.current)return;api({action:'callDraft',callId:call.callId,notes:value}).then(()=>{drafted.current=value;if(latest.current===value)setSynced(true);}).catch(()=>{});},[call.callId]);
  useEffect(()=>{const t=setInterval(()=>setNow(Date.now()),1000);const hide=()=>{if(document.visibilityState==='hidden')flush();};document.addEventListener('visibilitychange',hide);window.addEventListener('pagehide',flush);return()=>{clearInterval(t);document.removeEventListener('visibilitychange',hide);window.removeEventListener('pagehide',flush);flush();};},[flush]);
@@ -133,7 +144,7 @@ function LiveCallCard({call,isNew,onDone,onDiscard}:{call:LiveCall;isNew:boolean
   <section className="m-live glass" aria-label="Laufender Anruf">
    <div className="m-live-top"><span className="m-pulse" aria-hidden="true"/><span>{call.direction==='out'?'Ausgehender Anruf':'Eingehender Anruf'}</span><time>{clock(now-Date.parse(call.startedAt))}</time></div>
    <h1 className="m-title">{call.organisation.name}</h1>
-   <p className="m-live-who">{[call.contact?.name,call.phone].filter(Boolean).join(' · ')||'Anrufer'}</p>
+   <p className="m-live-who"><span>{[who.name,who.phone].filter(Boolean).join(' · ')||'Anrufer'}</span>{call.contact&&<button type="button" className="m-live-edit" aria-label="Kontakt bearbeiten" disabled={opening} onClick={editCaller}>{opening?<LoaderCircle size={15} className="m-spin" aria-hidden="true"/>:<Pencil size={15} aria-hidden="true"/>}</button>}</p>
    {isNew&&<p className="m-flag"><Flag size={14} aria-hidden="true"/>Neu angelegt · wird in Prüfen markiert</p>}
   </section>
   <label className="m-note glass"><span className="m-note-head"><span>Gesprächsnotiz</span><small aria-live="polite">{notes?synced?<><Check size={12} aria-hidden="true"/>gesichert</>:'…':''}</small></span><textarea value={notes} onChange={e=>type(e.target.value)} rows={5} placeholder="Worum geht es? Kurze Stichpunkte reichen." disabled={busy}/></label>
@@ -157,6 +168,9 @@ function LiveCallCard({call,isNew,onDone,onDiscard}:{call:LiveCall;isNew:boolean
    <button type="button" className="m-primary" disabled={busy||!ready} onClick={save}><Check size={19} aria-hidden="true"/>{busy?'Wird gespeichert …':'Speichern'}</button>
    <button type="button" className="m-text-button" disabled={busy} onClick={()=>setConfirm(true)}><X size={15} aria-hidden="true"/>Ohne Eintrag verwerfen</button>
   </>}
+  {sheet&&<ContactSheet orgId={call.organisation.id} contact={sheet} onClose={()=>setSheet(null)} onSaved={updated}/>}
+  {/* Scrolling down past the card shows the organisation's history, read-only, like the timeline on the organisation screen. */}
+  <div className="m-call-history"><OrgTimeline key={call.organisation.id} orgId={call.organisation.id} readOnly/></div>
  </main>;
 }
 function Saved({org,label,onNext}:{org:string;label:string;onNext:()=>void}){
