@@ -41,3 +41,26 @@ test('checks read the loaded list, clear once link or pin is saved, and leave Pr
  // Running the checks writes nothing: the handoff from the call is still the only Prüfen item.
  assert.deepEqual(after.review.map(r=>[r.id,r.text]),[[a.id,'E-Mail senden']]);
 }finally{db.close();}});
+test('Zuweisen lists only Leads nobody is responsible for, including owner names that match no account',()=>{
+ const lead=(name,extra={})=>({...org(name,'Lead'),...extra});
+ const legacy=lead('Legacy Lead');legacy.values[11]='Ehemalige Kollegin';
+ const all=[lead('Zeta offen'),lead('Alpha offen'),lead('Vergeben',{ownerId:'u1'}),legacy,org('Kunde offen','Kunde'),org('Partner offen','Partner / Agentur')];
+ assert.deepEqual(names(dataCheckList(all,'owner')),['Alpha offen','Legacy Lead','Zeta offen']);
+ assert.equal(dataCheckIssue(all[0],'owner'),'Niemand zuständig');
+ assert.equal(dataCheckIssue(legacy,'owner'),'„Ehemalige Kollegin“ ist kein Teammitglied');
+ assert.equal(dataCheckIssue(all[2],'owner'),'');assert.equal(dataCheckIssue(all[4],'owner'),'');
+});
+test('assigning an owner from Zuweisen clears the lead, and an owner who matches a team account counts as assigned',async()=>{const{db,user}=await setup();try{
+ const a=createOrg(db,user,'Offener Lead'),b=createOrg(db,user,'Alter Lead');
+ for(const o of [a,b])save(db,user,{id:o.id,version:entity(db,o.id).version,requestId:randomUUID(),fields:{9:'Lead'}});
+ const open=()=>listData(db).entities.filter(e=>dataCheckIssue(e,'owner')).map(e=>e.id).sort();
+ // createOrg may or may not default the owner; clear it so both start unassigned.
+ for(const o of [a,b])save(db,user,{id:o.id,version:entity(db,o.id).version,requestId:randomUUID(),fields:{11:''}});
+ assert.deepEqual(open(),[a.id,b.id].sort());
+ save(db,user,{id:a.id,version:entity(db,a.id).version,requestId:randomUUID(),fields:{11:user.id}});
+ assert.deepEqual(open(),[b.id]);
+ // Older rows store the owner by name; a name that resolves to a team member is not listed.
+ db.prepare('UPDATE organisations SET owner=? WHERE id=?').run('Alex',b.id);
+ assert.deepEqual(open(),[]);
+ assert.throws(()=>save(db,user,{id:b.id,version:entity(db,b.id).version,requestId:randomUUID(),fields:{11:'nobody'}}),/Person aus dem Team/);
+}finally{db.close();}});
