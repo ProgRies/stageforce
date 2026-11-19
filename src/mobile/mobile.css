@@ -266,3 +266,4 @@ svg{flex-shrink:0}
 .m-live-edit:disabled{opacity:.6}
 /* The organisation's history below the call card, after a thin divider, so the controls above stay as they are. */
 .m-call-history{margin-top:18px;padding-top:6px;border-top:1px solid var(--line)}
+.m-contact-delete{color:var(--danger);font-weight:550}

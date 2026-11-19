@@ -392,3 +392,5 @@
 .review-checks{padding-top:0;gap:2px}.review-checks .filter{white-space:nowrap;padding:6px 9px}.review-checks .filter{display:inline-flex;align-items:center;gap:5px}.review-checks .filter small{font-size:11px;font-weight:600;color:var(--theme-text-muted,#a0adb6)}.review-checks .filter.active small{color:inherit;opacity:.75}
 /* Prüfen: four checks no longer fit one line in the list pane. */
 .review-checks{flex-wrap:wrap;row-gap:4px}
+.inline-contact-editor .contact-delete{display:flex;margin:12px auto 0;gap:6px;font-size:13px;color:#b4533f}.inline-contact-editor .contact-delete:hover:not(:disabled){color:#8f3524}
+[data-theme="dark"] .inline-contact-editor .contact-delete{color:#f0a493}[data-theme="dark"] .inline-contact-editor .contact-delete:hover:not(:disabled){color:#ffc4b6}
