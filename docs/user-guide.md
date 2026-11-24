@@ -10,7 +10,7 @@ The sidebar switches between **Organisationen**, **Anrufe** (your call list), **
 
 The header of an organisation holds:
 
-- **Status**: Kunde, Lead or Partner / Agentur. Kunde means a confirmed obligation to pay. Nothing sets it automatically; FastBill imports only set it for new organisations with a real invoice (see [FastBill import](fastbill-import.md)).
+- **Status**: Kunde, Lead, Partner / Agentur or Ehemaliger Kunde. Kunde means a confirmed obligation to pay; Ehemaliger Kunde is a former client who cancelled their subscription (red pin on the map, never put on the call list). Nothing sets it automatically; FastBill imports only set it for new organisations with a real invoice (see [FastBill import](fastbill-import.md)).
 - **Zuständig**: the colleague who owns the organisation, or nobody. Only the owner gets it on their call list.
 - The **FastBill** link to the customer page, with a pencil to edit it.
 
