@@ -1,3 +1,11 @@
+# StageForce 0.3.25 · Ehemaliger Kunde as a status with a red map pin
+
+Publishes `ghcr.io/progries/stageforce:0.3.25`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.25` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. No database change and no new settings; the extension is unchanged.
+
+- **Ehemaliger Kunde** (a former client who cancelled their subscription) can now be chosen in the status dropdown of an organisation, next to Lead, Kunde and Partner / Agentur. The status already existed in the data, so organisations that have it keep it.
+- **Filter:** the organisation list gets an **Ehem.** filter after Partner.
+- **Map:** former clients get a red pin and a legend entry. The other pin colours are unchanged.
+
 # StageForce 0.3.24 · Delete a contact · calendar notifications no longer pick an organisation
 
 Publishes `ghcr.io/progries/stageforce:0.3.24`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.24` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. No database change and no new settings; the extension is unchanged.
