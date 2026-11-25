@@ -1,3 +1,11 @@
+# StageForce 0.3.26 · Tidier organisation view in a half-screen window
+
+Publishes `ghcr.io/progries/stageforce:0.3.26`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.26` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. No database change and no new settings; the extension is unchanged.
+
+- **Header:** Status, Zuständig and the next-call button sit together on one line under the organisation name and get narrower instead of wrapping when the window is half the screen.
+- **Aktivitäten:** the white call button sits on the far right with „Notiz hinzufügen“ to its left, on one line. In narrow columns the button reads „Notiz“ and the number is shortened; the call button no longer slides over the first timeline entry.
+- Layout only: nothing works differently.
+
 # StageForce 0.3.25 · Ehemaliger Kunde as a status with a red map pin
 
 Publishes `ghcr.io/progries/stageforce:0.3.25`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.25` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. No database change and no new settings; the extension is unchanged.
