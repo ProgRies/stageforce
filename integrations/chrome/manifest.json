@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Stage Force \u00b7 Gmail",
-  "version": "0.4.23",
+  "name": "Stage Force \u00b7 Gmail & Calendar",
+  "version": "0.5.0",
   "minimum_chrome_version": "120",
-  "description": "Review one Gmail message and save it to your own Stage Force CRM.",
+  "description": "Review Gmail messages and Google Calendar meetings and save them to your own Stage Force CRM.",
   "permissions": [
     "storage"
   ],
@@ -34,6 +34,15 @@
         "extract.js",
         "call-card.js",
         "content.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://calendar.google.com/*"
+      ],
+      "js": [
+        "calendar.js"
       ],
       "run_at": "document_idle"
     }

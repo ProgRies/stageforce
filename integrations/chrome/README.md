@@ -1,10 +1,10 @@
-# StageForce Chrome extension · 0.4.23
+# StageForce Chrome extension · 0.5.0
 
-Adds **Add to StageForce** to Gmail: save the emails, contacts and meetings you confirm to the right organisation in your StageForce CRM, and start calls with the shared floating call card.
+Adds **Add to StageForce** to Gmail: save the emails, contacts and meetings you confirm to the right organisation in your StageForce CRM, and start calls with the shared floating call card. In Google Calendar, each event pop-up shows whether the meeting is logged in an organisation's timeline and can log it, and logged meetings get a small StageForce mark in the calendar grid.
 
 1. In `chrome://extensions`, turn on Developer mode, click **Load unpacked** and select this folder.
 2. In the CRM: gear → **Browser-Erweiterung verbinden** → **Schlüssel erstellen** (asks for an authenticator code).
 3. Click the toolbar icon, enter the CRM address and the key, and click **Connect**.
-4. Reload Gmail and open an email.
+4. Reload Gmail and open an email, or open an event in Google Calendar.
 
 Setup, what is sent and the limits: [`docs/extension-setup.md`](../../docs/extension-setup.md).

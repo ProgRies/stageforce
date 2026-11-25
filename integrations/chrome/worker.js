@@ -23,7 +23,9 @@ chrome.runtime.onMessage.addListener((message,sender,reply)=>{
    }
    throw Error('Unknown setting.');
   }
-  if(!sender.tab||new URL(sender.url).origin!=='https://mail.google.com')throw Error('Gmail only.');
+  // Gmail gets every action; Google Calendar only what its pop-up and event marks need.
+  const page=sender.tab?new URL(sender.url).origin:'',calendar=page==='https://calendar.google.com';
+  if(page!=='https://mail.google.com'&&!calendar)throw Error('Gmail and Google Calendar only.');
   if(message.type==='options'){await chrome.runtime.openOptionsPage();return{};}
   const {connection}=await chrome.storage.local.get('connection');if(!connection)throw failure('Connect Stage Force first — use the connection button.','connection_required');
   if(message.type==='status'){const checked=await request(connection,{action:'check'});return{origin:connection.origin,email:checked.email,appearance:checked.appearance||'system'};}
@@ -31,7 +33,7 @@ chrome.runtime.onMessage.addListener((message,sender,reply)=>{
    if(typeof message.organisationId!=='string'||message.organisationId.length>100)throw Error('Invalid organisation.');
    await chrome.tabs.create({url:validOrigin(connection.origin)+'/?organisation='+encodeURIComponent(message.organisationId)});return{};
   }
-  if(message.type!=='api'||!['lookup','search','save','meeting','messageStatus','threadStatus','callPrepare','callSave','callCancel','callOpen','callDraft','contactSave'].includes(message.payload?.action))throw Error('Unknown request.');
+  if(message.type!=='api'||!(calendar?['search','calendarCheck','calendarLog','calendarStatus']:['lookup','search','save','meeting','messageStatus','threadStatus','callPrepare','callSave','callCancel','callOpen','callDraft','contactSave']).includes(message.payload?.action))throw Error('Unknown request.');
   if(JSON.stringify(message.payload).length>1500000)throw Error('This message is too large.');
   return request(connection,message.payload);
  })().then(data=>reply({ok:true,data}),error=>reply({ok:false,error:error.message,code:error.code||'request_failed'}));
