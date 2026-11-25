@@ -1,3 +1,12 @@
+# StageForce 0.3.27 · Google Calendar in the browser extension
+
+Publishes `ghcr.io/progries/stageforce:0.3.27`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.27` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. One new table (`calendar_event_refs`), schema still 13, so 0.3.26 and 0.3.25 can still open the database. No new settings. Needs browser extension 0.5.0: everyone reloads the extension after the update.
+
+- **Google Calendar (extension 0.5.0):** an event pop-up shows whether the meeting is in an organisation's timeline, with **Open ↗**, or offers **Log meeting** when a guest is a saved contact. The card prefills the organisation from the guests and saves the guests as contacts; you and colleagues are never saved as contacts. Events without clients only get a quiet "No client among the guests".
+- **Marks in the calendar grid:** logged meetings get a small white StageForce mark on their event box.
+- **One entry per meeting, whatever the source:** the invitation email, the calendar event, a colleague's copy and a meeting typed in the CRM or phone app end up as one timeline entry. A meeting moved in Google Calendar is offered as an update instead of being logged again; each week of a repeating meeting stays its own entry; an event cannot be logged in two organisations.
+- **Gmail fix:** an invitation email now joins the meeting at its own time on that day, not an earlier entry without a time.
+
 # StageForce 0.3.26 · Tidier organisation view in a half-screen window
 
 Publishes `ghcr.io/progries/stageforce:0.3.26`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.26` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. No database change and no new settings; the extension is unchanged.
