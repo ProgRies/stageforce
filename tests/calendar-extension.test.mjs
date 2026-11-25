@@ -45,8 +45,8 @@ test('an unlogged client meeting is offered for logging, saved with its contacts
   // The event moved in the calendar: logging it again moves the same entry.
   const moved=act(db,user,{...save,requestId:randomUUID(),date:'2026-12-02',time:'09:30',version:getOrg(db,org.id).version});
   assert.equal(moved.logged.activityId,saved.logged.activityId);assert.equal(meetings(db).length,1);assert.equal(meetings(db)[0].occurred_on,'2026-12-02');
-  // A stale organisation version is refused instead of overwriting a colleague's change.
-  assert.throws(()=>act(db,user,{...save,requestId:randomUUID(),eventId:'other-event',version:'0'}),e=>e.http===409);
+  // Logging into an organisation someone edited meanwhile is fine: no organisation field is changed.
+  assert.equal(act(db,user,{...save,requestId:randomUUID(),eventId:'other-event',date:'2026-12-09',version:'0'}).saved,true);
  }finally{db.close();}
 });
 

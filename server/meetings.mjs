@@ -81,19 +81,22 @@ const uhr=body=>/(\d{2}:\d{2}) Uhr/.exec(body||'')?.[1]||'';
 // organisation on the same day at a matching time, so an invite, its acceptance, a booking confirmation
 // and a reminder end up as one entry. A personal Zoom room or a generic subject ("Terminbestätigung") is shared by
 // different meetings: an email naming another date only belongs to an entry with that key when it updates or cancels it.
-export function findMeeting(db,organisationId,meeting,date,time){
+// `taken` (optional) names entries that already belong to another calendar event, so a match on the day alone skips them.
+export function findMeeting(db,organisationId,meeting,date,time,taken=null){
  const byKey=db.prepare('SELECT a.id,a.occurred_on AS date,a.body FROM meeting_refs r JOIN activities a ON a.id=r.activity_id WHERE a.organisation_id=? AND r.meeting_key=? ORDER BY a.created_at').all(organisationId,meeting.key);
  const day=meeting.date||date,same=byKey.find(a=>a.date===day)||((meeting.updated||meeting.cancelled||!meeting.date)&&byKey.at(-1));
  if(same)return{...same,match:'key'};
  if(!date)return null;const at=time??meeting.time;
- const sameDay=db.prepare("SELECT id,occurred_on AS date,body FROM activities WHERE organisation_id=? AND kind='Meeting' AND occurred_on=? ORDER BY created_at").all(organisationId,date).find(a=>!at||!uhr(a.body)||uhr(a.body)===at);
+ // An entry at exactly that time wins over one without a time, so a typed "Termin bei X" is not taken by every meeting of the day.
+ const day_=db.prepare("SELECT id,occurred_on AS date,body FROM activities WHERE organisation_id=? AND kind='Meeting' AND occurred_on=? ORDER BY created_at").all(organisationId,date).filter(a=>!taken?.(a.id));
+ const sameDay=(at&&day_.find(a=>uhr(a.body)===at))||day_.find(a=>!at||!uhr(a.body)||uhr(a.body)===at);
  return sameDay?{...sameDay,match:'date'}:null;
 }
 // One meeting per invitation: the invitation itself (or an updated one) moves the existing entry, cancellations mark it,
 // other emails about the same meeting (acceptances, replies, reminders) only add their contacts.
-export function logMeeting(db,user,{organisationId,meeting,date,time,messageId,contactIds=[]}){
+export function logMeeting(db,user,{organisationId,meeting,date,time,messageId,contactIds=[],taken=null}){
  const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Berlin'}).format(new Date());
- const m={...meeting,time:time??meeting.time},found=findMeeting(db,organisationId,meeting,date,m.time);let activityId=found?.id;
+ const m={...meeting,time:time??meeting.time},found=findMeeting(db,organisationId,meeting,date,m.time,taken);let activityId=found?.id;
  if(found){
   // The same invitation moves the entry; any email about it can cancel it.
   if(found.match==='key'&&meeting.moves!==false)db.prepare('UPDATE activities SET occurred_on=?,body=? WHERE id=?').run(date,meetingText(m),activityId);

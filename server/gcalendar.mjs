@@ -1,7 +1,7 @@
 import {contactName} from '../src/domain.ts';
 import {email} from './auth.mjs';
 import {transaction,now} from './db.mjs';
-import {Problem,ourAddresses,notificationSender,getOrg,contacts,createOrg,contactSave,assertVersion} from './crm.mjs';
+import {Problem,ourAddresses,notificationSender,getOrg,contacts,createOrg,contactSave} from './crm.mjs';
 import {detectMeeting,findMeeting,logMeeting,meetingText} from './meetings.mjs';
 import {meetingTime} from './calendar.mjs';
 // Google Calendar in the browser extension: the event pop-up says whether a meeting is in an organisation's timeline and can log it,
@@ -27,12 +27,17 @@ function guestsIn(db,user,b){
 }
 // The meeting as the logging code knows it: a video link gives the same key an invitation email gets, so a meeting logged from
 // Gmail is found again; without a link the calendar event itself is the key. Date and time always come from the calendar.
+// A Google Meet or Teams link belongs to one meeting, so the same link on another day means the meeting was moved. Not so for a
+// repeating event (every occurrence shares the link; its id ends in the occurrence's start) or a personal Zoom or Webex room.
+const UNIQUE_LINK=new Set(['Google Meet','Microsoft Teams']),occurrence=id=>/_\d{8}(?:T\d{6}Z?)?$/.test(id);
 function calendarMeeting(b){
  const title=field(b.title||'',300)||'Meeting',id=eventId(b.eventId),date=day(b.date),time=hour(b.time);
  const found=detectMeeting({subject:title,body:'',links:linksIn(b)});
  const linked=found?.link?found:null;
- return{provider:linked?.provider||'',title,link:linked?.link||'',date,time,cancelled:false,moves:true,updated:false,likely:true,key:linked?linked.key:('Kalender:'+(id||titleKey(title))).slice(0,500)};
+ return{provider:linked?.provider||'',title,link:linked?.link||'',date,time,cancelled:false,moves:true,updated:!!linked&&UNIQUE_LINK.has(linked.provider)&&!occurrence(id),likely:true,key:linked?linked.key:('Kalender:'+(id||titleKey(title))).slice(0,500)};
 }
+// Entries another calendar event already stands for; a match on the day alone must not hand them to this event too.
+const takenBy=(db,id)=>{const other=db.prepare('SELECT 1 FROM calendar_event_refs WHERE activity_id=? AND event_id<>? LIMIT 1');return activityId=>!!other.get(activityId,id||'');};
 const refOf=(db,id)=>id?db.prepare("SELECT a.id,a.organisation_id,a.occurred_on AS date,a.body FROM calendar_event_refs r JOIN activities a ON a.id=r.activity_id WHERE r.event_id=? AND a.kind='Meeting'").get(id):null;
 const remember=(db,id,activityId)=>{if(id)db.prepare('INSERT INTO calendar_event_refs VALUES(?,?,?) ON CONFLICT(event_id) DO UPDATE SET activity_id=excluded.activity_id,created_at=excluded.created_at').run(id,activityId,now());};
 function loggedView(db,a){
@@ -58,7 +63,8 @@ export function calendarCheck(db,user,b){
  const ref=refOf(db,id);if(ref)return{logged:loggedView(db,ref),organisation:brief(getOrg(db,ref.organisation_id)),candidates:[],participants:participants(db,guests,ref.organisation_id),meeting:publicMeeting(meeting)};
  const candidates=guestOrganisations(db,guests),chosen=b.organisationId?brief(getOrg(db,field(b.organisationId,100))):candidates.length===1?candidates[0]:null;
  for(const o of chosen?[chosen]:candidates){
-  const hit=findMeeting(db,o.id,meeting,meeting.date||null,meeting.time);
+  const hit=findMeeting(db,o.id,meeting,meeting.date||null,meeting.time,takenBy(db,id));
+  if(hit&&hit.match==='key'&&takenBy(db,id)(hit.id))continue;
   if(hit){if(hit.match==='key')remember(db,id,hit.id);const a=db.prepare('SELECT id,organisation_id,occurred_on AS date,body FROM activities WHERE id=?').get(hit.id);return{logged:loggedView(db,a),organisation:brief(getOrg(db,a.organisation_id)),candidates,participants:participants(db,guests,a.organisation_id),meeting:publicMeeting(meeting)};}
  }
  return{logged:null,organisation:chosen?{id:chosen.id,name:chosen.name,version:chosen.version}:null,candidates,participants:participants(db,guests,chosen?.id),meeting:publicMeeting(meeting)};
@@ -77,7 +83,8 @@ export function calendarLog(db,user,b){
   const prior=db.prepare('SELECT * FROM requests WHERE id=?').get(receipt);
   if(prior){if(prior.user_id!==user.id)throw new Problem('Request not found.',404);const ref=refOf(db,id);return{saved:true,duplicate:true,organisation:brief(getOrg(db,prior.organisation_id)),logged:ref?loggedView(db,ref):null};}
   let org;
-  if(b.organisationId){org=getOrg(db,field(b.organisationId,100));assertVersion(org,b.version);}
+  // Adding a meeting changes none of the organisation's fields, so an edit made meanwhile is no conflict (contacts check it themselves).
+  if(b.organisationId)org=getOrg(db,field(b.organisationId,100));
   else{const name=field(b.newOrganisation||'',500);if(!name)throw new Problem('Select or create an organisation first.');if(db.prepare('SELECT 1 FROM organisations WHERE name=? COLLATE NOCASE').get(name))throw new Problem('This organisation already exists. Select it from the search results.');org=createOrg(db,user,name);}
   const contactIds=[];
   for(const address of chosen){
@@ -87,8 +94,9 @@ export function calendarLog(db,user,b){
   }
   // The same event logged before keeps its entry (and moves with the calendar); otherwise the usual meeting matching applies.
   const ref=refOf(db,id);let activityId;
+  if(ref&&ref.organisation_id!==org.id)throw new Problem('Already logged in '+getOrg(db,ref.organisation_id).name+'. Open it there to change or delete it.',409,'calendar_logged_elsewhere');
   if(ref&&ref.organisation_id===org.id){db.prepare('UPDATE activities SET occurred_on=?,body=? WHERE id=?').run(meeting.date,meetingText(meeting),ref.id);for(const cid of contactIds)db.prepare('INSERT OR IGNORE INTO activity_contacts VALUES(?,?)').run(ref.id,cid);activityId=ref.id;}
-  else activityId=logMeeting(db,user,{organisationId:org.id,meeting,date:meeting.date,time:meeting.time,messageId:null,contactIds});
+  else activityId=logMeeting(db,user,{organisationId:org.id,meeting,date:meeting.date,time:meeting.time,messageId:null,contactIds,taken:takenBy(db,id)});
   remember(db,id,activityId);
   db.prepare('INSERT INTO requests VALUES(?,?,?,?)').run(receipt,user.id,org.id,now());
   const a=db.prepare('SELECT id,organisation_id,occurred_on AS date,body FROM activities WHERE id=?').get(activityId);
