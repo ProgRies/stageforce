@@ -1,5 +1,6 @@
 import {contactName,formatPhone} from '../src/domain.ts';
 import {appearance} from './appearance.mjs';
+import {calendarCheck,calendarLog,calendarStatus} from './gcalendar.mjs';
 import {detectMeeting,logMeeting,manualMeeting,findMeeting,meetingText} from './meetings.mjs';
 import {prepareCall,saveCall,cancelCall,openCall,draftCall,mergePhones,dialNumber} from './calls.mjs';
 import {randomBytes,createHash,randomUUID} from 'node:crypto';
@@ -91,6 +92,10 @@ function meetingIn(db,b){const m=detectMeeting({subject:field(b.originalSubject|
 function attachmentRefs(value){if(value===undefined)return[];if(!Array.isArray(value)||value.length>100)throw new Problem('Too many attachment references.');return value.map(a=>({name:field(a.name,500),size:field(a.size||'',100),type:field(a.type||'',100),referenceOnly:true})).filter(a=>a.name);}
 export function extensionAction(db,user,b,origin){
  if(b.action==='check')return{email:user.email,appearance:appearance(db,user)||'system'};
+ // Google Calendar: the event pop-up check and logging, and the marks on event boxes (see gcalendar.mjs).
+ if(b.action==='calendarCheck')return calendarCheck(db,user,b);
+ if(b.action==='calendarLog')return calendarLog(db,user,b);
+ if(b.action==='calendarStatus')return calendarStatus(db,user,b);
  // Inbox marks: which of the listed Gmail conversations/messages of this mailbox already have a saved email. Only ids go back, no content.
  if(b.action==='threadStatus'){
   const {mailbox}=identity(b,user);if(!Array.isArray(b.ids)||b.ids.length>150)throw new Problem('Invalid conversations.');

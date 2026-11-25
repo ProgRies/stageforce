@@ -23,6 +23,7 @@ The current schema version is **13** (`PRAGMA user_version`). Startup brings an 
 | message_sources | Which user and mailbox saved an email; several colleagues can reference one email |
 | extension_message_refs | Mailbox plus Gmail message id → saved email |
 | extension_thread_refs | Mailbox plus Gmail conversation id → saved emails, so later emails of a conversation find the organisation |
+| calendar_event_refs | Google Calendar event id → meeting entry, set when a meeting is logged from the Calendar pop-up or found there by its join link; drives the marks on calendar event boxes |
 | followups | The open follow-up (next action and due date) per organisation |
 | followup_times | Optional time of a follow-up, valid only while its stored date equals the follow-up's date. A separate table, added within version 13, so older images keep working on the same database |
 | review_issues | Open and closed Prüfen points |

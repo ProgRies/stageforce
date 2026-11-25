@@ -27,3 +27,19 @@ test('worker reload reuses saved pairing; missing keys and invalid acknowledgeme
  mode='revoked';assert.equal((await send({type:'status'})).code,'connection_required');mode='offline';assert.equal((await send({type:'status'})).code,'connection_unavailable');mode='malformed';assert.equal((await send({type:'status'})).code,'invalid_response');
  delete stored.connection;const before=calls;assert.equal((await send({type:'api',payload:{action:'save'}})).code,'connection_required');assert.equal(calls,before);
 });
+
+test('Google Calendar may only search and check, log and mark meetings; Gmail keeps every action',async()=>{
+ const id='c'.repeat(32),token='sf_ext_'+'c'.repeat(43),stored={connection:{origin:'http://localhost:3000',token,email:'alex@team.test'}},calls=[];let listener;
+ const context=vm.createContext({URL,AbortSignal,fetch:async(url,options)=>{calls.push(JSON.parse(options.body));return{ok:true,json:async()=>({status:'success',data:{email:'alex@team.test',logged:[]}})};},chrome:{storage:{local:{setAccessLevel:async()=>{},get:async()=>stored,set:async x=>Object.assign(stored,x),remove:async()=>{}}},action:{onClicked:{addListener(){}}},runtime:{id,getURL:p=>'chrome-extension://'+id+'/'+p,onMessage:{addListener:f=>{listener=f;}},openOptionsPage:async()=>{}},tabs:{create:async()=>{}}}});
+ vm.runInContext(readFileSync(new URL('../integrations/chrome/worker.js',import.meta.url),'utf8'),context);
+ const send=(m,url)=>new Promise(resolve=>listener(m,{id,url,tab:{id:1}},resolve)),calendar='https://calendar.google.com/calendar/u/0/r/week',gmail='https://mail.google.com/mail/u/0';
+ assert.equal((await send({type:'status'},calendar)).ok,true);
+ const used=new Set([...readFileSync(new URL('../integrations/chrome/calendar.js',import.meta.url),'utf8').matchAll(/action:\s*'(\w+)'/g)].map(m=>m[1]));
+ assert.deepEqual([...used].sort(),['calendarCheck','calendarLog','calendarStatus','search']);
+ for(const action of used)assert.equal((await send({type:'api',payload:{action}},calendar)).ok,true,action);
+ for(const action of ['save','lookup','contactSave','callSave','messageStatus'])assert.equal((await send({type:'api',payload:{action}},calendar)).ok,false,action);
+ assert.equal((await send({type:'api',payload:{action:'calendarCheck'}},gmail)).ok,false,'Gmail does not need the calendar actions');
+ assert.equal((await send({type:'api',payload:{action:'calendarStatus'}},'https://calendar.google.com.evil.test/')).ok,false);
+ const manifest=JSON.parse(readFileSync(new URL('../integrations/chrome/manifest.json',import.meta.url),'utf8'));
+ assert.deepEqual(manifest.content_scripts.map(c=>c.matches),[['https://mail.google.com/*'],['https://calendar.google.com/*']]);assert.deepEqual(manifest.permissions,['storage']);
+});

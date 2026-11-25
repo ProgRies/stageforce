@@ -76,3 +76,8 @@ CREATE INDEX IF NOT EXISTS security_events_at ON security_events(at);
 -- Still version 13: an optional time for the open follow-up. It sits beside followups instead of being a new column, because older
 -- images insert follow-ups by position and must keep working on this database. A time only counts while its date is the follow-up's date.
 CREATE TABLE IF NOT EXISTS followup_times(followup_id TEXT PRIMARY KEY REFERENCES followups(id) ON DELETE CASCADE,due_date TEXT NOT NULL,time TEXT NOT NULL CHECK(time GLOB '[0-2][0-9]:[0-5][0-9]'));
+
+-- Still version 13: Google Calendar events logged or recognised through the browser extension, so the event pop-up and the marks on
+-- event boxes find their meeting again. Event ids are shared by everyone invited. A new table only; older images ignore it.
+CREATE TABLE IF NOT EXISTS calendar_event_refs(event_id TEXT PRIMARY KEY,activity_id TEXT NOT NULL REFERENCES activities(id) ON DELETE CASCADE,created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS calendar_event_refs_activity ON calendar_event_refs(activity_id);

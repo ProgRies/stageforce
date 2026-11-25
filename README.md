@@ -3,7 +3,7 @@
 StageForce is our internal CRM for Stage clients. It has three parts that share one SQLite database:
 
 - **The CRM** at `/`: organisations, contacts, the communication timeline, call lists, meetings, map pins, the Prüfen list and FastBill imports. Every open tab updates live when a colleague saves something.
-- **The Chrome extension** in `integrations/chrome`: adds an **Add to StageForce** button to Gmail, so you save selected emails, contacts and meetings to the right organisation, and starts calls from Gmail.
+- **The Chrome extension** in `integrations/chrome`: adds an **Add to StageForce** button to Gmail, so you save selected emails, contacts and meetings to the right organisation, and starts calls from Gmail. In Google Calendar it shows whether a meeting is logged, logs it, and marks logged meetings.
 - **The phone app** at `/m/`: a small iPhone web app for logging a call while it is still running.
 
 Every account signs in with a password and an authenticator app. On the server, the CRM takes verified database snapshots on its own.
@@ -56,7 +56,7 @@ Details: [Browser extension](docs/extension-setup.md).
 | Page | For |
 | --- | --- |
 | [User guide](docs/user-guide.md) | Working in the CRM: organisations, timeline, calls and the call card, call lists, meetings, map, Prüfen, settings |
-| [Browser extension](docs/extension-setup.md) | Installing, pairing, saving emails and meetings from Gmail, what is sent |
+| [Browser extension](docs/extension-setup.md) | Installing, pairing, saving emails and meetings from Gmail and Google Calendar, what is sent |
 | [Phone app](docs/mobile-app.md) | Installing `/m/` on an iPhone and testing it from your Mac |
 | [FastBill import](docs/fastbill-import.md) | Adding FastBill customers one row at a time |
 | [Deployment](docs/deployment.md) | Server setup, accounts, two-factor resets, snapshots, backups and updates |
@@ -76,10 +76,10 @@ npm run build
 APP_URL=http://localhost:3000 node server/http.mjs
 ```
 
-After changing the extension, click its reload button in `chrome://extensions` and reload Gmail.
+After changing the extension, click its reload button in `chrome://extensions` and reload Gmail and Google Calendar.
 
 All work happens on `main`. Each change gets a short-lived branch and a pull request into `main`; test it locally with `compose.local.yaml`. Merging a change does not touch the server. Only a version change merged into `main` builds and publishes `ghcr.io/progries/stageforce:<version>` (see [Releases](docs/release.md)).
 
-Current versions: CRM 0.3.26, extension 0.4.23, database schema 13. Startup migrates older databases automatically; back up first, because older versions cannot open a newer schema.
+Current versions: CRM 0.3.26, extension 0.5.0, database schema 13. Startup migrates older databases automatically; back up first, because older versions cannot open a newer schema.
 
 No real customer data, mailbox contents, passwords or keys belong in this repository.
