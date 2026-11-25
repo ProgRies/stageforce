@@ -394,3 +394,28 @@
 .review-checks{flex-wrap:wrap;row-gap:4px}
 .inline-contact-editor .contact-delete{display:flex;margin:12px auto 0;gap:6px;font-size:13px;color:#b4533f}.inline-contact-editor .contact-delete:hover:not(:disabled){color:#8f3524}
 [data-theme="dark"] .inline-contact-editor .contact-delete{color:#f0a493}[data-theme="dark"] .inline-contact-editor .contact-delete:hover:not(:disabled){color:#ffc4b6}
+/* Half-screen org view: the name and FastBill share the first row; Status, Zuständig and the next call stay on one line below it, across the whole header, and shrink instead of wrapping. */
+.organisation-header{row-gap:14px}
+.organisation-title{grid-column:1;grid-row:1}
+.organisation-fastbill{grid-column:2;grid-row:1}
+.organisation-controls{grid-column:1/-1;grid-row:2;display:flex;align-items:center;gap:8px;min-width:0}
+.organisation-controls>.organisation-status-wrap{flex:0 1 auto;min-width:90px}
+.organisation-controls>.organisation-status-wrap:first-child{flex-shrink:0;min-width:0}
+.organisation-controls .organisation-status{field-sizing:content;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.organisation-controls>.followup-wrap{flex:0 1 auto;min-width:130px}
+.organisation-controls .followup-pill{min-width:0;white-space:nowrap;overflow:hidden}
+.organisation-controls .followup-pill>svg{flex-shrink:0}
+.organisation-controls .followup-pill>span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.organisation-controls .followup-pill>small{min-width:0;overflow:hidden;flex-shrink:1000}
+@container(max-width:560px){.organisation-title,.organisation-fastbill,.organisation-controls{grid-column:auto;grid-row:auto}.organisation-controls .followup-pill>small{display:none}}
+@container(max-width:312px){.organisation-controls{flex-wrap:wrap}}
+/* Aktivitäten row: "Notiz hinzufügen" and the call button stay on one line to the right. When the column gets narrow the button reads "Notiz", then only its plus icon shows, and the number shortens. */
+.timeline-heading{container-type:inline-size}
+.timeline-heading,.timeline-actions{flex-wrap:nowrap}
+.timeline-heading h3{flex:none}
+.timeline-actions{min-width:0}
+.timeline-actions>.button{flex:none}
+.quick-call{flex:0 1 220px;min-width:108px}
+@container(max-width:470px){.timeline-note-more{display:none}}
+@container(max-width:280px){.timeline-note-label{display:none}}
+@container(max-width:250px){.timeline-heading,.timeline-actions{flex-wrap:wrap}}
