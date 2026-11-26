@@ -31,7 +31,7 @@ To add a person from the email body, select their details and choose **Extract c
 
 An email that is in the CRM shows **Already in StageForce** instead. This also works for emails a colleague saved from their own mailbox: the copy is matched by sender, subject, the minute it was sent and a shared recipient, and the popup names who saved it. Opening a saved email shows the stored version; contacts can still be edited and calls started.
 
-In the inbox list, a small **✓ CRM: Name** mark shows conversations whose latest email is already in the CRM, with the person Zuständig for that organisation. Your own organisations get a ring around the mark. An amber **! CRM: niemand zuständig** means nobody is assigned yet. Emails that are not in the CRM get no mark. The marks are checked again every minute, so a new owner shows up without reloading Gmail.
+In the inbox list, a small **✓ CRM: Vorname** mark shows conversations whose latest email is already in the CRM, with the first name of the person Zuständig for that organisation (the full name shows on hover). An amber **! CRM: niemand zuständig** means nobody is assigned yet. Emails that are not in the CRM get no mark. The marks are checked again every minute, so a new owner shows up without reloading Gmail.
 
 ### Meetings
 
