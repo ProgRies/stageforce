@@ -1,3 +1,12 @@
+# StageForce 0.3.28 · Who is Zuständig in the Gmail inbox, steadier Calendar row
+
+Publishes `ghcr.io/progries/stageforce:0.3.28`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.28` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. No database change (schema still 13) and no new settings. Browser extension 0.5.1: everyone reloads the extension after the update.
+
+- **Gmail inbox mark names the owner:** the mark on saved conversations reads **✓ CRM: Name** with the person Zuständig for that organisation, with a ring around it on your own organisations. An amber **! CRM: niemand zuständig** shows when nobody is assigned. Marks are checked again every minute, so a new owner shows up without reloading Gmail.
+- **Google Calendar (extension 0.5.1):** the Google Meet link in an event pop-up stays visible next to the StageForce row; before, Calendar could hide it inside our row. The row sits under the title and no longer disappears when Calendar redraws the pop-up.
+- **Calendar marks are more reliable:** logged meetings get their mark even when Calendar shows them while a check is running, and a failed check is retried on its own.
+- Older and newer versions work together: the 0.5.0 extension keeps showing the plain mark on the 0.3.28 server, and the 0.5.1 extension shows the plain mark on 0.3.27.
+
 # StageForce 0.3.27 · Google Calendar in the browser extension
 
 Publishes `ghcr.io/progries/stageforce:0.3.27`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.27` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. One new table (`calendar_event_refs`), schema still 13, so 0.3.26 and 0.3.25 can still open the database. No new settings. Needs browser extension 0.5.0: everyone reloads the extension after the update.
