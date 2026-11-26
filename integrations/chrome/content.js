@@ -483,32 +483,45 @@ function setButtonState(b,state,celebrate=false,detail=''){
  const [icon,label,title]=states[state];b.dataset.state=state;b.sfRevision=(b.sfRevision||0)+1;b.classList.toggle('celebrate',celebrate);b.querySelector('.symbol').textContent=icon;b.querySelector('.label').textContent=label;b.title=detail||title;
 }
 function buttonIssue(b,error){const message=error?.message||'Check the StageForce connection.';const state=error?.code==='connection_required'?'disconnected':/Connect Stage Force first|Connect your extension|Connect Stage Force using/.test(message)?'disconnected':/unavailable|Failed to fetch|timeout|timed out|aborted/i.test(message)?'offline':'attention';setButtonState(b,state,false,message);}
-// Inbox rows get a small mark when their conversation is in StageForce, also when a colleague saved its latest email. Gmail ids and the latest email's sender, minute and subject are sent; only a yes/no comes back, so no CRM data is put into the page.
+// Inbox rows get a small mark when their conversation is in StageForce, also when a colleague saved its latest email. Gmail ids and the latest email's sender, minute and subject are sent; back come the saved ids and, for each, only the name of the person Zuständig for its organisation (or none), so a mailbox shows whose conversation it is.
 const rowStatus=new Map();let rowsBusy=false,rowsPausedUntil=0;
 const rowKey=(mailbox,id)=>mailbox.toLowerCase()+'|'+id;
 function rowIds(r){const attr=(s,a)=>r.querySelector(s)?.getAttribute(a)||r.getAttribute(a)||'';return unique([attr('[data-thread-id]','data-thread-id').replace(/^#/,''),attr('[data-legacy-thread-id]','data-legacy-thread-id'),attr('[data-legacy-last-message-id]','data-legacy-last-message-id')]).filter(v=>v.length<=200&&/^[\w:.-]+$/.test(v));}
 // The latest message of a row, so an email a colleague saved is found in this mailbox too.
 function rowLatest(r){const sentAt=globalThis.stageForceDate(r.querySelector('.xW [title],td.xW span[title]')?.getAttribute('title'))?.toISOString(),subject=text(r.querySelector('.bog'));const from=unique([...r.querySelectorAll('.yX [email],.yW [email]')].map(e=>String(e.getAttribute('email')).toLowerCase())).slice(0,10);return sentAt&&subject&&from.length?{from,sentAt,subject:subject.slice(0,1000)}:null;}
-function rowSaved(mailbox,ids){return ids.some(v=>rowStatus.get(rowKey(mailbox,v))?.saved);}
-function rowSavedNow(m){const mailbox=account();if(!mailbox)return;for(const v of [m.gmailThreadId,m.gmailMessageId])if(v)rowStatus.set(rowKey(mailbox,String(v).replace(/^#/,'')),{saved:true,at:Date.now()});markInbox();}
-function markRow(r){
- if(r.querySelector('[data-stageforce-row]'))return;const cell=r.querySelector('.y6')||r.querySelector('.xT')||r.querySelector('.yX');if(!cell)return;
- const wrap=document.createElement('span');wrap.dataset.stageforceRow='true';const root=wrap.attachShadow({mode:'closed'});
- root.innerHTML='<style>span{display:inline-flex;align-items:center;margin-right:6px;padding:0 6px;height:18px;border-radius:9px;font:600 11px/18px "Google Sans",Roboto,Arial,sans-serif;color:#fff;background:linear-gradient(115deg,#6546b3,#3f58a8);white-space:nowrap;vertical-align:middle}</style><span title="In StageForce" aria-label="In StageForce">✓ CRM</span>';
- cell.prepend(wrap);
+// The saved status of a row: the first of its ids known as saved, preferring one whose owner is known.
+function rowInfo(mailbox,ids){const found=ids.map(v=>rowStatus.get(rowKey(mailbox,v))).filter(s=>s?.saved);return found.find(s=>s.owner!==undefined)||found[0]||null;}
+function rowSavedNow(m){const mailbox=account();if(!mailbox)return;for(const v of [m.gmailThreadId,m.gmailMessageId])if(v)rowStatus.set(rowKey(mailbox,String(v).replace(/^#/,'')),{saved:true,owner:undefined,at:0});markInbox();}
+// owner: undefined while unknown (plain "✓ CRM"), null when nobody is Zuständig, else {name,mine}.
+function ownerOf(v){if(v===null)return null;if(v&&typeof v==='object'&&typeof v.name==='string'&&v.name.trim())return{name:v.name.trim().slice(0,100),mine:v.mine===true};return undefined;}
+function markRow(r,info){
+ const old=r.querySelector('[data-stageforce-row]');
+ if(!info){old?.remove();return;}
+ const o=info.owner,state=o===undefined?'saved':o===null?'none':(o.mine?'mine:':'other:')+o.name;
+ if(old?.dataset.stageforceRow===state)return;
+ const cell=r.querySelector('.y6')||r.querySelector('.xT')||r.querySelector('.yX');if(!cell)return;
+ const wrap=document.createElement('span');wrap.dataset.stageforceRow=state;const root=wrap.attachShadow({mode:'closed'});
+ root.innerHTML='<style>span.b{display:inline-flex;align-items:center;max-width:180px;margin-right:6px;padding:0 6px;height:18px;border-radius:9px;font:600 11px/18px "Google Sans",Roboto,Arial,sans-serif;color:#fff;background:linear-gradient(115deg,#6546b3,#3f58a8);white-space:nowrap;vertical-align:middle;box-sizing:border-box}span.n{font-weight:500;margin-left:3px;overflow:hidden;text-overflow:ellipsis}span.mine{box-shadow:inset 0 0 0 1.5px #fff,0 0 0 1.5px #6546b3}span.none{background:#f3b33d;color:#3d2a00}@media (prefers-color-scheme:dark){span.none{background:#f6c35a;color:#2b1d00}}</style><span class="b"><span class="l"></span></span>';
+ const badge=root.querySelector('.b'),label=root.querySelector('.l');
+ if(o===undefined){label.textContent='✓ CRM';badge.title='In StageForce';}
+ else if(o===null){badge.classList.add('none');label.textContent='! CRM:';const n=document.createElement('span');n.className='n';n.textContent='niemand zuständig';badge.append(n);badge.title='In StageForce · niemand ist zuständig';}
+ else{if(o.mine)badge.classList.add('mine');label.textContent='✓ CRM:';const n=document.createElement('span');n.className='n';n.textContent=o.name;badge.append(n);badge.title='In StageForce · Zuständig: '+o.name+(o.mine?' (du)':'');}
+ badge.setAttribute('aria-label',badge.title);
+ if(old)old.replaceWith(wrap);else cell.prepend(wrap);
 }
 async function markInbox(){
  if(rowsBusy||document.hidden||Date.now()<rowsPausedUntil)return;
  const rows=[...document.querySelectorAll('tr.zA')].filter(visible);if(!rows.length)return;
  const mailbox=account();if(!mailbox)return;
  const now=Date.now(),wanted=new Set(),latest=new Map();
- for(const r of rows){const ids=rowIds(r);if(rowSaved(mailbox,ids)){markRow(r);continue;}let stale=false;for(const v of ids){const s=rowStatus.get(rowKey(mailbox,v));if(!s||now-s.at>60000){wanted.add(v);stale=true;}}const row=stale&&ids[0]&&rowLatest(r);if(row&&latest.size<150)latest.set(ids[0],{id:ids[0],...row});}
+ // Saved rows are marked at once and still checked again every minute, so a change of Zuständig shows up.
+ for(const r of rows){const ids=rowIds(r),info=rowInfo(mailbox,ids);if(info)markRow(r,info);let stale=false;for(const v of ids){const s=rowStatus.get(rowKey(mailbox,v));if(!s||now-s.at>60000){wanted.add(v);stale=true;}}const row=stale&&ids[0]&&rowLatest(r);if(row&&latest.size<150)latest.set(ids[0],{id:ids[0],...row});}
  if(!wanted.size)return;
  const ids=[...wanted].slice(0,150);rowsBusy=true;
- try{const r=await api({action:'threadStatus',mailbox,ids,rows:[...latest.values()].filter(row=>ids.includes(row.id))});const saved=new Set(Array.isArray(r?.saved)?r.saved:[]);for(const v of ids)rowStatus.set(rowKey(mailbox,v),{saved:saved.has(v),at:Date.now()});}
+ try{const r=await api({action:'threadStatus',mailbox,ids,rows:[...latest.values()].filter(row=>ids.includes(row.id))});const saved=new Set(Array.isArray(r?.saved)?r.saved:[]),owners=r?.owners&&typeof r.owners==='object'?r.owners:{};for(const v of ids)rowStatus.set(rowKey(mailbox,v),{saved:saved.has(v),owner:saved.has(v)&&Object.hasOwn(owners,v)?ownerOf(owners[v]):undefined,at:Date.now()});}
  catch{rowsPausedUntil=Date.now()+60000;return;}
  finally{rowsBusy=false;}
- for(const r of rows)if(r.isConnected&&rowSaved(mailbox,rowIds(r)))markRow(r);
+ for(const r of rows)if(r.isConnected)markRow(r,rowInfo(mailbox,rowIds(r)));
  if(wanted.size>ids.length)setTimeout(markInbox,0);
 }
 window.addEventListener('hashchange',()=>setTimeout(markInbox,400));document.addEventListener('visibilitychange',()=>{if(!document.hidden)markInbox();});

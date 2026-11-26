@@ -107,10 +107,29 @@ test('inbox status says only which of the given conversations are saved, for the
   const thread='thread-f:1780000000000000009';
   action({action:'save',confirmed:true,requestId:randomUUID(),mailbox,gmailThreadId:thread,gmailMessageId:'18c9',from:{name:'Pat',email:'pat@client.test'},recipients:[{email:mailbox,name:''}],originalSubject:'Offer',subject:'Offer',body:'Hi',originalBody:'Hi',timestamp:'2026-10-20T09:00:00Z',timestampRaw:'',contactEmails:[],newOrganisation:'Client'});
   assert.deepEqual(action({action:'threadStatus',mailbox,ids:['#'+thread,'thread-f:222','18c9','bb2']}).saved,[thread,'18c9']);
-  assert.deepEqual(Object.keys(action({action:'threadStatus',mailbox,ids:[thread]})),['saved']);
+  assert.deepEqual(Object.keys(action({action:'threadStatus',mailbox,ids:[thread]})),['saved','owners']);
   assert.throws(()=>action({action:'threadStatus',mailbox:'someone@else.test',ids:[thread]}),/mailbox/);
   assert.throws(()=>action({action:'threadStatus',mailbox,ids:['bad id<>']}),/Invalid/);
   assert.throws(()=>action({action:'threadStatus',mailbox,ids:Array(151).fill('x')}),/Invalid/);
+ }finally{db.close();}
+});
+test('inbox status names only who is Zuständig for each saved conversation',async()=>{
+ const {db,user,action}=await setup();try{
+  const colleague=await addUser(db,'sam@team.test','Sam Berger','long-password-1234');const sam=db.prepare('SELECT * FROM users WHERE id=?').get(colleague),samAction=b=>extensionAction(db,sam,b,'http://localhost:3000');
+  const saveOne=(thread,gmailId,org,at)=>action({action:'save',confirmed:true,requestId:randomUUID(),mailbox,gmailThreadId:thread,gmailMessageId:gmailId,from:{name:'Pat',email:'pat@client.test'},recipients:[{email:mailbox,name:''},{email:'sam@team.test',name:''}],originalSubject:'Offer '+gmailId,subject:'Offer '+gmailId,body:'Hi',originalBody:'Hi',timestamp:at,timestampRaw:'',contactEmails:[],newOrganisation:org}).organisation.id;
+  const a=saveOne('thread-f:1','m1','Mine','2026-10-20T09:00:00Z'),b=saveOne('thread-f:2','m2','Sams','2026-10-20T10:00:00Z'),c=saveOne('thread-f:3','m3','Nobody','2026-10-20T11:00:00Z'),d=saveOne('thread-f:4','m4','Legacy','2026-10-20T12:00:00Z'),e=saveOne('thread-f:5','m5','Gone','2026-10-20T13:00:00Z');
+  const owner=(id,v)=>db.prepare('UPDATE organisations SET owner=? WHERE id=?').run(v,id);
+  owner(a,user.id);owner(b,colleague);owner(c,'');owner(d,'sam berger');owner(e,'Someone Who Left');
+  const r=action({action:'threadStatus',mailbox,ids:['thread-f:1','thread-f:2','thread-f:3','thread-f:4','thread-f:5','thread-f:9']});
+  assert.deepEqual(r.saved,['thread-f:1','thread-f:2','thread-f:3','thread-f:4','thread-f:5']);
+  assert.deepEqual(r.owners,{'thread-f:1':{name:'Alex',mine:true},'thread-f:2':{name:'Sam Berger',mine:false},'thread-f:3':null,'thread-f:4':{name:'Sam Berger',mine:false},'thread-f:5':null});
+  assert.deepEqual(action({action:'threadStatus',mailbox,ids:['m2']}).owners,{m2:{name:'Sam Berger',mine:false}},'a message id finds its organisation too');
+  // In a colleague's mailbox the same email matched by sender, minute and subject names the owner, and "mine" is from their side.
+  const seen=samAction({action:'threadStatus',mailbox:'sam@team.test',ids:['x1','x2'],rows:[{id:'x1',from:['pat@client.test'],sentAt:'2026-10-20T10:00:00.000Z',subject:'Offer m2'},{id:'x2',from:['pat@client.test'],sentAt:'2026-10-20T09:00:00.000Z',subject:'Offer m1'}]});
+  assert.deepEqual(seen.owners,{x1:{name:'Sam Berger',mine:true},x2:{name:'Alex',mine:false}});
+  // A later email of the thread filed under another organisation decides the name.
+  action({action:'save',confirmed:true,requestId:randomUUID(),mailbox,gmailThreadId:'thread-f:1',gmailMessageId:'m1b',from:{name:'Pat',email:'pat@client.test'},recipients:[{email:mailbox,name:''}],originalSubject:'Re',subject:'Re',body:'Hi',originalBody:'Hi',timestamp:'2026-10-21T09:00:00Z',timestampRaw:'',contactEmails:[],organisationId:b,version:getOrg(db,b).version});
+  assert.deepEqual(action({action:'threadStatus',mailbox,ids:['thread-f:1']}).owners,{'thread-f:1':{name:'Sam Berger',mine:false}});
  }finally{db.close();}
 });
 test('an email a colleague saved is recognised in another mailbox by sender, minute, subject and a shared recipient',async()=>{

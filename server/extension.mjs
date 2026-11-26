@@ -5,6 +5,7 @@ import {detectMeeting,logMeeting,manualMeeting,findMeeting,meetingText} from './
 import {prepareCall,saveCall,cancelCall,openCall,draftCall,mergePhones,dialNumber} from './calls.mjs';
 import {randomBytes,createHash,randomUUID} from 'node:crypto';
 import {hashToken,limited,email} from './auth.mjs';
+import {ownerResolver} from './leads.mjs';
 import {transaction,now} from './db.mjs';
 import {Problem,ourAddresses,notificationSender,matchEmail,stageImport,confirmImport,getOrg,contacts,createOrg,linkSave,contactSave,assertVersion} from './crm.mjs';
 const brief=o=>({id:o.id,name:o.name,version:String(o.version)});
@@ -100,11 +101,16 @@ export function extensionAction(db,user,b,origin){
  if(b.action==='threadStatus'){
   const {mailbox}=identity(b,user);if(!Array.isArray(b.ids)||b.ids.length>150)throw new Problem('Invalid conversations.');
   const ids=[...new Set(b.ids.map(v=>field(v,200).replace(/^#/,'')))];if(ids.some(v=>!/^[\w:.-]+$/.test(v)))throw new Problem('Invalid conversations.');
-  const thread=db.prepare('SELECT 1 FROM extension_thread_refs WHERE mailbox=? AND thread_id=? LIMIT 1'),message=db.prepare('SELECT 1 FROM extension_message_refs WHERE mailbox=? AND gmail_id=?');
-  const saved=ids.filter(v=>thread.get(mailbox,v)||message.get(mailbox,v));
+  // The organisation of each saved row is the one of its latest saved email, so the mark can name who is Zuständig.
+  const thread=db.prepare('SELECT a.organisation_id FROM extension_thread_refs r JOIN messages m ON m.id=r.message_id JOIN activities a ON a.message_id=m.id WHERE r.mailbox=? AND r.thread_id=? ORDER BY m.sent_at DESC LIMIT 1'),message=db.prepare('SELECT a.organisation_id FROM extension_message_refs r JOIN activities a ON a.message_id=r.message_id WHERE r.mailbox=? AND r.gmail_id=?');
+  const orgOf=new Map();for(const v of ids){const o=thread.get(mailbox,v)||message.get(mailbox,v);if(o)orgOf.set(v,o.organisation_id);}
+  const saved=ids.filter(v=>orgOf.has(v));
   // Rows not saved from this mailbox may still hold an email a colleague saved: their latest message is matched by sender, minute and subject.
-  if(b.rows!==undefined){if(!Array.isArray(b.rows)||b.rows.length>150)throw new Problem('Invalid conversations.');for(const r of b.rows){const id=field(r?.id,200).replace(/^#/,'');if(!/^[\w:.-]+$/.test(id)||!Array.isArray(r.from)||r.from.length>10)throw new Problem('Invalid conversations.');if(saved.includes(id))continue;const senders=r.from.map(e=>field(e,254).toLowerCase()).filter(e=>email(e));if(sameEmail(db,senders,field(r.sentAt,50),field(r.subject,1000)))saved.push(id);}}
-  return{saved};
+  if(b.rows!==undefined){if(!Array.isArray(b.rows)||b.rows.length>150)throw new Problem('Invalid conversations.');for(const r of b.rows){const id=field(r?.id,200).replace(/^#/,'');if(!/^[\w:.-]+$/.test(id)||!Array.isArray(r.from)||r.from.length>10)throw new Problem('Invalid conversations.');if(saved.includes(id))continue;const senders=r.from.map(e=>field(e,254).toLowerCase()).filter(e=>email(e));const m=sameEmail(db,senders,field(r.sentAt,50),field(r.subject,1000));if(m){saved.push(id);orgOf.set(id,m.organisation_id);}}}
+  // Only the Zuständig person's name goes back (mine marks your own accounts); an owner who is no team account counts as nobody, as in the call lists.
+  const resolve=ownerResolver(db),names=new Map(db.prepare('SELECT id,name FROM users').all().map(u=>[u.id,u.name])),orgOwner=db.prepare('SELECT owner FROM organisations WHERE id=?');
+  const owners={};for(const v of saved){const id=resolve(orgOwner.get(orgOf.get(v))?.owner);owners[v]=id?{name:names.get(id),mine:id===user.id}:null;}
+  return{saved,owners};
  }
  if(b.action==='messageStatus'){
   const m=existingMessage(db,user,b);if(!m)return{saved:false};
