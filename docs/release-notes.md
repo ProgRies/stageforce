@@ -1,3 +1,11 @@
+# StageForce 0.3.29 · Typing in the Calendar card works, calmer marks
+
+Publishes `ghcr.io/progries/stageforce:0.3.29`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.29` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. No database change (schema still 13), no new settings and no server change; this release carries browser extension 0.5.2. Everyone reloads the extension.
+
+- **Logging from Google Calendar (extension 0.5.2):** typing in the logging card works again. The organisation field no longer clears itself on every key, typed letters no longer trigger Calendar's shortcuts (such as creating an event in the background), and clicking in the card no longer closes the event pop-up. Escape closes only the card.
+- **Calendar marks stop blinking:** a mark that Calendar drops while redrawing is put back at once, and opening an event no longer removes a mark the grid had set.
+- **Gmail inbox mark:** shows only the first name (**✓ CRM: Christian**); the full name is in the tooltip. The ring on your own organisations is gone, so every assigned mark looks the same.
+
 # StageForce 0.3.28 · Who is Zuständig in the Gmail inbox, steadier Calendar row
 
 Publishes `ghcr.io/progries/stageforce:0.3.28`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.28` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. No database change (schema still 13) and no new settings. Browser extension 0.5.1: everyone reloads the extension after the update.
