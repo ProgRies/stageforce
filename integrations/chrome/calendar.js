@@ -18,6 +18,12 @@ const isOurs = n => n?.nodeType === 1 && (n.hasAttribute(OURS) || !!n.closest?.(
 const host = (tag, kind) => { const el = document.createElement(tag); el.setAttribute(OURS, kind); el.attachShadow({ mode: 'open' }); return el; };
 // Should Calendar still put anything into one of our elements, it goes back right after it, where it is visible.
 function evict(el) { if (el?.firstChild && el.isConnected) el.after(...el.childNodes); }
+// Calendar handles keys, clicks and focus with listeners on the whole page that look at the event's target. Inside our shadow
+// DOM that target is our host element, not an input field, so typing "c" in our card opened "create event", a click in the card
+// counted as a click outside the event pop-up (closing it and moving focus back to the grid), and its focus trap pulled focus
+// away from our fields. What happens inside our elements stays there.
+const PRIVATE_EVENTS = ['keydown', 'keyup', 'keypress', 'beforeinput', 'input', 'paste', 'copy', 'cut', 'compositionstart', 'compositionupdate', 'compositionend', 'focusin', 'focusout', 'pointerdown', 'pointerup', 'mousedown', 'mouseup', 'click', 'dblclick', 'auxclick', 'contextmenu', 'wheel', 'touchstart', 'touchend'];
+function isolate(el) { for (const type of PRIVATE_EVENTS) el.addEventListener(type, e => e.stopPropagation()); return el; }
 
 async function send(message) {
  try { const r = await chrome.runtime.sendMessage(message); if (!r?.ok) throw Object.assign(new Error(r?.error || 'Extension unavailable. Refresh Google Calendar.'), { code: r?.code || 'request_failed' }); return r.data; }
@@ -121,7 +127,7 @@ button:focus-visible{outline:3px solid #aa8bed;outline-offset:2px}
 const rows = new WeakMap();
 function row(d, info) {
  // The same row for the pop-up's lifetime: when Calendar re-renders and drops it, it goes back in as it was, with no new check.
- let el = rows.get(d); if (!el) { el = host('stageforce-row', 'row'); rows.set(d, el); }
+ let el = rows.get(d); if (!el) { el = isolate(host('stageforce-row', 'row')); rows.set(d, el); }
  evict(el);
  const at = anchor(d, info); if (at && el.previousElementSibling !== at) at.after(el); else if (!at && !el.isConnected) d.append(el);
  el.classList.toggle('dark', dark()); return el;
@@ -158,7 +164,9 @@ async function checkDialogs() {
   renderRow(host, info, { kind: 'checking' });
   try {
    const r = await api({ action: 'calendarCheck', mailbox: account(), eventId: info.id, title: info.title, date: info.date, time: info.time, links: info.links, guests: info.guests });
-   if (host.sfKey !== key) continue; if (info.id) setMark(info.id, !!r.logged);
+   // Only a found meeting sets the mark here. "Not found" is no reason to take one away: the pop-up check looks at the guests,
+   // the grid check also at title and time, and a mark that blinked off and back on with every pop-up was the result.
+   if (host.sfKey !== key) continue; if (info.id && r.logged) setMark(info.id, true);
    host.sfState = { kind: 'done', r }; renderRow(host, info, host.sfState);
   } catch (error) { if (host.sfKey === key) renderRow(host, info, { kind: problem(error) === 'disconnected' ? 'disconnected' : 'error', error }); }
  }
@@ -168,7 +176,7 @@ async function checkDialogs() {
 const CARD_CSS = `
 :host{all:initial;--line:#d8d2ef;--text:#29334b;--muted:#5e6880;--ok:#16814d;--input:#fff;--modal:linear-gradient(160deg,#fbfaff,#f0ecfb);--surface:#f7f5ff;--veil:#2a2f3f55}
 :host(.dark){--line:#463f6b;--text:#e6e3f5;--muted:#a7a3c0;--ok:#5fd39a;--input:#16151f;--modal:linear-gradient(160deg,#211f30,#1a1827);--surface:#252238;--veil:#000a}
-*{box-sizing:border-box}.veil{position:fixed;inset:0;z-index:2147483000;background:var(--veil);backdrop-filter:blur(2px);display:grid;place-items:center;padding:16px;font:14px/1.4 Inter,system-ui,sans-serif;color:var(--text);animation:fade .15s ease both}
+*{box-sizing:border-box}dialog.top{all:unset;display:block;position:fixed;inset:0}dialog.top::backdrop{background:none}.veil{position:fixed;inset:0;z-index:2147483000;background:var(--veil);backdrop-filter:blur(2px);display:grid;place-items:center;padding:16px;font:14px/1.4 Inter,system-ui,sans-serif;color:var(--text);animation:fade .15s ease both}
 .modal{width:min(880px,100%);max-height:calc(100vh - 32px);overflow:auto;border-radius:26px;background:var(--modal);box-shadow:0 30px 80px #0005;padding:22px 24px 18px;animation:rise .2s ease both}
 header{display:flex;align-items:center;gap:10px;margin-bottom:16px}header svg{width:28px;height:28px}h1{font-size:18px;margin:0;flex:1}
 .x{all:unset;cursor:pointer;width:40px;height:40px;border-radius:12px;border:1px solid var(--line);display:grid;place-items:center;background:var(--input)}
@@ -192,21 +200,25 @@ input:focus{outline:none;border-color:#7d62d6;box-shadow:0 0 0 3px #7d62d633}#or
 let card = null;
 function openCard(info, check, onSaved) {
  if (card) return; const lastFocus = document.activeElement;
- card = document.createElement('div'); card.setAttribute(OURS, 'card'); card.classList.toggle('dark', dark());
- const sh = card.attachShadow({ mode: 'open' }), requestId = crypto.randomUUID(); let selected = check.organisation || null, participants = check.participants, busy = false;
+ card = isolate(host('stageforce-card', 'card')); card.classList.toggle('dark', dark());
+ const sh = card.shadowRoot, requestId = crypto.randomUUID(); let selected = check.organisation || null, participants = check.participants, busy = false;
  const external = () => participants.filter(p => !p.internal), team = () => participants.filter(p => p.internal);
  const ticked = new Map(external().map(p => [p.email, p.known || !p.elsewhere?.length]));
- sh.innerHTML = `<style>${CARD_CSS}</style><div class="veil"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="t"><header>${LOGO}<h1 id="t">Log meeting in StageForce</h1><button class="x" aria-label="Close">✕</button></header>
+ sh.innerHTML = `<style>${CARD_CSS}</style><dialog class="top" aria-labelledby="t"><div class="veil"><section class="modal"><header>${LOGO}<h1 id="t">Log meeting in StageForce</h1><button class="x" aria-label="Close">✕</button></header>
  <div class="grid"><div><div class="picker"><input id="org" aria-label="Organization" placeholder="Find or create an organization" autocomplete="off"><div class="options" id="options"></div></div><div class="hint" id="org-hint"></div>
  <div class="when"><input id="title" aria-label="Meeting title"><input id="date" type="date" aria-label="Meeting date"><input id="time" type="time" aria-label="Meeting time, optional"></div>
  <div class="chips" id="chips"></div></div>
- <div><div id="contacts"></div><div class="hint" id="state"></div><div class="error" id="error" role="alert"></div><div class="actions"><button class="b" id="open">Log & Open ↗</button><button class="b p" id="save">Log meeting</button></div></div></div></section></div>`;
- document.body.append(card); const $ = s => sh.querySelector(s);
+ <div><div id="contacts"></div><div class="hint" id="state"></div><div class="error" id="error" role="alert"></div><div class="actions"><button class="b" id="open">Log & Open ↗</button><button class="b p" id="save">Log meeting</button></div></div></div></section></div></dialog>`;
+ // A modal <dialog> sits above everything on the page and makes the rest of it inert while open, so Calendar can neither
+ // cover the card nor take focus back to its own pop-up.
+ document.body.append(card); const $ = s => sh.querySelector(s); $('dialog').showModal();
+ $('dialog').addEventListener('cancel', e => { e.preventDefault(); close(); });
  $('#title').value = info.title; $('#date').value = info.date; $('#time').value = info.time;
  const m = check.meeting || {}; $('#chips').innerHTML = [m.provider ? m.provider + (m.link ? ' · ' + (m.link.match(/[a-z]{3}-[a-z]{4}-[a-z]{3}|\d{6,}/i)?.[0] || 'link') : '') : '', 'From Google Calendar'].filter(Boolean).map(c => `<span class="chip">${esc(c)}</span>`).join('');
  function orgHint() {
   const c = selected && check.candidates.find(c => c.id === selected.id);
-  $('#org').value = selected?.name || ''; $('#org-hint').className = 'hint' + (c ? ' ok' : '');
+  // Only a choice fills the field. While typing nothing is chosen, and writing '' here emptied the field on every key.
+  if (selected) $('#org').value = selected.name; $('#org-hint').className = 'hint' + (c ? ' ok' : '');
   $('#org-hint').textContent = !selected ? (check.candidates.length > 1 ? 'Guests belong to ' + check.candidates.map(c => c.name).join(', ') + '. Choose one.' : 'Choose the organisation this meeting belongs to.') : selected.id ? (c ? '✓ Matched by guest email ' + c.guests[0] : 'Selected') : 'New organisation · created when you log';
   $('#save').disabled = $('#open').disabled = !selected || busy;
  }
@@ -244,9 +256,9 @@ function openCard(info, check, onSaved) {
   }, 200);
  });
  $('#org').addEventListener('blur', () => setTimeout(() => { if (card) $('#options').innerHTML = ''; }, 150));
- function close() { card?.remove(); card = null; document.removeEventListener('keydown', keys, true); lastFocus?.focus?.(); }
- function keys(e) { if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); close(); } else if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); save(false); } }
- document.addEventListener('keydown', keys, true);
+ function close() { if (!card) return; card.remove(); card = null; lastFocus?.focus?.(); }
+ // Escape arrives as the dialog's cancel event; Ctrl/Cmd+Enter logs.
+ $('dialog').addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); save(false); } });
  $('.x').onclick = close; $('.veil').addEventListener('mousedown', e => { if (e.target === $('.veil')) close(); });
  async function save(openAfter) {
   if (busy || !selected) return; if (!$('#date').value) { $('#error').textContent = 'Choose the meeting date.'; return; }
@@ -309,7 +321,22 @@ async function markBoxes() {
 // ---- Watching the page ----
 let pending = false;
 function schedule() { if (pending) return; pending = true; setTimeout(() => { pending = false; checkDialogs(); markBoxes(); }, 250); }
-new MutationObserver(records => { if (records.every(r => isOurs(r.target) || [...r.addedNodes, ...r.removedNodes].every(n => isOurs(n)) && (r.addedNodes.length || r.removedNodes.length))) return; schedule(); }).observe(document.body, { childList: true, subtree: true });
+// When Calendar re-renders a box or the pop-up it drops our mark or row. They go back right here, in the observer, which runs
+// before the browser paints the next frame, so nothing blinks. Everything else waits for the debounced pass.
+function restore() {
+ if (status.size) paintMarks();
+ for (const d of eventDialogs()) { const el = rows.get(d); if (el && !el.isConnected) row(d, readDialog(d)); }
+}
+new MutationObserver(records => {
+ let dropped = false, theirs = false;
+ for (const r of records) {
+  if (isOurs(r.target)) continue;
+  for (const n of r.removedNodes) if (isOurs(n)) dropped = true; else theirs = true;
+  for (const n of r.addedNodes) if (!isOurs(n)) theirs = true;
+ }
+ if (dropped || theirs) restore();
+ if (theirs) schedule();
+}).observe(document.body, { childList: true, subtree: true });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) markBoxes(); });
 window.addEventListener('focus', () => markBoxes());
 // Calendar also shows boxes by changing styles and classes, which the observer above does not see (watching every attribute

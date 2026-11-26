@@ -35,19 +35,35 @@ window.fixture = {
   patch(document.getElementById('grid'), days.map(d => ({ tag: 'div', key: 'd' + d, attrs: { 'data-datekey': String(key(2026, 11, d)) }, html: '' })));
   for (const d of days) {
    const col = document.querySelector(`[data-datekey="${key(2026, 11, d)}"]`);
-   patch(col, events.filter(e => e.day === d).map(e => ({ tag: 'div', key: e.id, cls: e.cls || '', attrs: { 'data-eventid': eid(e.id), role: 'button', style: `top:${e.top}px;height:${e.height || 60}px` }, html: `<span>${e.title}</span><span>${e.when}</span>` })));
+   patch(col, events.filter(e => e.day === d).map(e => ({ tag: 'div', key: e.id, cls: e.cls || '', attrs: { 'data-eventid': eid(e.id), role: 'button', tabindex: '0', style: `top:${e.top}px;height:${e.height || 60}px` }, html: `<span>${e.title}</span><span>${e.when}</span>` })));
   }
  },
  chip(id) { return document.querySelector(`[data-eventid="${eid(id)}"]`); },
  // The pop-up renders in two passes, as Calendar does: first what the grid already knows, then the full event with the Meet link.
  renderPopup(full) {
   let dlg = document.querySelector('[role=dialog]');
-  if (!dlg) { dlg = document.createElement('div'); dlg.setAttribute('role', 'dialog'); dlg.innerHTML = '<div id="content"></div>'; document.getElementById('popup').append(dlg); }
+  if (!dlg) { dlg = document.createElement('div'); dlg.setAttribute('role', 'dialog'); dlg.tabIndex = -1; dlg.innerHTML = '<div id="content"></div>'; document.getElementById('popup').append(dlg); }
   const sections = [{ tag: 'div', cls: 'section header', html: '<span role="heading">Jahresgespräch Stage / LK Ravensburg</span><div>Donnerstag, 26. November · 11:00AM bis 12:00PM</div>' }];
   if (full) sections.push({ tag: 'div', cls: 'section meet', html: '<a id="join" href="https://meet.google.com/kkt-jtpi-qxd">Mit Google Meet teilnehmen</a><div>meet.google.com/kkt-jtpi-qxd</div>' });
   sections.push({ tag: 'div', cls: 'section notes', html: 'Besprechungsnotizen machen' }, { tag: 'div', cls: 'section guests', html: '<div data-email="c.arnegger@rv.de">c.arnegger@rv.de</div>' }, { tag: 'div', cls: 'section reminder', html: '10 Minuten vorher' }, { tag: 'div', cls: 'section owner', html: 'Christian Ries' });
   patch(dlg.querySelector('#content'), sections);
  },
  closePopup() { document.getElementById('popup').innerHTML = ''; },
+ opened: [],
 };
+// Calendar's page-wide behaviour, as Closure/Wiz handlers do it: listeners on the document that look at event.target.
+// 1. Keyboard shortcuts (c = create event, w/d/m = views) unless the key was typed into an input field.
+document.addEventListener('keydown', e => {
+ const t = e.target; if (t.closest?.('input,textarea,[contenteditable]') || e.ctrlKey || e.metaKey) return;
+ if (/^[cwdm]$/.test(e.key)) { e.preventDefault(); fixture.opened.push(e.key); const n = document.createElement('div'); n.className = 'shortcut-opened'; n.textContent = 'opened by ' + e.key; document.body.append(n); }
+});
+// 2. A click outside the event pop-up closes it and puts focus back on the event box.
+document.addEventListener('mousedown', e => {
+ const dlg = document.querySelector('[role=dialog]'); if (!dlg || dlg.contains(e.target)) return;
+ const box = document.querySelector('[data-eventid].open'); fixture.closePopup(); box?.focus();
+});
+// 3. Focus stays inside the open pop-up.
+document.addEventListener('focusin', e => {
+ const dlg = document.querySelector('[role=dialog]'); if (dlg && !dlg.contains(e.target)) dlg.focus();
+});
 </script></body></html>
