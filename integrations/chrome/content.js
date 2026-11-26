@@ -492,7 +492,7 @@ function rowLatest(r){const sentAt=globalThis.stageForceDate(r.querySelector('.x
 // The saved status of a row: the first of its ids known as saved, preferring one whose owner is known.
 function rowInfo(mailbox,ids){const found=ids.map(v=>rowStatus.get(rowKey(mailbox,v))).filter(s=>s?.saved);return found.find(s=>s.owner!==undefined)||found[0]||null;}
 function rowSavedNow(m){const mailbox=account();if(!mailbox)return;for(const v of [m.gmailThreadId,m.gmailMessageId])if(v)rowStatus.set(rowKey(mailbox,String(v).replace(/^#/,'')),{saved:true,owner:undefined,at:0});markInbox();}
-// owner: undefined while unknown (plain "✓ CRM"), null when nobody is Zuständig, else {name,mine}.
+// owner: undefined while unknown (plain "✓ CRM"), null when nobody is Zuständig, else {name,mine}. The mark shows the first name; the full name is in its tooltip.
 function ownerOf(v){if(v===null)return null;if(v&&typeof v==='object'&&typeof v.name==='string'&&v.name.trim())return{name:v.name.trim().slice(0,100),mine:v.mine===true};return undefined;}
 function markRow(r,info){
  const old=r.querySelector('[data-stageforce-row]');
@@ -501,11 +501,11 @@ function markRow(r,info){
  if(old?.dataset.stageforceRow===state)return;
  const cell=r.querySelector('.y6')||r.querySelector('.xT')||r.querySelector('.yX');if(!cell)return;
  const wrap=document.createElement('span');wrap.dataset.stageforceRow=state;const root=wrap.attachShadow({mode:'closed'});
- root.innerHTML='<style>span.b{display:inline-flex;align-items:center;max-width:180px;margin-right:6px;padding:0 6px;height:18px;border-radius:9px;font:600 11px/18px "Google Sans",Roboto,Arial,sans-serif;color:#fff;background:linear-gradient(115deg,#6546b3,#3f58a8);white-space:nowrap;vertical-align:middle;box-sizing:border-box}span.n{font-weight:500;margin-left:3px;overflow:hidden;text-overflow:ellipsis}span.mine{box-shadow:inset 0 0 0 1.5px #fff,0 0 0 1.5px #6546b3}span.none{background:#f3b33d;color:#3d2a00}@media (prefers-color-scheme:dark){span.none{background:#f6c35a;color:#2b1d00}}</style><span class="b"><span class="l"></span></span>';
+ root.innerHTML='<style>span.b{display:inline-flex;align-items:center;max-width:180px;margin-right:6px;padding:0 6px;height:18px;border-radius:9px;font:600 11px/18px "Google Sans",Roboto,Arial,sans-serif;color:#fff;background:linear-gradient(115deg,#6546b3,#3f58a8);white-space:nowrap;vertical-align:middle;box-sizing:border-box}span.n{font-weight:500;margin-left:3px;overflow:hidden;text-overflow:ellipsis}span.none{background:#f3b33d;color:#3d2a00}@media (prefers-color-scheme:dark){span.none{background:#f6c35a;color:#2b1d00}}</style><span class="b"><span class="l"></span></span>';
  const badge=root.querySelector('.b'),label=root.querySelector('.l');
  if(o===undefined){label.textContent='✓ CRM';badge.title='In StageForce';}
  else if(o===null){badge.classList.add('none');label.textContent='! CRM:';const n=document.createElement('span');n.className='n';n.textContent='niemand zuständig';badge.append(n);badge.title='In StageForce · niemand ist zuständig';}
- else{if(o.mine)badge.classList.add('mine');label.textContent='✓ CRM:';const n=document.createElement('span');n.className='n';n.textContent=o.name;badge.append(n);badge.title='In StageForce · Zuständig: '+o.name+(o.mine?' (du)':'');}
+ else{label.textContent='✓ CRM:';const n=document.createElement('span');n.className='n';n.textContent=o.name.split(/\s+/)[0];badge.append(n);badge.title='In StageForce · Zuständig: '+o.name+(o.mine?' (du)':'');}
  badge.setAttribute('aria-label',badge.title);
  if(old)old.replaceWith(wrap);else cell.prepend(wrap);
 }
