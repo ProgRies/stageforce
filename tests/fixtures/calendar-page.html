@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><title>Calendar fixture</title>
+<style>
+ /* A stand-in for Google Calendar's week grid and event pop-up: same attributes the extension reads, simple layout. */
+ body{margin:0;font:14px Roboto,sans-serif;background:#fff}
+ #grid{position:relative;display:flex;gap:4px;height:600px;padding:8px}
+ [data-datekey]{position:relative;flex:1;height:100%;background:#f6f6f6}
+ [data-eventid]{position:absolute;left:4px;right:4px;background:#c06fdc;color:#fff;border-radius:6px;padding:4px;overflow:hidden}
+ [data-eventid].collapsed{display:none}
+ [role=dialog]{position:fixed;top:40px;left:40px;width:420px;background:#eef;border-radius:20px;padding:12px}
+ .section{padding:8px 16px}
+</style></head><body>
+<div id="grid"></div>
+<div id="popup"></div>
+<script>
+// Minimal incremental-DOM-style renderer, the way Google's templates patch a container: walk the existing children in order,
+// reuse a node when tag name and key match, otherwise insert a new one, and remove what was not visited.
+function patch(parent, vnodes) {
+ let cur = parent.firstChild;
+ for (const v of vnodes) {
+  let node = cur;
+  if (node && node.nodeName === v.tag.toUpperCase() && (node.__key ?? null) === (v.key ?? null)) cur = cur.nextSibling;
+  else { node = document.createElement(v.tag); node.__key = v.key ?? null; parent.insertBefore(node, cur); }
+  if (v.cls != null) node.className = v.cls;
+  for (const [k, val] of Object.entries(v.attrs || {})) node.setAttribute(k, val);
+  if (node.__html !== v.html) { node.innerHTML = v.html; node.__html = v.html; }
+ }
+ while (cur) { const next = cur.nextSibling; parent.removeChild(cur); cur = next; }
+}
+const key = (y, m, d) => ((y - 1970) << 9) | (m << 5) | d;
+const eid = id => btoa(id + ' christian@stage.test').replace(/=+$/, '');
+window.fixture = {
+ renderWeek(events) {
+  const days = [26, 27, 28];
+  patch(document.getElementById('grid'), days.map(d => ({ tag: 'div', key: 'd' + d, attrs: { 'data-datekey': String(key(2026, 11, d)) }, html: '' })));
+  for (const d of days) {
+   const col = document.querySelector(`[data-datekey="${key(2026, 11, d)}"]`);
+   patch(col, events.filter(e => e.day === d).map(e => ({ tag: 'div', key: e.id, cls: e.cls || '', attrs: { 'data-eventid': eid(e.id), role: 'button', style: `top:${e.top}px;height:${e.height || 60}px` }, html: `<span>${e.title}</span><span>${e.when}</span>` })));
+  }
+ },
+ chip(id) { return document.querySelector(`[data-eventid="${eid(id)}"]`); },
+ // The pop-up renders in two passes, as Calendar does: first what the grid already knows, then the full event with the Meet link.
+ renderPopup(full) {
+  let dlg = document.querySelector('[role=dialog]');
+  if (!dlg) { dlg = document.createElement('div'); dlg.setAttribute('role', 'dialog'); dlg.innerHTML = '<div id="content"></div>'; document.getElementById('popup').append(dlg); }
+  const sections = [{ tag: 'div', cls: 'section header', html: '<span role="heading">Jahresgespräch Stage / LK Ravensburg</span><div>Donnerstag, 26. November · 11:00AM bis 12:00PM</div>' }];
+  if (full) sections.push({ tag: 'div', cls: 'section meet', html: '<a id="join" href="https://meet.google.com/kkt-jtpi-qxd">Mit Google Meet teilnehmen</a><div>meet.google.com/kkt-jtpi-qxd</div>' });
+  sections.push({ tag: 'div', cls: 'section notes', html: 'Besprechungsnotizen machen' }, { tag: 'div', cls: 'section guests', html: '<div data-email="c.arnegger@rv.de">c.arnegger@rv.de</div>' }, { tag: 'div', cls: 'section reminder', html: '10 Minuten vorher' }, { tag: 'div', cls: 'section owner', html: 'Christian Ries' });
+  patch(dlg.querySelector('#content'), sections);
+ },
+ closePopup() { document.getElementById('popup').innerHTML = ''; },
+};
+</script></body></html>

@@ -12,6 +12,12 @@ const visible = e => !!(e && e.getClientRects().length);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const pad = n => String(n).padStart(2, '0');
 const isOurs = n => n?.nodeType === 1 && (n.hasAttribute(OURS) || !!n.closest?.('[' + OURS + ']'));
+// What goes into Calendar's own containers uses a tag name Calendar never renders. Calendar patches a container by reusing
+// the existing child with the same tag in that position; a plain <div> of ours in its place was taken over as the next
+// section (the Google Meet join link) and that section's content ended up inside our element, where nobody can see it.
+const host = (tag, kind) => { const el = document.createElement(tag); el.setAttribute(OURS, kind); el.attachShadow({ mode: 'open' }); return el; };
+// Should Calendar still put anything into one of our elements, it goes back right after it, where it is visible.
+function evict(el) { if (el?.firstChild && el.isConnected) el.after(...el.childNodes); }
 
 async function send(message) {
  try { const r = await chrome.runtime.sendMessage(message); if (!r?.ok) throw Object.assign(new Error(r?.error || 'Extension unavailable. Refresh Google Calendar.'), { code: r?.code || 'request_failed' }); return r.data; }
@@ -84,7 +90,10 @@ function readDialog(d) {
  const own = d.matches('[data-eventid]') ? d : d.querySelector('[data-eventid]');
  const id = eventId(own?.getAttribute('data-eventid') || (Date.now() - lastChipAt < 8000 ? lastChip?.getAttribute('data-eventid') : '') || d.sfEvent?.id);
  let when = null, whenEl = null;
- for (const el of d.querySelectorAll('div,span')) { if (isOurs(el) || el.children.length > 3 || heading?.contains(el)) continue; const t = text(el); if (!t || t.length > 160 || t === title) continue; const w = parseWhen(t); if (w) { when = w; whenEl = el; break; } }
+ // The date line is the smallest element that reads as date and time (or date alone, if no element has a time), not a
+ // container that happens to hold it: the StageForce row goes right after it.
+ let best = Infinity;
+ for (const el of d.querySelectorAll('div,span')) { if (isOurs(el) || el.children.length > 3 || heading?.contains(el)) continue; const t = text(el); if (!t || t.length > 160 || t === title) continue; const w = parseWhen(t); if (!w) continue; const score = (w.time ? 0 : 1000) + t.length; if (score < best) { when = w; whenEl = el; best = score; } }
  if (!when) { const fromChip = Date.now() - lastChipAt < 8000 && lastChip ? { date: datekey(lastChip), time: times(text(lastChip)) } : null; when = fromChip?.date ? fromChip : d.sfEvent?.when || { date: '', time: '' }; }
  return { id, title, date: when.date, time: when.time, links: links(d), guests: guests(d), heading, whenEl, when };
 }
@@ -111,10 +120,11 @@ button:focus-visible{outline:3px solid #aa8bed;outline-offset:2px}
 @media(prefers-reduced-motion:reduce){.row{animation:none}}`;
 const rows = new WeakMap();
 function row(d, info) {
- let host = rows.get(d);
- if (!host || !host.isConnected) { host = document.createElement('div'); host.setAttribute(OURS, 'row'); host.attachShadow({ mode: 'open' }); rows.set(d, host); }
- const at = anchor(d, info); if (at && host.previousElementSibling !== at) at.after(host); else if (!at && !host.isConnected) d.append(host);
- host.classList.toggle('dark', dark()); return host;
+ // The same row for the pop-up's lifetime: when Calendar re-renders and drops it, it goes back in as it was, with no new check.
+ let el = rows.get(d); if (!el) { el = host('stageforce-row', 'row'); rows.set(d, el); }
+ evict(el);
+ const at = anchor(d, info); if (at && el.previousElementSibling !== at) at.after(el); else if (!at && !el.isConnected) d.append(el);
+ el.classList.toggle('dark', dark()); return el;
 }
 function paint(host, html, cls = '') { host.shadowRoot.innerHTML = `<style>${CSS}</style><div class="row ${cls}"><span class="logo">${LOGO}</span>${html}</div>`; return host.shadowRoot; }
 const shortDay = s => s ? s.slice(8, 10) + '.' + s.slice(5, 7) + '.' : '';
@@ -257,7 +267,7 @@ function toast(org) {
 }
 
 // ---- Marks on event boxes ----
-const status = new Map(); let marksBusy = false, marksPausedUntil = 0;
+const status = new Map(); let marksBusy = false, marksAgain = false, marksPausedUntil = 0, marksFailures = 0;
 function setMark(id, logged) { if (!id) return; status.set(id, { logged, at: Date.now() }); paintMarks(); }
 function boxes() { return [...document.querySelectorAll('[data-eventid]')].filter(c => !c.closest('[role="dialog"]') && !isOurs(c) && !c.parentElement?.closest('[data-eventid]') && visible(c)); }
 function boxInfo(c) {
@@ -270,23 +280,30 @@ function paintMarks() {
  for (const c of boxes()) {
   const s = status.get(eventId(c.getAttribute('data-eventid'))), mark = c.querySelector(':scope > [' + OURS + '="mark"]'), r = c.getBoundingClientRect();
   if (!s?.logged || r.width < 40 || r.height < 14) { mark?.remove(); continue; }
-  if (mark) continue;
-  const m = document.createElement('span'); m.setAttribute(OURS, 'mark'); m.title = 'Logged in StageForce';
-  m.attachShadow({ mode: 'open' }).innerHTML = `<style>${MARK_CSS}</style><span aria-label="Logged in StageForce">${LOGO}</span>`;
+  if (mark) { evict(mark); continue; }
+  const m = host('stageforce-mark', 'mark'); m.title = 'Logged in StageForce';
+  m.shadowRoot.innerHTML = `<style>${MARK_CSS}</style><span aria-label="Logged in StageForce">${LOGO}</span>`;
   if (getComputedStyle(c).position === 'static') c.style.position = 'relative';
   c.append(m);
  }
 }
 async function markBoxes() {
- if (marksBusy || document.hidden || Date.now() < marksPausedUntil) return;
+ // Marks already known are always put back, also while a check is running or paused; only asking the CRM waits.
+ if (document.hidden) return; paintMarks();
+ if (marksBusy) { marksAgain = true; return; }
+ if (Date.now() < marksPausedUntil) return;
  const now = Date.now(), wanted = new Map();
  for (const c of boxes()) { const b = boxInfo(c); if (!b.id || wanted.has(b.id)) continue; const s = status.get(b.id); if (!s || now - s.at > 60000) wanted.set(b.id, b); }
- paintMarks(); if (!wanted.size) return;
- const events = [...wanted.values()].slice(0, 150); marksBusy = true;
- try { const r = await api({ action: 'calendarStatus', events }); const logged = new Set(Array.isArray(r?.logged) ? r.logged : []); for (const e of events) status.set(e.id, { logged: logged.has(e.id), at: Date.now() }); }
- catch { marksPausedUntil = Date.now() + 60000; return; }
+ if (!wanted.size) return;
+ const events = [...wanted.values()].slice(0, 150); marksBusy = true; marksAgain = wanted.size > events.length;
+ try { const r = await api({ action: 'calendarStatus', events }); const logged = new Set(Array.isArray(r?.logged) ? r.logged : []); for (const e of events) status.set(e.id, { logged: logged.has(e.id), at: Date.now() }); marksFailures = 0; }
+ catch (error) {
+  // A refreshed page is needed after the extension was reloaded; anything else is tried again soon, then less often.
+  marksAgain = false; if (error?.code === 'reload_required') { marksPausedUntil = Infinity; return; }
+  marksFailures++; marksPausedUntil = Date.now() + Math.min(60000, 4000 * 2 ** (marksFailures - 1)); return;
+ }
  finally { marksBusy = false; }
- paintMarks(); if (wanted.size > events.length) setTimeout(markBoxes, 0);
+ paintMarks(); if (marksAgain) { marksAgain = false; setTimeout(markBoxes, 0); }
 }
 
 // ---- Watching the page ----
@@ -294,7 +311,11 @@ let pending = false;
 function schedule() { if (pending) return; pending = true; setTimeout(() => { pending = false; checkDialogs(); markBoxes(); }, 250); }
 new MutationObserver(records => { if (records.every(r => isOurs(r.target) || [...r.addedNodes, ...r.removedNodes].every(n => isOurs(n)) && (r.addedNodes.length || r.removedNodes.length))) return; schedule(); }).observe(document.body, { childList: true, subtree: true });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) markBoxes(); });
-window.addEventListener('focus', () => { if (Date.now() >= marksPausedUntil) markBoxes(); });
+window.addEventListener('focus', () => markBoxes());
+// Calendar also shows boxes by changing styles and classes, which the observer above does not see (watching every attribute
+// change in Calendar would cost far more). A light pass every few seconds catches those; it asks the CRM only for boxes it
+// has not checked in the last minute, and only while the tab is visible.
+setInterval(schedule, 3000);
 globalThis.stageForceCalendarTest = { eventId, parseWhen, times, datekey, boxInfo, readDialog };
 schedule();
 })();

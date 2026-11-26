@@ -7,7 +7,7 @@ function load(pathname='/calendar/u/0/r/week/2026/11/29'){
  const context={atob,btoa,URL,setTimeout:()=>0,clearTimeout(){},location:{pathname},crypto:globalThis.crypto,
   document:{hidden:false,body:{},addEventListener(){},querySelectorAll:()=>[],querySelector:()=>null},
   MutationObserver:class{observe(){}},getComputedStyle:()=>({backgroundColor:'rgb(255, 255, 255)',position:'absolute'}),matchMedia:()=>({matches:false}),
-  addEventListener(){},chrome:{runtime:{sendMessage:async()=>({ok:false,error:'not connected'})}}};
+  addEventListener(){},setInterval:()=>0,chrome:{runtime:{sendMessage:async()=>({ok:false,error:'not connected'})}}};
  context.window=context;context.globalThis=context;vm.createContext(context);
  vm.runInContext(readFileSync(new URL('../integrations/chrome/calendar.js',import.meta.url),'utf8'),context);return context.stageForceCalendarTest;
 }
