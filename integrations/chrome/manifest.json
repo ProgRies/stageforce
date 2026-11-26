@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Stage Force \u00b7 Gmail & Calendar",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "minimum_chrome_version": "120",
   "description": "Review Gmail messages and Google Calendar meetings and save them to your own Stage Force CRM.",
   "permissions": [

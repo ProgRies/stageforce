@@ -1,6 +1,6 @@
 # Browser extension for Gmail and Google Calendar
 
-The Chrome extension in `integrations/chrome` (version 0.5.1) connects Gmail and Google Calendar to the CRM. It adds an **Add to StageForce** button to every opened email, saves the emails, contacts and meetings you confirm, and starts calls. In Google Calendar it shows in each event pop-up whether the meeting is in an organisation's timeline, logs it on request, and marks logged meetings in the calendar grid. Gmail stays your mailbox: the extension only acts when you click, and it talks to the CRM's API with your personal key. It needs no Google sign-in.
+The Chrome extension in `integrations/chrome` (version 0.5.2) connects Gmail and Google Calendar to the CRM. It adds an **Add to StageForce** button to every opened email, saves the emails, contacts and meetings you confirm, and starts calls. In Google Calendar it shows in each event pop-up whether the meeting is in an organisation's timeline, logs it on request, and marks logged meetings in the calendar grid. Gmail stays your mailbox: the extension only acts when you click, and it talks to the CRM's API with your personal key. It needs no Google sign-in.
 
 ## Install and connect
 

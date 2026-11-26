@@ -21,8 +21,11 @@ async function open(browser,crm={}){
   window.chrome.runtime={sendMessage:async m=>{
    const c=window.crm,p=m.payload||{};c.calls.push(p.action);await new Promise(r=>setTimeout(r,c.delay));
    if(c.fail>0){c.fail--;return{ok:false,error:'CRM unavailable. Check that Docker is running.',code:'connection_unavailable'};}
-   if(p.action==='calendarStatus')return{ok:true,data:{logged:p.events.map(e=>e.id).filter(id=>c.logged.has(id))}};
-   if(p.action==='calendarCheck')return{ok:true,data:{logged:c.logged.has(p.eventId)?{organisation:{id:'o1',name:'Landkreis Ravensburg'},date:p.date,time:p.time,contacts:['C Arnegger'],cancelled:false}:null,candidates:[],participants:[],organisation:null}};
+   if(p.action==='calendarStatus')return{ok:true,data:{logged:p.events.map(e=>e.id).filter(id=>c.logged.has(id)||c.statusLogged)}};
+   const view=name=>({organisation:{id:'o1',name},date:p.date,time:p.time,contacts:['C Arnegger'],cancelled:false});
+   if(p.action==='calendarCheck')return{ok:true,data:{logged:c.logged.has(p.eventId)?view('Landkreis Ravensburg'):null,candidates:[],participants:[{email:'c.arnegger@rv.de',name:'C Arnegger',internal:false,known:false,elsewhere:[]}],organisation:null}};
+   if(p.action==='search')return{ok:true,data:{items:[]}};
+   if(p.action==='calendarLog'){c.lastLog=p;c.logged.add(p.eventId);return{ok:true,data:{saved:true,organisation:{id:'o2',name:p.newOrganisation},logged:view(p.newOrganisation)}};}
    return{ok:true,data:{}};
   }};
  },crm);
@@ -80,5 +83,67 @@ test('marks appear once the CRM answers again after a failed check, without a pa
   const page=await open(browser,{logged:['meeting-a'],fail:1});
   await page.evaluate(w=>fixture.renderWeek(w),week);await inject(page);
   assert.deepEqual(await until(async()=>{const m=await marks(page);return m.length===1&&m;},9000)||await marks(page),['Feedback Meeting']);
+ }finally{await browser.close();}
+});
+
+test('logging a new organisation from the pop-up: typing goes into the card, not into Calendar\'s shortcuts or focus trap',{skip},async()=>{
+ const browser=await chromium.launch();try{
+  const page=await open(browser);
+  await page.evaluate(w=>fixture.renderWeek(w),week);await inject(page);
+  await page.evaluate(()=>{const b=fixture.chip('meeting-b');b.click();b.classList.add('open');fixture.renderPopup(true);});
+  await page.locator('stageforce-row').getByText('Log anyway').click();
+  const org=page.locator('[data-stageforce-calendar="card"] #org');
+  await org.click();await page.keyboard.type('Theater Weimar cwdm',{delay:15});
+  assert.equal(await org.inputValue(),'Theater Weimar cwdm','every key lands in the organisation field');
+  assert.deepEqual(await page.evaluate(()=>fixture.opened),[],'no Calendar shortcut fired behind the card');
+  await page.locator('[data-stageforce-calendar="card"]').getByText('Create “Theater Weimar cwdm”').click();
+  // The other fields take typing and clicks too, and Calendar's pop-up behind the card stays as it was.
+  const title=page.locator('[data-stageforce-calendar="card"] #title');
+  await title.click();await page.keyboard.press('End');await page.keyboard.type(' 2026');
+  assert.equal(await title.inputValue(),'Jahresgespräch Stage / LK Ravensburg 2026');
+  assert.equal(await page.evaluate(()=>!!document.querySelector('[role=dialog]')),true,'the event pop-up was not closed by clicks in the card');
+  await page.locator('[data-stageforce-calendar="card"] #save').click();
+  assert.ok(await until(()=>page.evaluate(()=>!document.querySelector('[data-stageforce-calendar="card"]'))),'card closes after logging');
+  assert.equal(await page.evaluate(()=>crm.lastLog?.newOrganisation),'Theater Weimar cwdm');
+  assert.deepEqual(await until(async()=>{const m=await marks(page);return m.length===1&&m;})||await marks(page),['Jahresgespräch']);
+  assert.match(await page.evaluate(()=>document.querySelector('stageforce-row')?.shadowRoot?.textContent||''),/Logged in StageForce/);
+  assert.deepEqual(await page.evaluate(()=>fixture.opened),[]);
+ }finally{await browser.close();}
+});
+
+test('Escape closes only the card; the event pop-up and Calendar stay as they were',{skip},async()=>{
+ const browser=await chromium.launch();try{
+  const page=await open(browser);
+  await page.evaluate(w=>fixture.renderWeek(w),week);await inject(page);
+  await page.evaluate(()=>{fixture.chip('meeting-b').click();fixture.renderPopup(true);});
+  await page.locator('stageforce-row').getByText('Log anyway').click();
+  await page.locator('[data-stageforce-calendar="card"] #org').waitFor();
+  await page.keyboard.press('Escape');
+  assert.equal(await page.evaluate(()=>!!document.querySelector('[data-stageforce-calendar="card"]')),false);
+  assert.equal(await page.evaluate(()=>!!document.querySelector('[role=dialog] #join')),true);
+ }finally{await browser.close();}
+});
+
+test('marks never blink when Calendar re-renders a box: they are back before the next frame',{skip},async()=>{
+ const browser=await chromium.launch();try{
+  const page=await open(browser,{logged:['meeting-a','meeting-b']});
+  await page.evaluate(w=>fixture.renderWeek(w),week);await inject(page);
+  assert.ok(await until(async()=>(await marks(page)).length===2));
+  // Calendar re-renders boxes (selection, hover, the time line): a patch drops the extra child, here our mark.
+  const seen=await page.evaluate(async w=>{const out=[];for(let i=0;i<5;i++){fixture.renderWeek(w.map(e=>({...e,cls:i%2?'selected':'',when:e.when+(i%2?' ':'')})));await new Promise(r=>requestAnimationFrame(()=>{out.push(['meeting-a','meeting-b'].every(id=>fixture.chip(id).querySelector('[data-stageforce-calendar="mark"]')?.shadowRoot));r();}));}return out;},week);
+  assert.deepEqual(seen,[true,true,true,true,true]);
+ }finally{await browser.close();}
+});
+
+test('opening a pop-up whose check finds nothing does not take away a mark the grid check found',{skip},async()=>{
+ const browser=await chromium.launch();try{
+  const page=await open(browser,{logged:['meeting-b']});
+  await page.evaluate(w=>fixture.renderWeek(w),week);await inject(page);
+  assert.ok(await until(async()=>(await marks(page)).length===1));
+  // The grid check matched by title and time; the pop-up check (by guests) does not find it.
+  await page.evaluate(()=>{crm.logged.delete('meeting-b');window.crm.statusLogged=true;fixture.chip('meeting-b').click();fixture.renderPopup(true);});
+  await until(()=>page.evaluate(()=>/No client/.test(document.querySelector('stageforce-row')?.shadowRoot?.textContent||'')));
+  await page.waitForTimeout(400);
+  assert.deepEqual(await marks(page),['Jahresgespräch']);
  }finally{await browser.close();}
 });
