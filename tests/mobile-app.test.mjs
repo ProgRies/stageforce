@@ -111,7 +111,7 @@ test('the caller search finds organisations by name and by the last digits of a 
  const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Berlin'}).format(new Date());
  db.prepare("INSERT INTO followups VALUES('f1',?,'Rückruf',?,?,NULL)").run(b.id,today,user.id);
  const c=startIncoming(db,user,call({organisationId:a.id,contactId:contacts(db,a.id)[0].id}));saveCall(db,user,{callId:c.callId,outcome:'talked'});
- const home=mobileHome(db,user);assert.deepEqual(home.due.map(o=>o.name),['Hochschule Bremen']);assert.deepEqual(home.recent.map(o=>o.name),['Stadt Lüneburg']);
+ const home=mobileHome(db,user);assert.deepEqual(home.due,[],'today\'s calls are in the calendar list, not a block of their own');assert.deepEqual(home.recent.map(o=>o.name),['Stadt Lüneburg']);
  db.close();
 });
 
@@ -129,13 +129,13 @@ test('the server serves the phone app under /m/ and leaves the desktop page as i
  }finally{await new Promise(r=>server.close(r));db.close();rmSync(dir,{recursive:true,force:true});}
 });
 
-test('the phone app lists due calls of my organisations, also a date set by hand or a call a colleague logged',async()=>{
- const{db,user}=await team();const sid=await addUser(db,'sam@example.test','Sam',password);enableMfa(db,sid,newSecret());const sam=db.prepare('SELECT * FROM users WHERE id=?').get(sid);
- const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Berlin'}).format(new Date());
- const mine=createOrg(db,user,'Meine Stadt'),theirs=createOrg(db,user,'Sams Stadt');db.prepare('UPDATE organisations SET owner=? WHERE id=?').run(user.id,mine.id);db.prepare('UPDATE organisations SET owner=? WHERE id=?').run(sam.id,theirs.id);
- // Planned by hand (no one attached) and planned by a colleague's call: both belong to the organisation's owner.
- db.prepare("INSERT INTO followups VALUES('f1',?,'Rückruf',?,'',NULL)").run(mine.id,today);db.prepare("INSERT INTO followups VALUES('f2',?,'Rückruf',?,?,NULL)").run(theirs.id,today,user.id);
- assert.deepEqual(mobileHome(db,user).due.map(o=>o.name),['Meine Stadt']);assert.deepEqual(mobileHome(db,sam).due.map(o=>o.name),['Sams Stadt']);
+test('the phone start screen keeps an organisation that is due today in Zuletzt gesprochen',async()=>{
+ const{db,user}=await team();const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Berlin'}).format(new Date());
+ const org=createOrg(db,user,'Meine Stadt');addContact(db,org.id,{name:'Anna Becker',telefone:['+49 4131 309 3344']},true);db.prepare('UPDATE organisations SET owner=? WHERE id=?').run(user.id,org.id);
+ const c=startIncoming(db,user,call({organisationId:org.id,contactId:contacts(db,org.id)[0].id}));saveCall(db,user,{callId:c.callId,outcome:'talked'});
+ db.prepare("INSERT INTO followups VALUES('f1',?,'Rückruf',?,?,NULL)").run(org.id,today,user.id);
+ const home=mobileHome(db,user);assert.deepEqual(home.due,[]);assert.deepEqual(home.recent.map(o=>o.name),['Meine Stadt']);
+ db.close();
 });
 test('the phone app opens one organisation by id, with its contacts and current version',async()=>{const{db,user}=await team();try{
  const org=createOrg(db,user,'Stadtwerke Beispiel');addContact(db,org.id,{name:'Pat Example',telefone:['+49 30 1234567']},true);

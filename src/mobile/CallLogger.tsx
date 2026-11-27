@@ -1,5 +1,5 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {Phone,PhoneIncoming,MessageSquareText,UserPlus,Search,X,ChevronLeft,Settings,LogOut,Trash2,Sun,Moon,Monitor,Flag,MessageCircleCheck,CalendarClock,CalendarCheck,Mail,ThumbsDown,PhoneMissed,Check,Clock,History,LoaderCircle,Pause,Play,Building2,PhoneOutgoing,Pencil,Plus,type LucideIcon} from 'lucide-react';
+import {Phone,PhoneIncoming,MessageSquareText,UserPlus,Search,X,ChevronLeft,Settings,LogOut,Trash2,Sun,Moon,Monitor,Flag,MessageCircleCheck,CalendarClock,CalendarCheck,Mail,ThumbsDown,PhoneMissed,Check,History,LoaderCircle,Pause,Play,Building2,PhoneOutgoing,Pencil,Plus,type LucideIcon} from 'lucide-react';
 import TodaySchedule from './TodaySchedule';
 import OrgTimeline from './OrgTimeline';
 import ContactSheet from './ContactSheet';
@@ -75,9 +75,8 @@ function Home({onPick,onOpen,onNew}:{onPick:(org:Caller)=>void;onOpen:(id:string
   <section className="m-hero"><span className="m-eyebrow"><PhoneIncoming size={15} aria-hidden="true"/>Anruf loggen</span><h1>Wer ruft an?</h1></section>
   <label className="m-search glass"><Search size={20} aria-hidden="true"/><input type="search" enterKeyHint="search" autoComplete="off" autoCorrect="off" spellCheck={false} placeholder="Name, Organisation oder Nummer" value={query} onChange={e=>setQuery(e.target.value)} aria-label="Anrufer suchen"/>{searching?<LoaderCircle size={18} className="m-spin" aria-hidden="true"/>:query&&<button type="button" className="m-clear" aria-label="Suche leeren" onClick={()=>setQuery('')}><X size={16}/></button>}</label>
   {query.trim()?<div className="m-list glass">{results?.map(org=><OrgRow key={org.id} org={org} onPick={()=>onPick(org)}/>)}{empty&&<p className="m-empty">Nichts gefunden. Ein neuer Lead?</p>}</div>
-  :home&&(home.due.length||home.recent.length)?<>
-   {home.due.length>0&&<><h2 className="m-label"><Clock size={14} aria-hidden="true"/>Heute fällig</h2><div className="m-list glass">{home.due.map(org=><OrgRow key={org.id} org={org} onPick={()=>onPick(org)}/>)}</div></>}
-   {home.recent.length>0&&<><h2 className="m-label"><History size={14} aria-hidden="true"/>Zuletzt gesprochen</h2><div className="m-list glass">{home.recent.map(org=><OrgRow key={org.id} org={org} onPick={()=>onPick(org)}/>)}</div></>}
+  :home?.recent.length?<>
+   <h2 className="m-label"><History size={14} aria-hidden="true"/>Zuletzt gesprochen</h2><div className="m-list glass">{home.recent.map(org=><OrgRow key={org.id} org={org} onPick={()=>onPick(org)}/>)}</div>
   </>:home&&<p className="m-hint">Tippe ein paar Buchstaben des Namens oder die letzten Ziffern der Nummer.</p>}
   {!query.trim()&&<TodaySchedule onPick={item=>onOpen(item.organisationId)}/>}
   <div className="m-dock"><button type="button" className={`m-primary ${empty?'is-suggested':''}`} onClick={()=>onNew(empty?query.trim():'')}><UserPlus size={21} aria-hidden="true"/>Neuer Lead</button></div>
