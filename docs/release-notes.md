@@ -1,3 +1,10 @@
+# StageForce 0.3.30 · Shorter start screen in the phone app
+
+Publishes `ghcr.io/progries/stageforce:0.3.30`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.30` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. No database change (schema still 13), no new settings, and the browser extension is unchanged (0.5.2).
+
+- **Phone app start screen:** the "Heute fällig" block is gone. The screen now shows the search, then "Zuletzt gesprochen", then today's calls and meetings from the Follow-ups calendar, which already listed every call due today.
+- **Zuletzt gesprochen** now also shows an organisation that has a call due today; before, it was left out because it appeared in "Heute fällig".
+
 # StageForce 0.3.29 · Typing in the Calendar card works, calmer marks
 
 Publishes `ghcr.io/progries/stageforce:0.3.29`. Back up first, set `CRM_IMAGE=ghcr.io/progries/stageforce:0.3.29` in the server's `.env`, then `docker compose pull` and `docker compose up -d`. Nobody is signed out. No database change (schema still 13), no new settings and no server change; this release carries browser extension 0.5.2. Everyone reloads the extension.
